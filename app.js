@@ -838,14 +838,16 @@ const BUILD_PACKAGES = {
 
 // Vehicle models referenced by the header menus and pillar pages.
 // `slug` links to a PRODUCTS_DATA page when one exists; `image: null` shows a placeholder.
+// `label` (optional) is the short name shown in menus and on the pillar pages (e.g. "2 Seater");
+// `name` stays the full model name used in quotes and on the model pages.
 const VEHICLE_MODELS = {
-    'g-tempo-2':     { name: 'Tempo 2',             image: 'image/Products/Premium.png',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
-    'g-tempo-2-2':   { name: 'Tempo 2+2',           image: 'image/Products/Tempo 2+2 - Golf.png',       slug: 'golfer-tempo-2-2' },
-    'g-tempo-4':     { name: 'Tempo 4',             image: 'image/Products/Club Car 4.png',             slug: 'golfer-tempo-4' },
-    'l-tempo-2':     { name: 'Tempo 2',             image: 'image/Products/Base +.png',                 slug: 'lifestyle-tempo-2' },
-    'l-tempo-2-2':   { name: 'Tempo 2+2',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2' },
-    'l-tempo-4':     { name: 'Tempo 4',             image: 'image/Products/Club Car 4.png',             slug: 'lifestyle-tempo-4' },
-    'l-tempo-4-2':   { name: 'Tempo 4+2',           image: 'image/Products/4 plus2 Lifted.png',         slug: 'lifestyle-tempo-4-2' },
+    'g-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/Premium.png',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
+    'g-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Golf.png',       slug: 'golfer-tempo-2-2' },
+    'g-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'golfer-tempo-4' },
+    'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/Base +.png',                 slug: 'lifestyle-tempo-2' },
+    'l-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2' },
+    'l-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'lifestyle-tempo-4' },
+    'l-tempo-4-2':   { name: 'Tempo 4+2', label: '4+2 Seater',           image: 'image/Products/4 plus2 Lifted.png',         slug: 'lifestyle-tempo-4-2' },
     'villager-6':    { name: 'Villager 6',          image: 'image/Products/Villager 6.png',             slug: 'villager-6' },
     'villager-8':    { name: 'Villager 8',          image: 'image/Products/Villager 8.png',             slug: 'villager-8' },
     'transporter-4': { name: 'Transporter 4',       image: 'image/Products/Transporter 4.png',          slug: 'transporter-400' },
@@ -863,11 +865,11 @@ const VEHICLE_MODELS = {
     'landscaping':   { name: 'Landscaping Cart',    image: null,                                        slug: null },
     'cafe-express':  { name: 'Café Express',        image: 'image/Products/Cafe Express.png',           slug: 'cafe-express' },
     'custom':        { name: 'Custom Build',        image: null,                                        slug: null },
-    'r-tempo-2':     { name: 'Remanufactured 2-Seater',        image: 'image/Products/reman 2.png',     slug: null },
-    'r-tempo-2-custom': { name: 'Remanufactured 2-Seater (Custom Color)', image: 'image/Products/reman 3.png', slug: null },
-    'r-tempo-2-2':   { name: 'Remanufactured 2+2',             image: 'image/Products/reman 4.png',     slug: null },
-    'r-tempo-2-2-lifted': { name: 'Remanufactured 2+2 Lifted', image: 'image/Products/reman 5.png',     slug: null },
-    'r-tempo-4':     { name: 'Remanufactured 4-Seater',        image: 'image/Products/reman 1.png',     slug: null }
+    'r-tempo-2':     { name: 'Remanufactured 2-Seater', label: '2 Seater',        image: 'image/Products/reman 2.png',     slug: null },
+    'r-tempo-2-custom': { name: 'Remanufactured 2-Seater (Custom Color)', label: '2 Seater (Custom Color)', image: 'image/Products/reman 3.png', slug: null },
+    'r-tempo-2-2':   { name: 'Remanufactured 2+2', label: '2+2 Seater',             image: 'image/Products/reman 4.png',     slug: null },
+    'r-tempo-2-2-lifted': { name: 'Remanufactured 2+2 Lifted', label: '2+2 Seater, Lifted', image: 'image/Products/reman 5.png',     slug: null },
+    'r-tempo-4':     { name: 'Remanufactured 4-Seater', label: '4 Seater',        image: 'image/Products/reman 1.png',     slug: null }
 };
 
 // Menu hierarchy: pillar -> subcategory -> group -> model keys. Drives the header dropdowns, the mobile
@@ -1391,8 +1393,8 @@ function modelMenuItem(seg, sub, key, className) {
     const model = VEHICLE_MODELS[key];
     const badge = model.badge ? ` <span class="text-green-text text-xs font-medium">${model.badge}</span>` : '';
     return model.slug
-        ? `<a href="${routeHref('product-details', model.slug)}" data-route="product-details" data-slug="${model.slug}" class="${className}" role="menuitem">${model.name}${badge}</a>`
-        : `<button type="button" onclick="${modelMenuAction(seg, sub, key)}" class="${className}" role="menuitem">${model.name}${badge}</button>`;
+        ? `<a href="${routeHref('product-details', model.slug)}" data-route="product-details" data-slug="${model.slug}" class="${className}" role="menuitem">${model.label || model.name}${badge}</a>`
+        : `<button type="button" onclick="${modelMenuAction(seg, sub, key)}" class="${className}" role="menuitem">${model.label || model.name}${badge}</button>`;
 }
 
 // Hover/focus sub-menu for a pillar (header nav and Cart page tabs)
@@ -3657,7 +3659,8 @@ function renderSegmentModelCard(segmentId, subId, modelKey) {
                     : '<span class="text-sm text-ink-2">Photo to follow</span>'}
             </div>
             <div class="pt-5 flex flex-col gap-2 flex-1">
-                <h3 class="type-md text-ink">${model.name}${model.badge ? ` <span class="font-sans text-sm text-green-text align-middle">${model.badge}</span>` : ''}</h3>
+                <h3 class="type-md text-ink">${model.label || model.name}${model.badge ? ` <span class="font-sans text-sm text-green-text align-middle">${model.badge}</span>` : ''}</h3>
+                ${model.label ? `<p class="text-sm text-mute -mt-1">${model.name}</p>` : ''}
                 ${product ? `<p class="text-[0.9375rem]">${product.tagline}</p>` : ''}
                 ${product && product.buildSet ? `<p class="text-sm text-mute">${BUILD_SETS[product.buildSet].builds.map(b => b.name).join(' · ')}</p>` : ''}
                 ${isReman ? '<p class="text-sm text-mute">Ask for current units, rebuild scope and warranty.</p>' : ''}
