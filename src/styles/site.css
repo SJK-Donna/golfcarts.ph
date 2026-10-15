@@ -741,6 +741,193 @@
     .opt-row-nested {
         border-top-style: dashed;
     }
+    /* ---- Model page configurator: preview + steps in one screen. 7.5rem = site header (4rem) + section bar ---- */
+    .configurator {
+        scroll-margin-top: 7.5rem;
+        background: var(--paper);
+    }
+    /* Phones: the preview stays pinned under the section bar while the steps scroll under it */
+    .cfg-stage {
+        position: sticky;
+        top: 7.5rem;
+        z-index: 5;
+        display: flex;
+        flex-direction: column;
+        padding: 0.75rem 1.25rem;
+        background: var(--stone);
+    }
+    .cfg-photo {
+        height: 28svh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .cfg-photo img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    .cfg-photo-note {
+        margin-top: 0.25rem;
+        font-size: 0.75rem;
+    }
+    .cfg-chips {
+        display: none;
+    }
+    .cfg-panel {
+        display: flex;
+        flex-direction: column;
+    }
+    .cfg-steps {
+        display: flex;
+        gap: 0.25rem;
+        padding: 0 0.75rem;
+        border-bottom: 1px solid var(--line);
+        background: var(--paper);
+    }
+    .cfg-step {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--ink-2);
+        transition: color 0.25s var(--ease);
+    }
+    .cfg-step:hover {
+        color: var(--ink);
+    }
+    .cfg-step-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.375rem;
+        height: 1.375rem;
+        border: 1px solid var(--line);
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        transition: background-color 0.25s var(--ease), border-color 0.25s var(--ease), color 0.25s var(--ease);
+    }
+    .cfg-step-active {
+        color: var(--ink);
+    }
+    .cfg-step-active::after {
+        content: '';
+        position: absolute;
+        left: 0.5rem;
+        right: 0.5rem;
+        bottom: -1px;
+        height: 2px;
+        background: var(--ink);
+    }
+    .cfg-step-active .cfg-step-num {
+        background: var(--green);
+        border-color: var(--green);
+        color: var(--on-green);
+    }
+    .cfg-body {
+        padding: 1.5rem 1.25rem 2rem;
+    }
+    /* Phones: the build summary and Back / Next stay at the bottom of the screen */
+    .cfg-footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 6;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.75rem 1.25rem;
+        border-top: 1px solid var(--line);
+        background: var(--paper);
+    }
+    .cfg-summary {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .cfg-btn {
+        min-height: 2.75rem;
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+    }
+    .cfg-btn[hidden] {
+        display: none;
+    }
+    /* In the narrow step panel each equipment label sits above its choices */
+    .cfg-panel .opt-row {
+        grid-template-columns: 1fr;
+        padding: 0.875rem 0;
+    }
+    .cfg-pane h3.type-md {
+        font-size: 1.5rem;
+    }
+    @media (min-width: 1024px) {
+        /* Desktop: exactly one screen high; only the step panel scrolls */
+        .configurator {
+            display: grid;
+            grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+            height: calc(100svh - 7.5rem - 1px);
+            min-height: 34rem;
+        }
+        .cfg-stage {
+            position: relative;
+            top: auto;
+            min-height: 0;
+            padding: 2rem 3rem 1.5rem;
+        }
+        .cfg-photo {
+            flex: 1;
+            height: auto;
+            min-height: 0;
+        }
+        .cfg-photo-note {
+            font-size: 0.875rem;
+        }
+        .cfg-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--line);
+        }
+        .cfg-panel {
+            min-height: 0;
+            border-left: 1px solid var(--line);
+        }
+        .cfg-steps {
+            padding: 0 1.5rem;
+        }
+        .cfg-step {
+            padding: 1.125rem 0.75rem;
+        }
+        .cfg-step-active::after {
+            left: 0.75rem;
+            right: 0.75rem;
+        }
+        .cfg-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding: 2rem;
+        }
+        .cfg-footer {
+            position: static;
+            padding: 1rem 2rem;
+        }
+    }
+    @media (min-width: 1280px) {
+        .cfg-panel .opt-row {
+            grid-template-columns: 9rem 1fr;
+        }
+        .cfg-panel .opt-row-nested {
+            grid-template-columns: 7.5rem 1fr;
+        }
+    }
     .detail-trim-dot {
         width: 1.125rem;
         height: 1.125rem;

@@ -1160,7 +1160,7 @@ function buildYourCart() {
     // The color picked in the homepage preview starts the builder
     if (currentPage === 'home') pendingBodyColor = homePreviewColor;
     navigateTo('product-details', 'golfer-tempo-2');
-    setTimeout(() => scrollToDetailSection('build'), 350);
+    setTimeout(() => openConfigurator('build'), 350);
 }
 
 // ==========================================
@@ -3459,7 +3459,7 @@ function getTempoOptionRows(product) {
 function getBuildSummaryText() {
     const product = currentDetailProduct();
     const buildSet = product && getProductBuildSet(product);
-    if (!buildSet) return '';
+    if (!buildSet) return product ? product.name : '';
     const level = buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0];
     const parts = [`${product.name} ${level.name}`];
     if (isTempoVersion(product)) {
@@ -3630,7 +3630,7 @@ function renderTempoOptions(product) {
     const subs = getTempoSubGroups(product, i, o);
     const sections = [...new Set(groups.map(g => g.section))];
     return `
-        <p class="text-sm text-ink-2">Showing the <span class="text-ink font-medium">${product.name} ${level.name}</span> build. <button type="button" onclick="scrollToDetailSection('build')" class="link">Change build</button></p>
+        <p class="text-sm text-ink-2">Showing the <span class="text-ink font-medium">${product.name} ${level.name}</span> build. <button type="button" onclick="showCfgStep('build')" class="link">Change build</button></p>
         ${sections.map(section => `
             <div class="mt-10">
                 <h3 class="type-md text-ink pb-2">${section}</h3>
@@ -3693,17 +3693,81 @@ function renderBuildCompareTable(buildSet) {
         </div>`;
 }
 
-function renderBuildSection(product, buildSet) {
-    return `
-        <section id="build" class="detail-section rise scroll-mt-32 home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12">
-            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-12">
-                <h2 class="type-xl text-ink lg:col-span-7">${buildSet.title}</h2>
-                ${buildSet.note ? `<p class="measure lg:col-span-5">${buildSet.note}</p>` : ''}
-            </div>
+// Steps of the model page configurator: build level (when the model has builds), colors, and equipment
+// (Tempo builds)
+function getConfiguratorSteps(product) {
+    return [
+        getProductBuildSet(product) && { id: 'build', label: 'Build' },
+        { id: 'colors', label: 'Colors' },
+        isTempoVersion(product) && { id: 'options', label: 'Equipment' }
+    ].filter(Boolean);
+}
 
-            <div class="grid grid-cols-1 md:grid-cols-${buildSet.builds.length} gap-4" role="radiogroup" aria-label="Build level">
+let cfgStep = null;
+
+// Shows one configurator step; the panel scrolls back to its top so each step starts in view
+function showCfgStep(id) {
+    const product = currentDetailProduct();
+    if (!product) return;
+    const steps = getConfiguratorSteps(product);
+    const index = Math.max(0, steps.findIndex(st => st.id === id));
+    cfgStep = steps[index].id;
+    document.querySelectorAll('.cfg-step').forEach(tab => {
+        const active = tab.dataset.step === cfgStep;
+        tab.classList.toggle('cfg-step-active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.tabIndex = active ? 0 : -1;
+    });
+    document.querySelectorAll('.cfg-pane').forEach(pane => { pane.hidden = pane.dataset.step !== cfgStep; });
+    const body = document.getElementById('cfg-body');
+    if (body) body.scrollTop = 0;
+    const back = document.getElementById('cfg-back');
+    if (back) back.hidden = index === 0;
+    const next = document.getElementById('cfg-next');
+    if (next) next.textContent = index < steps.length - 1 ? `Next: ${steps[index + 1].label}` : 'Get a quote';
+}
+
+function cfgNext() {
+    const product = currentDetailProduct();
+    const steps = getConfiguratorSteps(product);
+    const index = steps.findIndex(st => st.id === cfgStep);
+    if (index < steps.length - 1) showCfgStep(steps[index + 1].id);
+    else requestQuoteInColor();
+}
+
+function cfgBack() {
+    const steps = getConfiguratorSteps(currentDetailProduct());
+    const index = steps.findIndex(st => st.id === cfgStep);
+    if (index > 0) showCfgStep(steps[index - 1].id);
+}
+
+// Opens the configurator on a step and brings it into view
+function openConfigurator(step) {
+    showCfgStep(step);
+    scrollToDetailSection('configure');
+}
+
+// Arrow keys move between the step tabs
+function cfgStepKey(event) {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    const tabs = [...document.querySelectorAll('.cfg-step')];
+    const i = tabs.findIndex(t => t.dataset.step === cfgStep) + (event.key === 'ArrowRight' ? 1 : -1);
+    const tab = tabs[(i + tabs.length) % tabs.length];
+    showCfgStep(tab.dataset.step);
+    tab.focus();
+}
+
+// The configurator: preview on the left, the steps on the right. On desktop it is one screen high and only the
+// step panel scrolls; on phones the preview stays pinned at the top and the step footer at the bottom.
+function renderConfigurator(product, { buildSet, startColor, accessoryCount }) {
+    const steps = getConfiguratorSteps(product);
+    cfgStep = steps[0].id;
+    setTimeout(() => showCfgStep(cfgStep), 0);
+    const panes = {
+        build: () => `
+            <div class="space-y-3" role="radiogroup" aria-label="Build level">
                 ${buildSet.builds.map(b => `
-                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} text-left p-6 lg:p-8 flex flex-col gap-5">
+                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} w-full text-left p-5 flex flex-col gap-3">
                         <span class="flex items-start justify-between gap-4">
                             <span>
                                 <span class="block type-md text-ink">${product.name} ${b.name}</span>
@@ -3711,31 +3775,54 @@ function renderBuildSection(product, buildSet) {
                             </span>
                             <span class="build-card-check" aria-hidden="true"></span>
                         </span>
-                        <ul class="home-list text-[0.9375rem]">
+                        <ul class="home-list text-sm">
                             ${b.includes.map(x => `<li>${x}</li>`).join('')}
                         </ul>
-                        ${b.note ? `<span class="block text-sm text-mute mt-auto">${b.note}</span>` : ''}
-                        ${b.proposed ? '<span class="block text-sm text-green-text font-medium">Proposed package, confirmed in your quote</span>' : ''}
+                        ${b.note ? `<span class="block text-sm text-mute">${b.note}</span>` : ''}
                     </button>
                 `).join('')}
             </div>
-
-            <div class="mt-16 bg-band text-on-band p-6 sm:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                    <p class="text-sm text-on-band-mute">Your build</p>
-                    <p id="build-summary-line" class="type-md mt-2" aria-live="polite"></p>
-                    <p class="text-sm text-on-band-mute mt-3 measure">${isTempoVersion(product)
-                        ? 'Choose colors, equipment and upgrades next, then send it to us.'
-                        : 'Choose colors next, then send it to us.'} We confirm inclusions, pricing and availability in the quote.</p>
+            ${buildSet.confirmed ? '' : '<p class="text-sm text-mute mt-4">Build names and package contents are proposed and may change.</p>'}`,
+        colors: () => `<div id="detail-color-pickers" class="space-y-8">${renderDetailColorPickers(product)}</div>`,
+        options: () => `<div id="detail-options">${renderTempoOptions(product)}</div>`
+    };
+    return `
+        <section id="configure" class="detail-section configurator border-t border-line" aria-label="Build your ${product.name}">
+            <div class="cfg-stage">
+                <div class="cfg-photo">
+                    <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : product.image}" alt="${product.name} color preview">
                 </div>
-                <div class="flex flex-wrap gap-3 flex-shrink-0">
-                    <button type="button" onclick="scrollToDetailSection('colors')" class="btn btn-primary">Choose colors</button>
-                    <button type="button" onclick="requestQuoteInColor()" class="btn btn-on-dark">Get a quote</button>
+                <p id="detail-color-photo-note" class="${startColor && !startColor.image ? '' : 'hidden'} cfg-photo-note text-sm text-ink-2">Photo shows a standard finish</p>
+                <!-- Live summary of the selected body / seat / canopy colors -->
+                <div id="detail-build-summary" class="cfg-chips" aria-live="polite"></div>
+            </div>
+
+            <div class="cfg-panel">
+                <div class="cfg-steps" role="tablist" aria-label="Build steps" onkeydown="cfgStepKey(event)">
+                    ${steps.map((st, i) => `
+                        <button type="button" role="tab" id="cfg-tab-${st.id}" aria-controls="cfg-pane-${st.id}" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-step="${st.id}" onclick="showCfgStep('${st.id}')" class="cfg-step ${i === 0 ? 'cfg-step-active' : ''}">
+                            <span class="cfg-step-num">${i + 1}</span>${st.label}
+                        </button>`).join('')}
+                </div>
+                <div id="cfg-body" class="cfg-body">
+                    ${steps.map((st, i) => `
+                        <div id="cfg-pane-${st.id}" role="tabpanel" aria-labelledby="cfg-tab-${st.id}" data-step="${st.id}" class="cfg-pane" ${i === 0 ? '' : 'hidden'}>
+                            ${panes[st.id]()}
+                        </div>`).join('')}
+                    ${accessoryCount ? `<p class="mt-8 text-sm text-ink-2">Need something else? <button type="button" onclick="addAccessoriesFromDetail()" class="link">Browse ${accessoryCount} accessories</button></p>` : ''}
+                </div>
+                <div class="cfg-footer">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs text-mute">Your build</p>
+                        <p id="build-summary-line" class="text-sm font-medium text-ink cfg-summary" aria-live="polite"></p>
+                    </div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button type="button" id="cfg-back" onclick="cfgBack()" class="btn btn-outline cfg-btn" hidden>Back</button>
+                        <button type="button" id="cfg-next" onclick="cfgNext()" class="btn btn-primary cfg-btn">Next</button>
+                    </div>
                 </div>
             </div>
-            ${buildSet.confirmed ? '' : '<p class="text-sm text-mute mt-4">Build names and package contents are proposed and may change.</p>'}
-        </section>
-    `;
+        </section>`;
 }
 
 function showDetailImage(button, src) {
@@ -3855,9 +3942,7 @@ function renderProductDetailsPage() {
 
     const tabs = [
         { id: 'overview', label: 'Overview' },
-        ...(buildSet ? [{ id: 'build', label: 'Build' }] : []),
-        ...(isVehicle ? [{ id: 'colors', label: 'Colors' }] : []),
-        ...(tempo ? [{ id: 'options', label: 'Equipment' }] : []),
+        ...(isVehicle ? [{ id: 'configure', label: buildSet ? 'Build' : 'Colors' }] : []),
         { id: 'features', label: 'Highlights' },
         { id: 'specifications', label: 'Specifications' }
     ];
@@ -3887,7 +3972,7 @@ function renderProductDetailsPage() {
                     <p class="text-sm text-ink-2">${product.priceLabel === 'Inquire for Price' || !product.priceLabel ? 'Price on request' : product.priceLabel}</p>
                     <div class="flex flex-wrap items-center gap-4 pt-2">
                         ${buildSet
-                            ? `<button type="button" onclick="scrollToDetailSection('build')" class="btn btn-primary">Build your ${product.name}</button>
+                            ? `<button type="button" onclick="openConfigurator('build')" class="btn btn-primary">Build your ${product.name}</button>
                                <button type="button" onclick="openQuoteModal('${safeName}')" class="btn btn-outline">Get a quote</button>`
                             : `<button type="button" onclick="openQuoteModal('${safeName}')" class="btn btn-primary">Get a quote</button>`}
                     </div>
@@ -3941,57 +4026,7 @@ function renderProductDetailsPage() {
             </div>
         </div>
 
-        ${buildSet ? `<div class="border-t border-line">${renderBuildSection(product, buildSet)}</div>` : ''}
-
-        ${isVehicle ? `
-        <!-- Colors: the preview stays pinned on desktop while the pickers scroll past it -->
-        <section id="colors" class="detail-section rise scroll-mt-32 home-section border-t border-line">
-            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
-                <h2 class="type-xl text-ink mb-12">${bodyColors.length ? 'Your color. Your seat.' : 'Make it yours.'}</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
-                    <div class="lg:col-span-7 lg:sticky lg:top-36">
-                        <div class="relative bg-stone px-4 sm:px-8 py-8">
-                            <div class="relative aspect-[4/3] overflow-hidden flex items-center justify-center">
-                                <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : product.image}" alt="${product.name} color preview" class="w-full h-full object-contain">
-                            </div>
-                            <p id="detail-color-photo-note" class="${startColor && !startColor.image ? '' : 'hidden'} text-sm text-ink-2 mt-2">Photo shows a standard finish</p>
-                            <!-- Live summary of the selected body / seat / canopy colors -->
-                            <div id="detail-build-summary" class="flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 mt-4" aria-live="polite"></div>
-                        </div>
-                    </div>
-
-                    <div class="lg:col-span-5 space-y-10">
-                        <div id="detail-color-pickers" class="space-y-10">${renderDetailColorPickers(product)}</div>
-
-                        <div class="flex flex-wrap gap-3">
-                            ${tempo ? `<button type="button" onclick="scrollToDetailSection('options')" class="btn btn-primary">Choose equipment</button>` : ''}
-                            <button type="button" id="detail-color-quote" onclick="requestQuoteInColor()" class="btn ${tempo ? 'btn-outline' : 'btn-primary'}">${bodyColors.length || canopyOptions.length ? 'Get a quote for this build' : 'Get a quote'}</button>
-                            ${accessoryCount && !tempo ? `<button type="button" onclick="addAccessoriesFromDetail()" class="btn btn-outline">Add accessories <span class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-        ` : ''}
-
-        ${tempo ? `
-        <!-- Equipment and upgrades: what the chosen build includes and what can be added (the "Versions" document) -->
-        <section id="options" class="detail-section rise scroll-mt-32 home-section border-t border-line">
-            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12">
-                <div class="lg:col-span-4 space-y-6">
-                    <h2 class="type-xl text-ink">Equipment and upgrades.</h2>
-                    <p class="measure">What your build includes, and what you can add to it. The choices change with the build level.</p>
-                </div>
-                <div class="lg:col-span-8">
-                    <div id="detail-options">${renderTempoOptions(product)}</div>
-                    <div class="mt-12 flex flex-wrap gap-3">
-                        <button type="button" onclick="requestQuoteInColor()" class="btn btn-primary">Get a quote for this build</button>
-                        ${accessoryCount ? `<button type="button" onclick="addAccessoriesFromDetail()" class="btn btn-outline">More accessories <span class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
-                    </div>
-                </div>
-            </div>
-        </section>
-        ` : ''}
+        ${isVehicle ? renderConfigurator(product, { buildSet, startColor, accessoryCount }) : ''}
 
         <section id="features" class="detail-section rise scroll-mt-32 home-section border-t border-line">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12">
