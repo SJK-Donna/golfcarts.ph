@@ -712,6 +712,35 @@
         color: var(--ink);
         font-weight: 600;
     }
+    .detail-trim:not(:has(.detail-trim-dot)) {
+        padding-left: 0.875rem;
+    }
+    .detail-trim:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+    .detail-trim:disabled:hover {
+        border-color: var(--line);
+    }
+    /* Equipment and upgrades (Tempo builds): label beside its choices; sub-choices indented under their parent */
+    .opt-row {
+        display: grid;
+        gap: 0.5rem 1.5rem;
+        padding: 1.25rem 0;
+        border-top: 1px solid var(--line);
+    }
+    @media (min-width: 640px) {
+        .opt-row {
+            grid-template-columns: 12rem 1fr;
+        }
+        .opt-row-nested {
+            padding-left: 1.5rem;
+            grid-template-columns: 10.5rem 1fr;
+        }
+    }
+    .opt-row-nested {
+        border-top-style: dashed;
+    }
     .detail-trim-dot {
         width: 1.125rem;
         height: 1.125rem;

@@ -1,0 +1,1080 @@
+{
+  "_about": "The Tempo builder as it was before it followed the Versions document (Google Doc 1w9LmW_Oad0U4Lg7m4WnLBiDpA2uA94D4gj6j7b2Gp04). Saved on 2026-10-15 for future reference: the colours, seats and options here that the document does not list can be brought back from this file. Source: app.js at commit 59ebe69",
+  "buildSets": {
+    "golfer-2": {
+      "title": "Golfer, Scratch or Pro.",
+      "confirmed": true,
+      "builds": [
+        {
+          "id": "golfer",
+          "name": "Golfer",
+          "tagline": "Golf essentials",
+          "includes": [
+            "Standard cart",
+            "Golf bag provision",
+            "Basic rear bag cover"
+          ]
+        },
+        {
+          "id": "scratch",
+          "name": "Scratch",
+          "tagline": "Golf accessories & comfort",
+          "includes": [
+            "Everything in Golfer",
+            "Cooler",
+            "Ball washer",
+            "Premium magnetic bag cover"
+          ],
+          "note": "Upgraded steering wheel can be selected separately."
+        },
+        {
+          "id": "pro",
+          "name": "Pro",
+          "tagline": "Premium personal build",
+          "includes": [
+            "Scratch golf accessories",
+            "Premium seats",
+            "Premium steering wheel",
+            "Bluetooth audio",
+            "10-inch rims"
+          ],
+          "note": "12-inch rims available as an option."
+        }
+      ]
+    },
+    "golfer-2-2": {
+      "title": "Golfer, Scratch or Pro.",
+      "confirmed": true,
+      "builds": [
+        {
+          "id": "golfer",
+          "name": "Golfer",
+          "tagline": "Golf essentials",
+          "includes": [
+            "Standard 2+2 cart",
+            "Compatible rear golf bag attachment"
+          ]
+        },
+        {
+          "id": "scratch",
+          "name": "Scratch",
+          "tagline": "Golf accessories & comfort",
+          "includes": [
+            "10-inch rims",
+            "Premium seats",
+            "Mirror package",
+            "Compatible golf accessory options"
+          ],
+          "proposed": true
+        },
+        {
+          "id": "pro",
+          "name": "Pro",
+          "tagline": "Premium personal build",
+          "includes": [
+            "12-inch rims",
+            "Premium seats",
+            "Bluetooth audio",
+            "Upper / rear storage",
+            "Upgraded steering wheel",
+            "Compatible golf accessories"
+          ],
+          "proposed": true
+        }
+      ]
+    },
+    "golfer-4": {
+      "title": "Golfer, Scratch or Pro.",
+      "confirmed": true,
+      "note": "Tempo 4 follows the Tempo 2 build concept, adapted to its extra seating row.",
+      "builds": [
+        {
+          "id": "golfer",
+          "name": "Golfer",
+          "tagline": "Golf essentials",
+          "includes": [
+            "Standard cart",
+            "Golf bag provision",
+            "Basic rear bag cover"
+          ]
+        },
+        {
+          "id": "scratch",
+          "name": "Scratch",
+          "tagline": "Golf accessories & comfort",
+          "includes": [
+            "Everything in Golfer",
+            "Cooler",
+            "Ball washer",
+            "Premium magnetic bag cover"
+          ],
+          "note": "Upgraded steering wheel can be selected separately."
+        },
+        {
+          "id": "pro",
+          "name": "Pro",
+          "tagline": "Premium personal build",
+          "includes": [
+            "Scratch golf accessories",
+            "Premium seats",
+            "Premium steering wheel",
+            "Bluetooth audio",
+            "10-inch rims"
+          ],
+          "note": "12-inch rims available as an option."
+        }
+      ]
+    },
+    "lifestyle": {
+      "title": "Essential, Signature or Elite.",
+      "confirmed": false,
+      "builds": [
+        {
+          "id": "essential",
+          "name": "Essential",
+          "tagline": "Daily practicality",
+          "includes": [
+            "Standard seats",
+            "Windshield",
+            "Defined lighting kit",
+            "Mirror package"
+          ],
+          "note": "Upgrades: flip seat where compatible; battery, wheel and task-related options."
+        },
+        {
+          "id": "signature",
+          "name": "Signature",
+          "tagline": "Comfort & style",
+          "includes": [
+            "Essential equipment",
+            "Premium seats",
+            "10-inch rims",
+            "Upgraded steering wheel",
+            "Upgraded lighting selection"
+          ],
+          "note": "Upgrades: upgraded windshield, storage, audio, lifted package."
+        },
+        {
+          "id": "elite",
+          "name": "Elite",
+          "tagline": "Premium personal cart",
+          "includes": [
+            "Signature comfort",
+            "12-inch rims",
+            "Bluetooth audio",
+            "Premium steering wheel",
+            "Upgraded lighting",
+            "Suitable storage"
+          ],
+          "note": "Upgrades: custom finishes, battery upgrade, lifted package, compatible wheel alternatives."
+        }
+      ]
+    }
+  },
+  "buildPackages": {
+    "lithium": {
+      "name": "Lithium",
+      "detail": "Battery upgrade where offered."
+    },
+    "caddy": {
+      "name": "Caddy Package",
+      "detail": "Rear caddy stand."
+    },
+    "lifted": {
+      "name": "Lifted Package",
+      "detail": "Lift kit; optional bull bar, nerf bars / side steps. Approved combinations only."
+    },
+    "flip": {
+      "name": "Rear Flip Seat",
+      "detail": "Switch between passenger and cargo mode."
+    },
+    "rims": {
+      "name": "Rims",
+      "detail": "Larger wheels may require a lift. Tire size confirmed separately.",
+      "choices": [
+        "Standard",
+        "10-inch",
+        "12-inch",
+        "14-inch"
+      ]
+    }
+  },
+  "tempoBodyColours": [
+    {
+      "tier": "Standard Club Car Colors",
+      "colors": [
+        {
+          "name": "White",
+          "hex": "#F5F5F2"
+        },
+        {
+          "name": "Black",
+          "hex": "#1C1D1F"
+        },
+        {
+          "name": "Cashmere",
+          "hex": "#CDBA96"
+        },
+        {
+          "name": "Sangria",
+          "hex": "#8E1B22"
+        },
+        {
+          "name": "Sapphire",
+          "hex": "#1E3A78"
+        },
+        {
+          "name": "Green",
+          "hex": "#0F5A45"
+        },
+        {
+          "name": "Platinum Grey",
+          "hex": "#8F9396"
+        }
+      ]
+    },
+    {
+      "tier": "Premium Club Car Colors",
+      "colors": [
+        {
+          "name": "Atomic Orange",
+          "hex": "#F26B1D"
+        },
+        {
+          "name": "Synergy Green",
+          "hex": "#6DB33F"
+        },
+        {
+          "name": "Rally Red",
+          "hex": "#C4161C"
+        },
+        {
+          "name": "Metallic Green",
+          "hex": "#2E5E3A"
+        },
+        {
+          "name": "Metallic Black",
+          "hex": "#232427"
+        },
+        {
+          "name": "Metallic Midnight Silver",
+          "hex": "#4B5056"
+        },
+        {
+          "name": "Metallic Brilliant Blue",
+          "hex": "#1F4FBF"
+        },
+        {
+          "name": "Metallic Ice Blue",
+          "hex": "#A9C8DA"
+        },
+        {
+          "name": "Metallic Signature Silver",
+          "hex": "#B7BABD"
+        },
+        {
+          "name": "Metallic Glacier White",
+          "hex": "#EEF0EE"
+        },
+        {
+          "name": "Pearl Mist Grey",
+          "hex": "#A7A9AA"
+        },
+        {
+          "name": "Pearl Blue",
+          "hex": "#2F5D8A"
+        }
+      ]
+    },
+    {
+      "tier": "Premium GC Custom Paint",
+      "colors": [
+        {
+          "name": "3D Paint",
+          "hex": "linear-gradient(135deg, #C9CCD1, #5E6670, #E8EAEC)"
+        },
+        {
+          "name": "Chameleon (7 colors)",
+          "hex": "linear-gradient(135deg, #5B2C83, #1F6FB2, #2E9E6B)"
+        },
+        {
+          "name": "Chameleon (3 colors)",
+          "hex": "linear-gradient(135deg, #5B2C83, #1F6FB2, #2E9E6B)"
+        }
+      ]
+    }
+  ],
+  "tempoSeatGroups": [
+    {
+      "tier": "Standard Club Car Seats",
+      "options": [
+        "White",
+        "Beige",
+        "Black",
+        "Grey"
+      ]
+    },
+    {
+      "tier": "Premium Club Car Seats",
+      "options": [
+        "Modern Premium Light Beige",
+        "Premium Camello",
+        "Modern Premium Black",
+        "Premium Black and Grey",
+        "Modern Premium Grey",
+        "Elite Bright White",
+        "Premium Light Beige",
+        "Premium Off White",
+        "Premium Black",
+        "Premium Grey",
+        "Premium Camello & Light Beige",
+        "Premium Camello & Off White",
+        "Premium Light Beige & Off White",
+        "Premium Camello (Special Promo)",
+        "Premium Black and Grey (Special Promo)",
+        "High-Back Sport Black Carbon Fiber with Silver Inlay",
+        "High-Back Luxury Honey Beige with Black Inlay",
+        "High-Back Luxury Briar Brown"
+      ]
+    },
+    {
+      "tier": "Premium GC Seats",
+      "options": [
+        "Tsunami Silver Red & Black",
+        "Tsunami Silver Grey & Black",
+        "Tsunami Silver Blue & Black",
+        "GC White with Arm Rest",
+        "GC Beige with Arm Rest",
+        "GC Dark Brown with Arm Rest",
+        "Coffee Brown Ventilated Premium Seats"
+      ]
+    }
+  ],
+  "canopyOptions": {
+    "tempo-2": [
+      "White",
+      "Beige",
+      "Black"
+    ],
+    "tempo-2+2": [
+      "White",
+      "Beige",
+      "Black",
+      "Black CN"
+    ],
+    "tempo-4": [
+      "Black"
+    ],
+    "tempo-4+2": [
+      "White CC",
+      "Beige CC",
+      "Black CC",
+      "Black CN"
+    ],
+    "tempo-6": [
+      "White CC",
+      "Beige CC",
+      "Black CC",
+      "Black CN"
+    ],
+    "tempo-6+2": [
+      "White",
+      "Black"
+    ]
+  },
+  "accessoryCatalog": [
+    {
+      "group": "Windshield",
+      "items": [
+        {
+          "id": "ws-clear",
+          "name": "Clear Hinged Windshield",
+          "sku": "SJK-0066",
+          "fits": [
+            "tempo"
+          ]
+        },
+        {
+          "id": "ws-tinted",
+          "name": "Tinted Hinged Windshield",
+          "sku": "SJK-1854",
+          "fits": [
+            "tempo"
+          ]
+        },
+        {
+          "id": "ws-premium-clear",
+          "name": "Premium Clear Hinged Windshield",
+          "sku": "SJK-1042",
+          "fits": [
+            "onward"
+          ]
+        },
+        {
+          "id": "ws-premium-tinted",
+          "name": "Premium Tinted Hinged Windshield",
+          "sku": "SJK-1043",
+          "fits": [
+            "onward"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Lighting",
+      "items": [
+        {
+          "id": "lt-cc-tempo",
+          "name": "CC Tempo Lights (Head Lights)",
+          "sku": "SJK-0249",
+          "fits": [
+            "tempo"
+          ],
+          "product": "acc-deluxe-lights"
+        },
+        {
+          "id": "lt-gc-tempo",
+          "name": "GC Tempo Light Kit",
+          "sku": "SJK-1921",
+          "fits": [
+            "tempo"
+          ]
+        },
+        {
+          "id": "lt-gc-tempo-full",
+          "name": "GC Tempo Full Light Kit",
+          "sku": "SJK-1573",
+          "fits": [
+            "tempo"
+          ]
+        },
+        {
+          "id": "lt-gc-tempo-rgb",
+          "name": "GC Tempo Full Light Kit RGB",
+          "sku": "SJK-1548",
+          "fits": [
+            "tempo"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Golf Accessories",
+      "items": [
+        {
+          "id": "golf-sand",
+          "name": "Sand Bottle",
+          "sku": "SJK-0332",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-divot-sand-bottle"
+        },
+        {
+          "id": "golf-washer",
+          "name": "Ball Washer",
+          "sku": "SJK-0248",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-ball-cleaner"
+        },
+        {
+          "id": "golf-cooler",
+          "name": "Caddie Cooler",
+          "sku": "SJK-0257",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-cooler"
+        },
+        {
+          "id": "golf-cooler-premium",
+          "name": "Premium Caddie Cooler",
+          "sku": "SJK-1363",
+          "fits": [
+            "golf"
+          ]
+        },
+        {
+          "id": "golf-caddie",
+          "name": "Caddie Carrier",
+          "sku": "SJK-1374",
+          "fits": [
+            "golf"
+          ]
+        },
+        {
+          "id": "golf-bag-mag-black",
+          "name": "Premium Magnetic Bag Cover (Black)",
+          "sku": "SJK-0344",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-bag-cover"
+        },
+        {
+          "id": "golf-bag-mag-beige",
+          "name": "Premium Magnetic Bag Cover (Beige)",
+          "sku": "SJK-0347",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-bag-cover"
+        },
+        {
+          "id": "golf-bag-black",
+          "name": "Bag Cover (Black)",
+          "sku": "SJK-0136",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-bag-cover"
+        },
+        {
+          "id": "golf-bag-beige",
+          "name": "Bag Cover (Beige)",
+          "sku": "SJK-1038",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-bag-cover"
+        },
+        {
+          "id": "golf-bag-white",
+          "name": "Bag Cover (White)",
+          "sku": "SJK-1040",
+          "fits": [
+            "golf"
+          ],
+          "product": "acc-bag-cover"
+        }
+      ]
+    },
+    {
+      "group": "Mirrors",
+      "items": [
+        {
+          "id": "mir-side",
+          "name": "Side Mirrors",
+          "sku": "SJK-1146",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager",
+            "utility"
+          ]
+        },
+        {
+          "id": "mir-side-blinker",
+          "name": "Side Mirrors with Blinkers",
+          "sku": "SJK-1545",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager",
+            "utility"
+          ],
+          "product": "acc-side-mirror"
+        },
+        {
+          "id": "mir-5-panel",
+          "name": "5 Panel Rear Mirror",
+          "sku": "SJK-0154",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager"
+          ],
+          "product": "acc-5-panel-mirror"
+        },
+        {
+          "id": "mir-convex",
+          "name": "Convex Rear Mirror",
+          "sku": "SJK-1461",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager",
+            "utility"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Storage",
+      "items": [
+        {
+          "id": "sto-overhead",
+          "name": "Overhead Storage Console",
+          "sku": "SJK-0880",
+          "fits": [
+            "tempo",
+            "onward"
+          ]
+        },
+        {
+          "id": "sto-underseat",
+          "name": "Rear Under Seat Storage Bucket",
+          "sku": "SJK-1002",
+          "fits": [
+            "tempo",
+            "onward"
+          ]
+        },
+        {
+          "id": "sto-glovebox",
+          "name": "Onward Locking Glove Box Kit",
+          "sku": "SJK-0881",
+          "fits": [
+            "onward"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Rain Enclosures",
+      "items": [
+        {
+          "id": "enc-onward-black",
+          "name": "Two-Sided Rain Enclosure (Black)",
+          "fits": [
+            "onward"
+          ]
+        },
+        {
+          "id": "enc-2-beige",
+          "name": "Three-Sided Rain Enclosure (Beige)",
+          "sku": "SJK-1855",
+          "fits": [
+            "tempo-2"
+          ],
+          "product": "acc-golf-cover"
+        },
+        {
+          "id": "enc-2-white",
+          "name": "Three-Sided Rain Enclosure (White)",
+          "sku": "SJK-1856",
+          "fits": [
+            "tempo-2"
+          ],
+          "product": "acc-golf-cover"
+        },
+        {
+          "id": "enc-2-black",
+          "name": "Three-Sided Rain Enclosure (Black)",
+          "sku": "SJK-1509",
+          "fits": [
+            "tempo-2"
+          ],
+          "product": "acc-golf-cover"
+        },
+        {
+          "id": "enc-22-black",
+          "name": "2+2 Three-Sided Rain Enclosure (Black)",
+          "sku": "SJK-0467",
+          "fits": [
+            "tempo-2+2"
+          ]
+        },
+        {
+          "id": "enc-22-beige",
+          "name": "2+2 Three-Sided Rain Enclosure (Beige)",
+          "fits": [
+            "tempo-2+2"
+          ]
+        },
+        {
+          "id": "enc-22-white",
+          "name": "2+2 Three-Sided Rain Enclosure (White)",
+          "sku": "SJK-1905",
+          "fits": [
+            "tempo-2+2"
+          ]
+        },
+        {
+          "id": "enc-4-black",
+          "name": "Tempo 4 Rain Enclosure (Black)",
+          "fits": [
+            "tempo-4"
+          ]
+        },
+        {
+          "id": "enc-4-beige",
+          "name": "Tempo 4 Rain Enclosure (Beige)",
+          "fits": [
+            "tempo-4"
+          ]
+        },
+        {
+          "id": "enc-42-black",
+          "name": "Tempo 4+2 Rain Enclosure (Black)",
+          "fits": [
+            "tempo-4+2"
+          ]
+        },
+        {
+          "id": "enc-42-beige",
+          "name": "Tempo 4+2 Rain Enclosure (Beige)",
+          "fits": [
+            "tempo-4+2"
+          ]
+        },
+        {
+          "id": "enc-v6-white",
+          "name": "Villager 6 Rain Enclosure (White)",
+          "sku": "SJK-1814",
+          "fits": [
+            "villager-6"
+          ]
+        },
+        {
+          "id": "enc-v6-beige",
+          "name": "Villager 6 Rain Enclosure (Beige)",
+          "sku": "SJK-1815",
+          "fits": [
+            "villager-6"
+          ]
+        },
+        {
+          "id": "enc-v6-white-fold",
+          "name": "Villager 6 Rain Enclosure, Fold Down (White)",
+          "fits": [
+            "villager-6"
+          ]
+        },
+        {
+          "id": "enc-v6-beige-fold",
+          "name": "Villager 6 Rain Enclosure, Fold Down (Beige)",
+          "fits": [
+            "villager-6"
+          ]
+        },
+        {
+          "id": "enc-v8-white",
+          "name": "Villager 8 Rain Enclosure (White)",
+          "sku": "SJK-1816",
+          "fits": [
+            "villager-8"
+          ]
+        },
+        {
+          "id": "enc-v8-beige",
+          "name": "Villager 8 Rain Enclosure (Beige)",
+          "sku": "SJK-1817",
+          "fits": [
+            "villager-8"
+          ]
+        },
+        {
+          "id": "enc-v8-white-fold",
+          "name": "Villager 8 Rain Enclosure, Fold Down (White)",
+          "fits": [
+            "villager-8"
+          ]
+        },
+        {
+          "id": "enc-v8-beige-fold",
+          "name": "Villager 8 Rain Enclosure, Fold Down (Beige)",
+          "fits": [
+            "villager-8"
+          ]
+        },
+        {
+          "id": "enc-t4-white",
+          "name": "Transporter 4 Long Rain Enclosure (White)",
+          "fits": [
+            "transporter-4"
+          ]
+        },
+        {
+          "id": "enc-t4-black",
+          "name": "Transporter 4 Long Rain Enclosure (Black)",
+          "fits": [
+            "transporter-4"
+          ]
+        },
+        {
+          "id": "enc-t4-beige",
+          "name": "Transporter 4 Long Rain Enclosure (Beige)",
+          "fits": [
+            "transporter-4"
+          ]
+        },
+        {
+          "id": "enc-ca-white",
+          "name": "Carryall Rain Enclosure (White)",
+          "sku": "SJK-1248",
+          "fits": [
+            "carryall"
+          ]
+        },
+        {
+          "id": "enc-ca-black",
+          "name": "Carryall Rain Enclosure (Black)",
+          "fits": [
+            "carryall"
+          ]
+        },
+        {
+          "id": "enc-ca-beige",
+          "name": "Carryall Rain Enclosure (Beige)",
+          "fits": [
+            "carryall"
+          ]
+        },
+        {
+          "id": "enc-mb14-black",
+          "name": "Minibus 14 Rain Enclosure (Black)",
+          "fits": [
+            "minibus"
+          ]
+        },
+        {
+          "id": "enc-mb14-beige",
+          "name": "Minibus 14 Rain Enclosure (Beige)",
+          "fits": [
+            "minibus"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Electronics",
+      "items": [
+        {
+          "id": "el-cc-soundbar",
+          "name": "Club Car Premium Sound Bar",
+          "sku": "SJK-0787",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager"
+          ],
+          "product": "acc-premium-speaker"
+        },
+        {
+          "id": "el-gc-soundbar",
+          "name": "GC Sound Bar 27\" RGB",
+          "sku": "SJK-1564",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager"
+          ]
+        },
+        {
+          "id": "el-wireless",
+          "name": "Wireless Charging",
+          "sku": "SJK-1510",
+          "fits": [
+            "tempo",
+            "onward"
+          ]
+        },
+        {
+          "id": "el-usb-premium",
+          "name": "Premium USB-C Charging Port",
+          "sku": "SJK-1178",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager",
+            "utility"
+          ]
+        },
+        {
+          "id": "el-usb-gc",
+          "name": "GC USB-C Charging Port QC3.0 with Volt Meter",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager",
+            "utility"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Driver Accessories",
+      "items": [
+        {
+          "id": "drv-wheel",
+          "name": "Premium Steering Wheel",
+          "sku": "SJK-1355",
+          "fits": [
+            "tempo",
+            "onward"
+          ]
+        },
+        {
+          "id": "drv-wheel-scorecard",
+          "name": "Premium Steering Wheel with Scorecard",
+          "sku": "SJK-1354",
+          "fits": [
+            "golf"
+          ]
+        },
+        {
+          "id": "drv-floormat",
+          "name": "GC Floor Mat",
+          "sku": "SJK-1375",
+          "fits": [
+            "tempo",
+            "onward",
+            "villager"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Exterior",
+      "items": [
+        {
+          "id": "ext-fender-3",
+          "name": "Tempo Fenders 3\"",
+          "sku": "SJK-1542",
+          "fits": [
+            "tempo"
+          ]
+        },
+        {
+          "id": "ext-fender-15",
+          "name": "Tempo Fenders 1.5\"",
+          "fits": [
+            "tempo"
+          ]
+        },
+        {
+          "id": "ext-fender-onward",
+          "name": "Onward Fenders",
+          "sku": "SJK-1885",
+          "fits": [
+            "onward"
+          ]
+        },
+        {
+          "id": "ext-brush-guard",
+          "name": "Brush Guard",
+          "sku": "SJK-0119",
+          "fits": [
+            "tempo",
+            "onward",
+            "utility"
+          ],
+          "product": "acc-brush-guard"
+        }
+      ]
+    },
+    {
+      "group": "Lifted Accessories",
+      "items": [
+        {
+          "id": "lift-4",
+          "name": "4\" Lift Kit",
+          "sku": "SJK-0330",
+          "fits": [
+            "tempo"
+          ]
+        },
+        {
+          "id": "lift-nerf",
+          "name": "Nerf Bar",
+          "sku": "SJK-0377",
+          "fits": [
+            "lifted"
+          ]
+        }
+      ]
+    }
+  ],
+  "tempoProducts": [
+    {
+      "slug": "golfer-tempo-2",
+      "buildSet": "golfer-2",
+      "packages": [
+        "lithium",
+        "caddy",
+        "lifted",
+        "rims"
+      ],
+      "battery": "72V Lithium Power Cell",
+      "range": "85 km per charge",
+      "chargingTime": "3.5 Hours"
+    },
+    {
+      "slug": "golfer-tempo-2-2",
+      "buildSet": "golfer-2-2",
+      "packages": [
+        "lithium",
+        "lifted",
+        "rims"
+      ],
+      "battery": "72V Lithium-Ion Pack",
+      "range": "80 km per charge",
+      "chargingTime": "3.5 Hours"
+    },
+    {
+      "slug": "golfer-tempo-4",
+      "buildSet": "golfer-4",
+      "packages": [
+        "lithium",
+        "lifted",
+        "rims"
+      ],
+      "battery": "72V Lithium-Ion Pack",
+      "range": "85 km per charge",
+      "chargingTime": "3.5 Hours"
+    },
+    {
+      "slug": "lifestyle-tempo-2",
+      "buildSet": "lifestyle",
+      "packages": [
+        "lithium",
+        "lifted",
+        "rims"
+      ],
+      "battery": "72V Standard Lithium Pack",
+      "range": "80 km per charge",
+      "chargingTime": "4.0 Hours"
+    },
+    {
+      "slug": "lifestyle-tempo-2-2",
+      "buildSet": "lifestyle",
+      "packages": [
+        "lithium",
+        "flip",
+        "lifted",
+        "rims"
+      ],
+      "battery": "72V High Capacity Lithium",
+      "range": "88 km per charge",
+      "chargingTime": "3.5 Hours"
+    },
+    {
+      "slug": "lifestyle-tempo-4",
+      "buildSet": "lifestyle",
+      "packages": [
+        "lithium",
+        "lifted",
+        "rims"
+      ],
+      "battery": "72V Lithium-Ion Pack",
+      "range": "95 km per charge",
+      "chargingTime": "3.0 Hours"
+    },
+    {
+      "slug": "lifestyle-tempo-4-2",
+      "buildSet": "lifestyle",
+      "packages": [
+        "lithium",
+        "flip",
+        "lifted",
+        "rims"
+      ],
+      "battery": "72V Lithium Pack",
+      "range": "85 km per charge",
+      "chargingTime": "4.0 Hours"
+    }
+  ]
+}
