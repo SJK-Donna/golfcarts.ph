@@ -3203,7 +3203,9 @@ const TRIM_COLOR_HEX = {
 const CANOPY_COLOR_HEX = {
     'White': '#E8E8E5', 'Beige': '#C8BBA2', 'Black': '#2E302F',
     'White CC': '#E8E8E5', 'Beige CC': '#C8BBA2', 'Black CC': '#2E302F', 'Black CN': '#333436',
-    'White Long Canopy': '#E8E8E5', 'Beige Long Canopy': '#C8BBA2', 'Black Long Canopy': '#2E302F'
+    'White Long Canopy': '#E8E8E5', 'Beige Long Canopy': '#C8BBA2', 'Black Long Canopy': '#2E302F',
+    // The Versions document's 80" GC canopy is the black non-Club Car canopy ("Black CN" in the earlier sheet)
+    '80" GC Canopy': '#333436'
 };
 
 // Striped and two-tone seats: the live preview paints these as vertical bands across the seat instead of

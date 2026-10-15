@@ -233,9 +233,10 @@ function paintRegion(out, base, region, target, xGradient, bands) {
             const stops = xGradient;
             const pos = Math.min(stops.length - 1.001, x * (stops.length - 1));
             const a = stops[Math.floor(pos)], b = stops[Math.floor(pos) + 1], t = pos - Math.floor(pos);
-            th = a[0] + ((((b[0] - a[0]) % 360) + 540) % 360 - 180) * t;
-            ts = a[1] + (b[1] - a[1]) * t;
-            tl = a[2] + (b[2] - a[2]) * t;
+            // Blend in RGB: blending hues would pass through unrelated colors between a near-neutral stop and a
+            // colored one (black to red went through purple, silver to beige through pink)
+            const ra = hslToRgb(a[0], a[1], a[2]), rb = hslToRgb(b[0], b[1], b[2]);
+            [th, ts, tl] = rgbToHsl(...ra.map((v, k) => v + (rb[k] - v) * t));
         }
         const l = Math.max(0.02, Math.min(0.98, tl + (base.light[i] - region.midL) * contrast));
         // Keep the swatch's colorfulness (chroma) through the shading. A fixed HSL saturation would grey out
