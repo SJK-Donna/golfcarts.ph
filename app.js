@@ -3303,6 +3303,7 @@ function updateDetailBuildSummary() {
         + pill('Seat', detailBuild.seat, getTrimHex('seat', detailBuild.seat))
         + pill('Canopy', detailBuild.canopy, getTrimHex('canopy', detailBuild.canopy));
     updateDetailPreview();
+    updateBuildPanel();
 }
 
 function hasLiveColorPreview(slug) {
@@ -3518,6 +3519,58 @@ function getBuildSummaryText() {
 function updateBuildSummaryLine() {
     const line = document.getElementById('build-summary-line');
     if (line) line.textContent = getBuildSummaryText();
+    updateBuildPanel();
+}
+
+// The "Your build" side panel beside Equipment and upgrades (Tempo builds): the build, its colors and every
+// choice made so far, with the quote button always in reach
+function renderBuildPanel(product) {
+    const buildSet = getProductBuildSet(product);
+    const level = buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0];
+    const i = detailLevelIndex(product);
+    const o = detailBuild.options || {};
+    const bodyHex = (getProductBodyColors(product).find(c => c.name === detailBuild.body) || {}).hex;
+    const colors = [
+        ['Body', detailBuild.body, bodyHex],
+        ['Seat', detailBuild.seat || 'Standard', getTrimHex('seat', detailBuild.seat)],
+        ['Canopy', detailBuild.canopy || 'Standard', getTrimHex('canopy', detailBuild.canopy)]
+    ].filter(([, v]) => v);
+    const choices = getTempoOptionGroups(product, i)
+        .filter(g => g.type !== 'fixed')
+        .map(g => [g.title, describeTempoChoice(product, i, g, o)])
+        .filter(([, v]) => v);
+    const row = (label, value, hex) => `
+        <div class="build-panel-row">
+            <dt>${label}</dt>
+            <dd>${hex ? `<span class="detail-trim-dot" style="background:${hex}"></span>` : ''}<span>${value}</span></dd>
+        </div>`;
+    return `
+        <div class="build-panel-head">
+            <p class="text-sm text-on-band-mute">Your build</p>
+            <p class="type-md mt-1">${product.name} ${level.name}</p>
+        </div>
+        <div class="build-panel-scroll">
+            <dl class="build-panel-list">
+                ${colors.map(([l, v, h]) => row(l, v, h)).join('')}
+            </dl>
+            <dl class="build-panel-list">
+                ${choices.map(([l, v]) => row(l, v)).join('')}
+            </dl>
+            <p class="build-panel-links">
+                <button type="button" onclick="scrollToDetailSection('build')" class="build-panel-link">Change build</button>
+                <button type="button" onclick="scrollToDetailSection('colors')" class="build-panel-link">Change colors</button>
+            </p>
+        </div>
+        <div class="build-panel-foot">
+            <button type="button" onclick="requestQuoteInColor()" class="btn btn-primary w-full">Get a quote for this build</button>
+            <p class="text-xs text-on-band-mute mt-2">We confirm inclusions, pricing and availability in the quote.</p>
+        </div>`;
+}
+
+function updateBuildPanel() {
+    const panel = document.getElementById('detail-build-panel');
+    const product = currentDetailProduct();
+    if (panel && product && isTempoVersion(product)) panel.innerHTML = renderBuildPanel(product);
 }
 
 // Choices for a new build level: keeps each earlier choice the new level still offers
@@ -3943,19 +3996,25 @@ function renderBuildSection(product, buildSet) {
                 `).join('')}
             </div>
 
-            <div class="mt-16 bg-band text-on-band p-6 sm:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                    <p class="text-sm text-on-band-mute">Your build</p>
-                    <p id="build-summary-line" class="type-md mt-2" aria-live="polite"></p>
-                    <p class="text-sm text-on-band-mute mt-3 measure">${isTempoVersion(product)
-                        ? 'Choose colors, equipment and upgrades next, then send it to us.'
-                        : 'Choose colors next, then send it to us.'} We confirm inclusions, pricing and availability in the quote.</p>
-                </div>
-                <div class="flex flex-wrap gap-3 flex-shrink-0">
+            ${isTempoVersion(product) ? `
+                <!-- Tempo builds: the running summary is the side panel beside Equipment and upgrades -->
+                <div class="mt-10 flex flex-wrap items-center justify-between gap-4">
+                    <p class="text-sm text-ink-2 measure">Next, choose colors, then equipment and upgrades. Your build stays beside you as you go.</p>
                     <button type="button" onclick="scrollToDetailSection('colors')" class="btn btn-primary">Choose colors</button>
-                    <button type="button" onclick="requestQuoteInColor()" class="btn btn-on-dark">Get a quote</button>
                 </div>
-            </div>
+            ` : `
+                <div class="mt-16 bg-band text-on-band p-6 sm:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div>
+                        <p class="text-sm text-on-band-mute">Your build</p>
+                        <p id="build-summary-line" class="type-md mt-2" aria-live="polite"></p>
+                        <p class="text-sm text-on-band-mute mt-3 measure">Choose colors next, then send it to us. We confirm inclusions, pricing and availability in the quote.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3 flex-shrink-0">
+                        <button type="button" onclick="scrollToDetailSection('colors')" class="btn btn-primary">Choose colors</button>
+                        <button type="button" onclick="requestQuoteInColor()" class="btn btn-on-dark">Get a quote</button>
+                    </div>
+                </div>
+            `}
             ${buildSet.confirmed ? '' : '<p class="text-sm text-mute mt-4">Build names and package contents are proposed and may change.</p>'}
         </section>
     `;
@@ -4200,11 +4259,15 @@ function renderProductDetailsPage() {
         ${tempo ? `
         <!-- Equipment and upgrades: what the chosen build includes and what can be added (the "Versions" document) -->
         <section id="options" class="detail-section rise scroll-mt-32 home-section border-t border-line">
-            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12">
-                <div class="lg:col-span-4 space-y-6">
-                    <h2 class="type-xl text-ink">Equipment and upgrades.</h2>
-                    <p class="measure">What your build includes, and what you can add to it. The choices change with the build level.</p>
-                </div>
+            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12 items-start">
+                <!-- Your build: stays in view beside the choices on desktop -->
+                <aside class="lg:col-span-4 lg:self-stretch space-y-8" aria-label="Your build">
+                    <div>
+                        <h2 class="type-xl text-ink">Equipment and upgrades.</h2>
+                        <p class="measure mt-4">What your build includes, and what you can add to it. The choices change with the build level.</p>
+                    </div>
+                    <div id="detail-build-panel" class="build-panel lg:sticky lg:top-36" aria-live="polite">${renderBuildPanel(product)}</div>
+                </aside>
                 <div class="lg:col-span-8">
                     <div id="detail-options">${renderTempoOptions(product)}</div>
                     <div class="mt-12 flex flex-wrap gap-3">

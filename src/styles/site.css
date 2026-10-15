@@ -722,6 +722,75 @@
     .detail-trim:disabled:hover {
         border-color: var(--line);
     }
+    /* ---- "Your build" side panel beside Equipment and upgrades (sticky on desktop) ---- */
+    .build-panel {
+        padding: 1.5rem;
+        background: var(--band);
+        color: var(--on-band);
+        border-radius: var(--radius);
+    }
+    .build-panel-list {
+        margin-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .build-panel-row {
+        display: grid;
+        grid-template-columns: 6.5rem minmax(0, 1fr);
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+        font-size: 0.875rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .build-panel-row dt {
+        color: var(--on-band-mute);
+    }
+    .build-panel-row dd {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        color: var(--on-band);
+    }
+    .build-panel-row .detail-trim-dot {
+        width: 0.875rem;
+        height: 0.875rem;
+        margin-top: 0.15rem;
+    }
+    .build-panel-head {
+        padding-bottom: 0.25rem;
+    }
+    .build-panel-foot {
+        padding-top: 1.25rem;
+    }
+    .build-panel-links {
+        display: flex;
+        gap: 1.25rem;
+        margin-top: 0.75rem;
+    }
+    .build-panel-link {
+        font-size: 0.8125rem;
+        color: var(--on-band-mute);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+    }
+    .build-panel-link:hover {
+        color: var(--on-band);
+    }
+    /* On desktop the panel fits under the section bar: if the build gets long its list scrolls inside it,
+       so the build name and the quote button stay in view */
+    @media (min-width: 1024px) {
+        .build-panel {
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 11rem);
+        }
+        .build-panel-scroll {
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-width: thin;
+        }
+    }
+
     /* ---- Equipment and upgrades (Tempo builds): photo cards ---- */
     .opt-section {
         margin-top: 3rem;
