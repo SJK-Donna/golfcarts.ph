@@ -852,12 +852,15 @@ const TEMPO_MATRIX = {
             '12" Hela Bright Chrome, 23x10.5-12 tires', '12" Triton Machined Black, 23x10.5-12 tires']
     ],
     lighting: {
-        golfer: [[], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']],
+        // Scratch lists "No Headlight" as a choice too
+        golfer: [[], ['No headlights', 'GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']],
         lifestyle: [['GC Tempo LED Headlights & Tail Lights'], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']]
     },
     // Golfer accessories (the Golf build includes the black GC bag cover)
     bagCover: [['GC Bag Cover, Black'], ['GC Bag Cover, Black', 'Bag Cover, Beige', 'Bag Cover, White', 'Club Car Magnetic Bag Cover, Black', 'Club Car Magnetic Bag Cover, Beige'], ['Club Car Magnetic Bag Cover, Black', 'Club Car Magnetic Bag Cover, Beige']],
-    golfExtras: [false, true, true],     // sand bottle (with mounting bracket), ball washer, Caddy Master cooler: 0-2 each
+    // Sand bottle (with mounting bracket): 0-2. Ball washer and Caddy Master cooler share the cart's left and
+    // right mounts: each takes none, one side or both, and a side one takes is not offered to the other.
+    golfExtras: [false, true, true],
     lifestyleCooler: [false, true, true], // the Lifestyle builds' only accessory row
     lift: [false, true, true],           // Lifted 3.5" GC lift kit, optional from Scratch / Signature
     liftFenders: ['Tempo Fenders 3"', 'Tempo Fenders 1.5"', 'Onward Fender Flare Kit'],
@@ -866,7 +869,11 @@ const TEMPO_MATRIX = {
     flipSeat: [['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat', 'Onward Premium Flip Seat']],
     genesisColors: [['White', 'Beige'], TEMPO_SCRATCH_SEATS, ['Premium Upholstered Seat Camello', 'Premium Upholstered Seat Black and Gray']],
     onwardColors: ['Classic Premium Seat Back Camello', 'Classic Premium Seat Back Black and Gray'],
-    bagAttachment: [['Golf Bag Attachment Combo'], ['Golf Bag Attachment Combo', 'GC Premium Bag Attachment'], ['GC Premium Bag Attachment']], // Golfer, +2 layouts
+    // +2 layouts. Lifestyle lists the GC premium bag attachment under Elite's flip seat upgrades.
+    bagAttachment: {
+        golfer: [['Golf Bag Attachment Combo'], ['Golf Bag Attachment Combo', 'GC Premium Bag Attachment'], ['GC Premium Bag Attachment']],
+        lifestyle: [[], [], ['GC Premium Bag Attachment']]
+    },
     electronics: [[], [], ['Club Car Premium Sound Bar', 'Apple CarPlay', 'GC Sound Bar 27" RGB']],
     electronicsAddOns: [[], [], ['Wireless Charging', 'Premium USB-C Charging Port', 'GC USB-C Charging Port QC3.0 with Volt Meter']],
     steering: [[], [], ['Premium Steering Wheel with Scorecard (Club Car)']],
@@ -920,7 +927,12 @@ function tempoLevelIncludes(line, i) {
     const items = [
         `${m.battery[i]} battery`,
         wheels.length > 1 ? `${wheels[0]}, or ${wheels.length - 1} other wheel choices` : wheels[0],
-        !lights.length ? 'No headlights' : lights.length > 1 ? `LED headlights (${lights.length} kits to choose from)` : lights[0],
+        (() => {
+            const kits = lights.filter(l => l !== 'No headlights');
+            if (!kits.length) return 'No headlights';
+            if (kits.length === 1) return kits[0];
+            return `LED headlights${kits.length < lights.length ? ', optional' : ''} (${kits.length} kits to choose from)`;
+        })(),
         `${m.body[i].length} body colors, ${m.seat[i].length} seat colors`
     ];
     if (line === 'golfer') items.push(i === 0 ? 'GC bag cover, black' : 'Bag covers, sand bottles, ball washers, cooler');
@@ -952,9 +964,29 @@ function getProductBuildSet(product) {
     return isTempoVersion(product) ? tempoBuildSet(product.version) : BUILD_SETS[product.buildSet] || null;
 }
 
+// Mounting sides for the ball washer and Caddy Master cooler: the value, its label and the sides it takes
+const TEMPO_SIDES = [
+    { value: '', label: 'None', sides: [] },
+    { value: 'both', label: 'Both', sides: ['left', 'right'] },
+    { value: 'left', label: 'Left', sides: ['left'] },
+    { value: 'right', label: 'Right', sides: ['right'] }
+];
+
+function tempoSidesOf(value) {
+    return (TEMPO_SIDES.find(s => s.value === value) || TEMPO_SIDES[0]).sides;
+}
+
+// True when a side choice would use a mount the other side-mounted accessory already has
+function tempoSideTaken(group, value, o) {
+    if (!group.shares) return false;
+    const taken = tempoSidesOf(o[group.shares]);
+    return tempoSidesOf(value).some(s => taken.includes(s));
+}
+
 // Option groups for a Tempo model at a build level. Types: fixed (shown, nothing to pick), single (pick
 // one, the first is the default), optional (pick one or none), multi (any number), qty (none, 1 or 2),
-// flag (on / off). `section` groups them on the page.
+// side (none, both, left or right mount, shared with the group named in `shares`), flag (on / off).
+// `section` groups them on the page.
 function getTempoOptionGroups(product, i) {
     const m = TEMPO_MATRIX;
     const line = product.version;
@@ -975,8 +1007,8 @@ function getTempoOptionGroups(product, i) {
         add({ id: 'bagCover', section: 'Accessories', title: 'Bag cover', type: 'single', options: m.bagCover[i] });
         if (m.golfExtras[i]) {
             add({ id: 'sandBottle', section: 'Accessories', title: 'Sand bottle (with mounting bracket)', type: 'qty' });
-            add({ id: 'ballWasher', section: 'Accessories', title: 'Ball washer', type: 'qty' });
-            add({ id: 'cooler', section: 'Accessories', title: 'Caddy Master cooler', type: 'qty' });
+            add({ id: 'ballWasher', section: 'Accessories', title: 'Ball washer', type: 'side', shares: 'cooler', sharesTitle: 'Caddy Master cooler' });
+            add({ id: 'cooler', section: 'Accessories', title: 'Caddy Master cooler', type: 'side', shares: 'ballWasher', sharesTitle: 'ball washer' });
         }
         if (layout === '2') add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
     } else if (m.lifestyleCooler[i]) {
@@ -986,7 +1018,8 @@ function getTempoOptionGroups(product, i) {
     if (m.lift[i]) add({ id: 'lift', section: 'Upgrades', title: 'Lift kit', type: 'flag', label: 'Lifted 3.5" GC lift kit' });
     if (plusTwo) {
         add({ id: 'flipSeat', section: 'Upgrades', title: 'Rear flip seat', type: 'optional', options: m.flipSeat[i] });
-        if (line === 'golfer') add({ id: 'bagAttachment', section: 'Upgrades', title: 'Golf bag attachment', type: 'optional', options: m.bagAttachment[i] });
+        const bags = m.bagAttachment[line][i];
+        if (bags.length) add({ id: 'bagAttachment', section: 'Upgrades', title: 'Golf bag attachment', type: 'optional', options: bags });
     }
     if (m.electronics[i].length) {
         add({ id: 'electronics', section: 'Upgrades', title: 'Audio', type: 'multi', options: m.electronics[i] });
@@ -1021,7 +1054,7 @@ function defaultTempoOptions(product, i) {
     const o = {};
     getTempoOptionGroups(product, i).forEach(g => {
         if (g.type === 'single') o[g.id] = g.options[0];
-        if (g.type === 'optional') o[g.id] = '';
+        if (g.type === 'optional' || g.type === 'side') o[g.id] = '';
         if (g.type === 'multi') o[g.id] = [];
         if (g.type === 'qty') o[g.id] = 0;
         if (g.type === 'flag') o[g.id] = false;
@@ -3439,6 +3472,7 @@ function describeTempoChoice(product, i, group, o) {
     else if (group.type === 'single' || group.type === 'optional') text = v || null;
     else if (group.type === 'multi') text = v && v.length ? v.join(', ') : null;
     else if (group.type === 'qty') text = v ? String(v) : null;
+    else if (group.type === 'side') text = v === 'both' ? 'Both sides' : v ? `${v[0].toUpperCase()}${v.slice(1)} side` : null;
     else if (group.type === 'flag') text = v ? group.label : null;
     if (!text) return null;
     const extra = getTempoSubGroups(product, i, o).filter(s => s.parent === group.id).map(s => {
@@ -3473,6 +3507,7 @@ function getBuildSummaryText() {
             if (g.type === 'optional' && v) parts.push(v);
             if (g.type === 'multi') parts.push(...(v || []));
             if (g.type === 'qty' && v) parts.push(`${v} × ${g.title}`);
+            if (g.type === 'side' && v) parts.push(`${g.title} (${v === 'both' ? 'both sides' : v})`);
             if (g.type === 'flag' && v) parts.push(g.label);
         });
     }
@@ -3494,7 +3529,7 @@ function carryTempoOptions(product, i, prev) {
         if (g.type === 'single' && g.options.includes(v)) next[g.id] = v;
         if (g.type === 'optional' && (v === '' || g.options.includes(v))) next[g.id] = v;
         if (g.type === 'multi') next[g.id] = v.filter(x => g.options.includes(x));
-        if (g.type === 'qty' || g.type === 'flag') next[g.id] = v;
+        if (g.type === 'qty' || g.type === 'flag' || g.type === 'side') next[g.id] = v;
     });
     if (prev.liftFender) next.liftFender = prev.liftFender;
     if (prev.liftAddOns) next.liftAddOns = prev.liftAddOns.slice();
@@ -3575,6 +3610,15 @@ function setTempoQty(id, n) {
     refreshTempoOptions();
 }
 
+// Ball washer / cooler mount: a side the other accessory already uses can't be picked
+function setTempoSide(id, value) {
+    const product = currentDetailProduct();
+    const group = findTempoGroup(product, detailLevelIndex(product), id);
+    if (!group || tempoSideTaken(group, value, detailBuild.options)) return;
+    detailBuild.options[id] = value;
+    refreshTempoOptions();
+}
+
 // Redraws the equipment list (keeping keyboard focus on the button that was pressed) and the summary
 function refreshTempoOptions() {
     const box = document.getElementById('detail-options');
@@ -3611,6 +3655,13 @@ function renderTempoGroup(g, o, nested) {
         [0, 1, 2].forEach(n => {
             controls += chip(n ? String(n) : 'None', o[g.id] === n, `setTempoQty('${g.id}', ${n})`, `${g.id}:${n}`);
         });
+    } else if (g.type === 'side') {
+        TEMPO_SIDES.forEach(s => {
+            const taken = tempoSideTaken(g, s.value, o);
+            controls += chip(s.label, (o[g.id] || '') === s.value, `setTempoSide('${g.id}', '${s.value}')`, `${g.id}:${s.value || 'none'}`, taken ? 'disabled' : '');
+        });
+        const used = tempoSidesOf(o[g.shares]);
+        if (used.length) controls += `<p class="w-full text-sm text-mute">${used.length > 1 ? 'Both sides are' : `The ${used[0]} side is`} taken by the ${g.sharesTitle}.</p>`;
     } else if (g.type === 'flag') {
         const blocked = g.requires && !o[g.requires];
         controls = chip(g.label, !!o[g.id], `toggleTempoOption('${g.id}')`, `${g.id}:on`, blocked ? 'disabled' : '')
