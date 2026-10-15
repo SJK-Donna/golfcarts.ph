@@ -3736,7 +3736,6 @@ const OPTION_PHOTOS = {
     'Club Car Premium Sound Bar': 'audio-cc-soundbar',
     'GC Sound Bar 27" RGB': 'audio-gc-soundbar-27',
     'Wireless Charging': 'charge-wireless',
-    'Premium USB-C Charging Port': 'charge-usb-c',
     'GC USB-C Charging Port QC3.0 with Volt Meter': 'charge-usb-c-voltmeter',
     steering: 'steering-premium',
     // Mirrors and storage
@@ -3773,8 +3772,8 @@ const OPTION_PLACEHOLDER = '<svg viewBox="0 0 24 24" width="32" height="32" fill
 function optionMedia(photo, label) {
     return `
         <span class="opt-card-media">
-            ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
-            <span class="opt-card-initials" aria-hidden="true">${label === 'None' ? '&mdash;' : OPTION_PLACEHOLDER}</span>
+            ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async" onerror="this.nextElementSibling.hidden=false;this.remove()">` : ''}
+            <span class="opt-card-initials" aria-hidden="true" ${photo ? 'hidden' : ''}>${label === 'None' ? '&mdash;' : OPTION_PLACEHOLDER}</span>
         </span>`;
 }
 

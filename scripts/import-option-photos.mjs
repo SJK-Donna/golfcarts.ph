@@ -47,22 +47,22 @@ const PHOTOS = {
     'Tempo Fender 1.5in.jpg': 'fender-tempo-15',
     'MAdjax Brush Guard SJK-1543.png': 'brush-guard',
     'Madjax Nerf Bar Side Step SJK-0119.png': 'nerf-bar',
-    'Genesis premium rear flip seat.jpeg': 'flip-genesis',
+    'Genesis Rear Seat Beige.jpg': 'flip-genesis',
     'Club Car onward premium flip seat.jpg': 'flip-onward',
     'Club Car Bluetooth soundbar.jpeg': 'audio-cc-soundbar',
     '27 Sound Bar.jpg': 'audio-gc-soundbar-27',
-    'club car wireless charging.jpeg': 'charge-wireless',
-    'USBA & USB-C.jpeg': 'charge-usb-c',
+    'Wireless Charging Left & Right SJK-1510.jpg': 'charge-wireless',
     'Type C Outlet QC3.0 PD  Voltmeter and button switch SJK-1593.jpg': 'charge-usb-c-voltmeter',
     'PremSteeringWheel.webp': 'steering-premium',
     'side mirror.jpg': 'mirror-side',
     'Side Mirror with Led Turn Signal.jpg': 'mirror-side-signal',
-    '5 panel mirror.jpg': 'mirror-5-panel',
-    'Convex Inner Mirror Short.jpeg': 'mirror-convex-short',
-    'Convex Inner Mirror long.jpg': 'mirror-convex-long',
+    'Club Car 5 Pannel Mirror SJK-0154.jpg': 'mirror-5-panel',
+    // One photo for both lengths (the separate short and long photos are only small thumbnails)
+    'Convex Inner Mirror SJK-1461.jpg': ['mirror-convex-short', 'mirror-convex-long'],
     'onward-overhead-console-accessory-600x415 (1).jpg': 'storage-overhead',
     'under seat storage.jpg': 'storage-under-seat',
-    'Three-sided rain enclosure Biege (CCJX).jpeg': 'enclosure-3-beige',
+    // The 2-seater beige photo is a small thumbnail; the 2+2 photo shows the same enclosure and color
+    '2+2 Three-sided rain enclosure Biege (CCJX).jpeg': 'enclosure-3-beige',
     'Three-sided rain enclosure White (CCJX).jpeg': 'enclosure-3-white',
     'Three-sided rain enclosure Black (CCJX).jpeg': 'enclosure-3-black',
     'Two-sided rain enclosure Black (CC).jpg': 'enclosure-2-black'
@@ -87,14 +87,16 @@ const found = new Map();
 
 fs.mkdirSync(outDir, { recursive: true });
 const missing = [];
-for (const [driveName, out] of Object.entries(PHOTOS)) {
+for (const [driveName, outs] of Object.entries(PHOTOS)) {
     const file = found.get(key(driveName));
     if (!file) { missing.push(driveName); continue; }
-    // Up to 900 x 675 (the cards are 4:3), on white, as a mid-quality JPEG; the build adds a WebP copy
-    await sharp(file).rotate().resize(900, 675, { fit: 'inside', withoutEnlargement: true })
-        .flatten({ background: '#FFFFFF' }).jpeg({ quality: 82, mozjpeg: true })
-        .toFile(path.join(outDir, `${out}.jpg`));
-    console.log(`  ${out}.jpg  <-  ${path.relative(source, file)}`);
+    for (const out of [].concat(outs)) {
+        // Up to 900 x 675 (the cards are 4:3), on white, as a mid-quality JPEG; the build adds a WebP copy
+        await sharp(file).rotate().resize(900, 675, { fit: 'inside', withoutEnlargement: true })
+            .flatten({ background: '#FFFFFF' }).jpeg({ quality: 82, mozjpeg: true })
+            .toFile(path.join(outDir, `${out}.jpg`));
+        console.log(`  ${out}.jpg  <-  ${path.relative(source, file)}`);
+    }
 }
 console.log(`\n${Object.keys(PHOTOS).length - missing.length} of ${Object.keys(PHOTOS).length} photos written to image/Options.`);
 if (missing.length) console.log(`Not found:\n  ${missing.join('\n  ')}`);

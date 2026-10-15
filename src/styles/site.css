@@ -880,15 +880,20 @@
         padding: 0.75rem;
         background: #EFEFEA; /* stays light in dark mode: the product photos are shot on white */
     }
+    /* The photo fits inside the tile's frame, so a tall photo can't make its card taller than its neighbours */
     .opt-card-media img {
-        position: relative;
+        position: absolute;
         z-index: 1;
-        max-width: 100%;
-        max-height: 100%;
+        inset: 0.75rem;
+        width: calc(100% - 1.5rem);
+        height: calc(100% - 1.5rem);
         object-fit: contain;
         mix-blend-mode: multiply;
     }
     /* Shown when the option has no photo (or it fails to load); a photo covers it */
+    .opt-card-initials[hidden] {
+        display: none;
+    }
     .opt-card-initials {
         position: absolute;
         inset: 0;
