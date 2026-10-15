@@ -722,24 +722,253 @@
     .detail-trim:disabled:hover {
         border-color: var(--line);
     }
-    /* Equipment and upgrades (Tempo builds): label beside its choices; sub-choices indented under their parent */
-    .opt-row {
+    /* ---- Equipment and upgrades (Tempo builds): photo cards ---- */
+    .opt-section {
+        margin-top: 3rem;
+    }
+    .opt-section-title {
+        font-family: var(--font-display);
+        font-size: 1.75rem;
+        line-height: 1.1;
+        letter-spacing: -0.015em;
+        color: var(--ink);
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--line);
+    }
+    .opt-group {
+        padding-top: 1.5rem;
+    }
+    .opt-group + .opt-group,
+    .opt-subpanel + .opt-group {
+        margin-top: 0.5rem;
+    }
+    .opt-group-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.875rem;
+    }
+    .opt-group-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--ink);
+    }
+    .opt-group-hint {
+        font-size: 0.8125rem;
+        color: var(--mute);
+        text-align: right;
+    }
+    .opt-grid {
         display: grid;
-        gap: 0.5rem 1.5rem;
-        padding: 1.25rem 0;
-        border-top: 1px solid var(--line);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
     }
-    @media (min-width: 640px) {
-        .opt-row {
-            grid-template-columns: 12rem 1fr;
-        }
-        .opt-row-nested {
-            padding-left: 1.5rem;
-            grid-template-columns: 10.5rem 1fr;
+    @media (min-width: 768px) {
+        .opt-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
         }
     }
-    .opt-row-nested {
-        border-top-style: dashed;
+    .opt-grid-label {
+        grid-column: 1 / -1;
+        padding-top: 0.75rem;
+        font-size: 0.8125rem;
+        color: var(--mute);
+    }
+    /* A selectable card: photo on a light tile, name below, a radio / check mark in the corner */
+    .opt-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        text-align: left;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+        overflow: hidden;
+        transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+    }
+    .opt-card:hover {
+        border-color: var(--ink-2);
+    }
+    .opt-card-active,
+    .opt-card-active:hover {
+        border-color: var(--ink);
+        box-shadow: inset 0 0 0 1px var(--ink);
+    }
+    .opt-card:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+    .opt-card:disabled:hover {
+        border-color: var(--line);
+    }
+    .opt-card-media {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 4 / 3;
+        padding: 0.75rem;
+        background: #EFEFEA; /* stays light in dark mode: the product photos are shot on white */
+    }
+    .opt-card-media img {
+        position: relative;
+        z-index: 1;
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        mix-blend-mode: multiply;
+    }
+    /* Shown when the option has no photo (or it fails to load); a photo covers it */
+    .opt-card-initials {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-size: 1.75rem;
+        letter-spacing: -0.02em;
+        color: #A9AAA3;
+    }
+    .opt-card-check {
+        position: absolute;
+        top: 0.625rem;
+        right: 0.625rem;
+        z-index: 2;
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 1px solid #C9CAC3;
+        background: #FFFFFF;
+        transition: border-color 0.25s var(--ease), border-width 0.25s var(--ease), background-color 0.25s var(--ease);
+    }
+    .opt-card-check-radio {
+        border-radius: 9999px;
+    }
+    .opt-card-check-check {
+        border-radius: 3px;
+    }
+    .opt-card-active .opt-card-check-radio {
+        border: 6px solid var(--green);
+    }
+    .opt-card-active .opt-card-check-check {
+        border-color: var(--green);
+        background: var(--green) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10.5l3.2 3.2L15 7' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") center / 100% no-repeat;
+    }
+    .opt-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        padding: 0.75rem 0.875rem 0.875rem;
+    }
+    .opt-card-name {
+        font-size: 0.9375rem;
+        font-weight: 500;
+        line-height: 1.3;
+        color: var(--ink);
+    }
+    .opt-card-detail {
+        font-size: 0.8125rem;
+        line-height: 1.35;
+        color: var(--mute);
+    }
+    .opt-card-note {
+        margin-top: 0.25rem;
+        font-size: 0.8125rem;
+        color: var(--green-text);
+    }
+    /* Single items with an amount or a mounting side: photo beside the name and a segmented control */
+    .opt-item {
+        display: grid;
+        grid-template-columns: 7.5rem minmax(0, 1fr);
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+        overflow: hidden;
+        transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+    }
+    .opt-item .opt-card-media {
+        height: 100%;
+        aspect-ratio: auto;
+        min-height: 6rem;
+    }
+    .opt-item-body {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.625rem;
+        padding: 0.875rem 1rem;
+    }
+    .opt-seg {
+        display: inline-flex;
+        flex-wrap: wrap;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+    .opt-seg-btn {
+        min-width: 3.25rem;
+        min-height: 2.5rem;
+        padding: 0 0.875rem;
+        font-size: 0.875rem;
+        color: var(--ink-2);
+        background: var(--paper);
+        transition: background-color 0.25s var(--ease), color 0.25s var(--ease);
+    }
+    .opt-seg-btn + .opt-seg-btn {
+        border-left: 1px solid var(--line);
+    }
+    .opt-seg-btn:hover {
+        color: var(--ink);
+        background: var(--stone);
+    }
+    .opt-seg-active,
+    .opt-seg-active:hover {
+        color: var(--on-band);
+        background: var(--band);
+        font-weight: 600;
+    }
+    .opt-seg-btn:disabled {
+        cursor: not-allowed;
+        color: var(--mute);
+        background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);
+        opacity: 0.6;
+    }
+    /* What the build comes with */
+    .opt-included {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        padding-top: 1.5rem;
+    }
+    @media (min-width: 768px) {
+        .opt-included {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+    .opt-included-item {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+    }
+    .opt-included-item .opt-card-media {
+        aspect-ratio: 16 / 9;
+    }
+    /* Sub-choices (fenders and add-ons, flip seat color) in a tinted panel under their parent */
+    .opt-subpanel {
+        margin-top: 0.75rem;
+        padding: 0 1rem 1rem;
+        background: var(--stone);
+        border-left: 2px solid var(--green);
+    }
+    .opt-group-nested .opt-group-title {
+        font-size: 0.9375rem;
+    }
+    .opt-group-nested .opt-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .detail-trim-dot {
         width: 1.125rem;

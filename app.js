@@ -3634,47 +3634,211 @@ function refreshTempoOptions() {
     updateBuildSummaryLine();
 }
 
+// Photos for the equipment cards (image/Options), from the sales team's Drive library ("Step 3 Power,
+// Drivetrain & Suspension" and "Step 4 Accessories"). scripts/import-option-photos.mjs copies them in from a
+// downloaded copy of those folders. Options without a photo here show a plain tile.
+const OPTION_PHOTOS = {
+    // Battery
+    'Trojan FLA 8V lead-acid': 'battery-trojan-8v',
+    'Battlite lithium': 'battery-battlite',
+    // Lighting
+    'GC Apex Tempo LED Headlights & Tail Lights': 'light-gc-apex',
+    'Club Car Tempo Deluxe Light Kit': 'light-cc-deluxe',
+    // Wheels and tires
+    '12" Triton Machined Black, 215/35-12 tires': 'wheel-12-triton-215',
+    '12" Hela Bright Chrome, 215/35-12 tires': 'wheel-12-hela-215',
+    '10" 5-spoke alloy wheels, gunmetal': 'wheel-10-5spoke-gunmetal',
+    '14" Gridlock Machined Black, 225/30-14 tires': 'wheel-14-gridlock-machined-225',
+    '14" Gridlock Gloss Black, 225/30-14 tires': 'wheel-14-gridlock-gloss-225',
+    '14" Talon, 225/30-14 tires': 'wheel-14-talon-225',
+    '12" Triton Machined Black, 23x10.5-12 tires': 'wheel-12-triton-23105',
+    '14" Aerion Gloss Black, 225/30-14 tires': 'wheel-14-aerion-gloss-225',
+    '14" Aerion Gloss Black, Kraken 23x10-14 tires': 'wheel-14-aerion-gloss-kraken',
+    '14" Aerion Black Chrome, Kraken 23x10-14 tires': 'wheel-14-aerion-chrome-kraken',
+    '14" Athena Solid Gloss Black, Kraken 23x10-14 tires': 'wheel-14-athena-gloss-kraken',
+    '14" Atlas Gunmetal, Kraken 23x10-14 tires': 'wheel-14-atlas-gunmetal-kraken',
+    '14" Zeus Gloss Black and Machined, Kraken 23x10-14 tires': 'wheel-14-zeus-kraken',
+    '14" Mercury, Kraken 23x10-14 tires': 'wheel-14-mercury-kraken',
+    '12" Hela Bright Chrome, 23x10.5-12 tires': 'wheel-12-hela-23105',
+    // Golf accessories
+    'GC Bag Cover, Black': 'bag-cover-black',
+    'Bag Cover, Beige': 'bag-cover-beige',
+    'Bag Cover, White': 'bag-cover-white',
+    'Club Car Magnetic Bag Cover, Black': 'bag-cover-magnetic-black',
+    'Club Car Magnetic Bag Cover, Beige': 'bag-cover-magnetic-beige',
+    sandBottle: 'sand-bottle',
+    ballWasher: 'ball-washer',
+    cooler: 'caddy-cooler',
+    caddyStand: 'caddy-stand',
+    // Lift
+    lift: 'lift-gc-35',
+    'Tempo Fenders 3"': 'fender-tempo-3',
+    'Tempo Fenders 1.5"': 'fender-tempo-15',
+    'GC Brush Guard': 'brush-guard',
+    'Nerf Bar': 'nerf-bar',
+    // Rear flip seats
+    'Genesis Rear Flip Seat': 'flip-genesis',
+    'Onward Premium Flip Seat': 'flip-onward',
+    // Audio and charging
+    'Club Car Premium Sound Bar': 'audio-cc-soundbar',
+    'GC Sound Bar 27" RGB': 'audio-gc-soundbar-27',
+    'Wireless Charging': 'charge-wireless',
+    'Premium USB-C Charging Port': 'charge-usb-c',
+    'GC USB-C Charging Port QC3.0 with Volt Meter': 'charge-usb-c-voltmeter',
+    steering: 'steering-premium',
+    // Mirrors and storage
+    'Side Mirrors': 'mirror-side',
+    'Side Mirrors with Turn Signal': 'mirror-side-signal',
+    '5 Panel Mirror': 'mirror-5-panel',
+    'Convex Inner Mirror (short)': 'mirror-convex-short',
+    'Convex Inner Mirror (long)': 'mirror-convex-long',
+    'Overhead Storage Console': 'storage-overhead',
+    'Under Seat Storage Tray': 'storage-under-seat',
+    // Rain enclosures
+    'Three-sided rain enclosure, Beige': 'enclosure-3-beige',
+    'Three-sided rain enclosure, White': 'enclosure-3-white',
+    'Three-sided rain enclosure, Black': 'enclosure-3-black',
+    'Two-sided rain enclosure, Black (Club Car)': 'enclosure-2-black'
+};
+
+// A photo for an option (by option name, or by the group's id for single-item groups such as the ball washer)
+function optionPhoto(key) {
+    const file = OPTION_PHOTOS[key];
+    return file ? `image/Options/${file}.jpg` : null;
+}
+
+// "12" Triton Machined Black, 215/35-12 tires" -> name and detail lines for a card
+function splitOptionName(text) {
+    const at = text.indexOf(', ');
+    return at > 0 ? [text.slice(0, at), text.slice(at + 2)] : [text, ''];
+}
+
+// The picture area of a card: the photo, or a plain tile with a picture glyph when there's none (a dash for
+// "None"); the photo covers the glyph, which shows again if the photo fails to load
+const OPTION_PLACEHOLDER = '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.25"><rect x="3.5" y="5" width="17" height="14" rx="1"/><circle cx="9" cy="10" r="1.75"/><path d="M4 17.5l5-4.5 3.5 3 3-2.5 4.5 4"/></svg>';
+
+function optionMedia(photo, label) {
+    return `
+        <span class="opt-card-media">
+            ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}
+            <span class="opt-card-initials" aria-hidden="true">${label === 'None' ? '&mdash;' : OPTION_PLACEHOLDER}</span>
+        </span>`;
+}
+
+// One selectable card. `extra` holds attributes such as disabled.
+function optionCard({ key, label, photo, active, onclick, kind, note = '', extra = '' }) {
+    const [name, detail] = splitOptionName(label);
+    return `
+        <button type="button" onclick="${onclick}" data-opt-key="${key}" aria-pressed="${active}" class="opt-card ${active ? 'opt-card-active' : ''}" ${extra}>
+            ${optionMedia(photo, name)}
+            <span class="opt-card-check ${kind === 'check' ? 'opt-card-check-check' : 'opt-card-check-radio'}" aria-hidden="true"></span>
+            <span class="opt-card-body">
+                <span class="opt-card-name">${name}</span>
+                ${detail ? `<span class="opt-card-detail">${detail}</span>` : ''}
+                ${note ? `<span class="opt-card-note">${note}</span>` : ''}
+            </span>
+        </button>`;
+}
+
+// A small segmented control (None / 1 / 2, or None / Both / Left / Right) under a single-item card
+function optionSegments(items) {
+    return `<span class="opt-seg" role="group">${items.map(it => `
+        <button type="button" onclick="${it.onclick}" data-opt-key="${it.key}" aria-pressed="${it.active}" class="opt-seg-btn ${it.active ? 'opt-seg-active' : ''}" ${it.disabled ? 'disabled' : ''}>${it.label}</button>`).join('')}
+    </span>`;
+}
+
+// What the visitor can do in a group, shown under its title
+function optionGroupHint(g) {
+    if (g.type === 'single') return 'Choose one';
+    if (g.type === 'optional') return 'Optional, choose one';
+    if (g.type === 'multi') return 'Optional, add any';
+    if (g.type === 'qty') return 'None, one or two';
+    if (g.type === 'side') return 'Mounts on the left, right or both sides';
+    if (g.type === 'flag') return 'Optional';
+    return '';
+}
+
 function renderTempoGroup(g, o, nested) {
-    const chip = (label, active, onclick, key, extra = '') => `
-        <button type="button" onclick="${onclick}" data-opt-key="${key}" aria-pressed="${active}" class="detail-trim ${active ? 'detail-trim-active' : ''}" ${extra}>${label}</button>`;
-    const dot = opt => g.id === 'flipSeatColor' ? `<span class="detail-trim-dot" style="background:${getTrimHex('seat', opt) || '#D6D6CE'}"></span>` : '';
-    let controls = '';
-    if (g.type === 'fixed') {
-        controls = `<p class="text-ink pt-2">${g.value}</p>`;
-    } else if (g.type === 'single' || g.type === 'optional') {
-        if (g.type === 'optional') controls += chip('None', !o[g.id], `pickTempoOption('${g.id}', -1)`, `${g.id}:none`);
+    let body = '';
+    if (g.type === 'single' || g.type === 'optional' || g.type === 'multi') {
+        const cards = [];
+        if (g.type === 'optional') {
+            cards.push(optionCard({ key: `${g.id}:none`, label: 'None', photo: null, active: !o[g.id], onclick: `pickTempoOption('${g.id}', -1)`, kind: 'radio' }));
+        }
         g.options.forEach((opt, k) => {
-            if (g.upgradeFrom && k === g.upgradeFrom) controls += '<p class="w-full text-sm text-mute pt-2">Upgrades</p>';
-            controls += chip(dot(opt) + opt, o[g.id] === opt, `pickTempoOption('${g.id}', ${k})`, `${g.id}:${k}`);
+            if (g.upgradeFrom && k === g.upgradeFrom) cards.push('<p class="opt-grid-label">Upgrades</p>');
+            const multi = g.type === 'multi';
+            const active = multi ? (o[g.id] || []).includes(opt) : o[g.id] === opt;
+            cards.push(optionCard({
+                key: `${g.id}:${k}`, label: opt, photo: optionPhoto(opt), active,
+                onclick: multi ? `toggleTempoOption('${g.id}', ${k})` : `pickTempoOption('${g.id}', ${k})`,
+                kind: multi ? 'check' : 'radio'
+            }));
         });
-    } else if (g.type === 'multi') {
-        g.options.forEach((opt, k) => {
-            controls += chip(opt, (o[g.id] || []).includes(opt), `toggleTempoOption('${g.id}', ${k})`, `${g.id}:${k}`);
-        });
-    } else if (g.type === 'qty') {
-        [0, 1, 2].forEach(n => {
-            controls += chip(n ? String(n) : 'None', o[g.id] === n, `setTempoQty('${g.id}', ${n})`, `${g.id}:${n}`);
-        });
-    } else if (g.type === 'side') {
-        TEMPO_SIDES.forEach(s => {
-            const taken = tempoSideTaken(g, s.value, o);
-            controls += chip(s.label, (o[g.id] || '') === s.value, `setTempoSide('${g.id}', '${s.value}')`, `${g.id}:${s.value || 'none'}`, taken ? 'disabled' : '');
-        });
-        const used = tempoSidesOf(o[g.shares]);
-        if (used.length) controls += `<p class="w-full text-sm text-mute">${used.length > 1 ? 'Both sides are' : `The ${used[0]} side is`} taken by the ${g.sharesTitle}.</p>`;
+        // Seat colors read better as swatches than as photo cards
+        if (g.id === 'flipSeatColor') {
+            body = `<div class="flex flex-wrap gap-2">${g.options.map((opt, k) => `
+                <button type="button" onclick="pickTempoOption('${g.id}', ${k})" data-opt-key="${g.id}:${k}" aria-pressed="${o[g.id] === opt}" class="detail-trim ${o[g.id] === opt ? 'detail-trim-active' : ''}">
+                    <span class="detail-trim-dot" style="background:${getTrimHex('seat', opt) || '#D6D6CE'}"></span>${opt}
+                </button>`).join('')}</div>`;
+        } else {
+            body = `<div class="opt-grid">${cards.join('')}</div>`;
+        }
+    } else if (g.type === 'qty' || g.type === 'side') {
+        const segs = g.type === 'qty'
+            ? [0, 1, 2].map(n => ({ key: `${g.id}:${n}`, label: n ? String(n) : 'None', active: o[g.id] === n, onclick: `setTempoQty('${g.id}', ${n})` }))
+            : TEMPO_SIDES.map(s => ({ key: `${g.id}:${s.value || 'none'}`, label: s.label, active: (o[g.id] || '') === s.value, onclick: `setTempoSide('${g.id}', '${s.value}')`, disabled: tempoSideTaken(g, s.value, o) }));
+        const used = g.type === 'side' ? tempoSidesOf(o[g.shares]) : [];
+        const chosen = g.type === 'qty' ? o[g.id] > 0 : !!o[g.id];
+        body = `
+            <div class="opt-item ${chosen ? 'opt-card-active' : ''}">
+                ${optionMedia(optionPhoto(g.id), g.title)}
+                <span class="opt-item-body">
+                    ${optionSegments(segs)}
+                    ${used.length ? `<span class="opt-card-note">${used.length > 1 ? 'Both sides are' : `The ${used[0]} side is`} taken by the ${g.sharesTitle}.</span>` : ''}
+                </span>
+            </div>`;
     } else if (g.type === 'flag') {
         const blocked = g.requires && !o[g.requires];
-        controls = chip(g.label, !!o[g.id], `toggleTempoOption('${g.id}')`, `${g.id}:on`, blocked ? 'disabled' : '')
-            + (blocked && g.requiresNote ? `<p class="w-full text-sm text-mute">${g.requiresNote}</p>` : '');
+        body = `<div class="opt-grid">${optionCard({
+            key: `${g.id}:on`, label: g.label, photo: optionPhoto(g.id), active: !!o[g.id],
+            onclick: `toggleTempoOption('${g.id}')`, kind: 'check',
+            note: blocked && g.requiresNote ? g.requiresNote : (o[g.id] ? 'Added' : 'Add to build'),
+            extra: blocked ? 'disabled' : ''
+        })}</div>`;
     }
+    const hint = optionGroupHint(g);
     return `
-        <div class="opt-row ${nested ? 'opt-row-nested' : ''}">
-            <p class="${nested ? 'text-mute' : 'text-ink-2'} text-sm pt-2">${g.title}</p>
-            <div class="flex flex-wrap gap-2" role="group" aria-label="${g.title}">${controls}</div>
+        <div class="opt-group ${nested ? 'opt-group-nested' : ''}" role="group" aria-label="${g.title}">
+            <div class="opt-group-head">
+                <p class="opt-group-title">${g.title}</p>
+                ${hint ? `<p class="opt-group-hint">${hint}</p>` : ''}
+            </div>
+            ${body}
         </div>`;
 }
 
-// The build's equipment, grouped into sections, with each choice's sub-choices under it
+// What the build comes with: small cards, nothing to choose
+function renderTempoIncluded(groups) {
+    return `
+        <div class="opt-included">
+            ${groups.map(g => {
+                const [name, detail] = splitOptionName(g.value);
+                return `
+                    <div class="opt-included-item">
+                        ${optionMedia(optionPhoto(g.value) || optionPhoto(g.id), name)}
+                        <span class="opt-card-body">
+                            <span class="opt-card-detail">${g.title}</span>
+                            <span class="opt-card-name">${name}</span>
+                            ${detail ? `<span class="opt-card-detail">${detail}</span>` : ''}
+                        </span>
+                    </div>`;
+            }).join('')}
+        </div>`;
+}
+
+// The build's equipment: what's included first, then each section's choices as photo cards, with
+// sub-choices (fenders, flip seat color) in a panel under their parent
 function renderTempoOptions(product) {
     const i = detailLevelIndex(product);
     const o = detailBuild.options;
@@ -3684,14 +3848,20 @@ function renderTempoOptions(product) {
     const sections = [...new Set(groups.map(g => g.section))];
     return `
         <p class="text-sm text-ink-2">Showing the <span class="text-ink font-medium">${product.name} ${level.name}</span> build. <button type="button" onclick="scrollToDetailSection('build')" class="link">Change build</button></p>
-        ${sections.map(section => `
-            <div class="mt-10">
-                <h3 class="type-md text-ink pb-2">${section}</h3>
-                ${groups.filter(g => g.section === section).map(g =>
-                    renderTempoGroup(g, o, false) + subs.filter(s => s.parent === g.id).map(s => renderTempoGroup(s, o, true)).join('')
-                ).join('')}
-            </div>
-        `).join('')}`;
+        ${sections.map(section => {
+            const inSection = groups.filter(g => g.section === section);
+            return `
+                <div class="opt-section">
+                    <h3 class="opt-section-title">${section}</h3>
+                    ${section === 'Included'
+                        ? renderTempoIncluded(inSection)
+                        : inSection.map(g => {
+                            const children = subs.filter(s => s.parent === g.id);
+                            return renderTempoGroup(g, o, false)
+                                + (children.length ? `<div class="opt-subpanel">${children.map(s => renderTempoGroup(s, o, true)).join('')}</div>` : '');
+                        }).join('')}
+                </div>`;
+        }).join('')}`;
 }
 
 // Splits a spec like "100 km per charge" into a big number, a unit, and a small trailing note
