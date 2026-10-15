@@ -21,8 +21,8 @@
 const TEMPO_TWO_SEAT_PREVIEW = {
     base: 'image/Products/Base +.png',
     seatStripes: true,
-    // Backrest from the seat top to 0.426 of the cart's height, cushion below it
-    seatZones: [0.252, 0.426, 0.7],
+    // Backrest from the seat top to 0.45 of the cart's height (its bottom edge is at 0.443), cushion below it
+    seatZones: [0.252, 0.45, 0.7],
     // Seat: from the top of the backrests (y 0.252) down; between the hood badge (x 0.37) and the rear curtain (x 0.785)
     seat: { hue: [25, 55], sat: [0.12, 0.8], light: [0.3, 0.95], box: [0.252, 0.7], x: [0.37, 0.785] },
     // Canopy: the roof, plus the rear side curtain that hangs down beside the seat backs
@@ -35,7 +35,27 @@ const TEMPO_TWO_SEAT_PREVIEW = {
 const COLOR_PREVIEW = {
     'golfer-tempo-2-2': {
         base: 'image/Products/Tempo 2+2 - Golf - Red.png',
-        seat: { hue: [22, 48], sat: [0.18, 1], light: [0.12, 0.9], box: [0.25, 0.75] },
+        // Seats only right of the windshield post (x 0.45), so the gold hood badge keeps its color. The pale
+        // stitched panels are low in saturation (from 0.08); the second rule takes the dark brown piping.
+        seat: [
+            { hue: [18, 65], sat: [0.08, 1], light: [0.12, 0.97], box: [0.25, 0.75], x: [0.45, 0.9] },
+            { hue: [18, 45], sat: [0.4, 1], light: [0.02, 0.12], box: [0.25, 0.75], x: [0.45, 0.9] }
+        ],
+        // The seat area is boxed in above, so only colors very close to the red paint (within 12°) are kept
+        // off the seat; the default 24° also kept the brown piping (hue 20-29) off it
+        bodyHueGap: 12,
+        // The photographed seat is two-tone (pale panels, caramel bolsters); less of its light / dark carries
+        // over, so a one-color seat reads as one color
+        seatContrast: 0.45,
+        // Stripes run across each part of the seat on its own: front backrest, front cushion, and the
+        // rear-facing seat's back and cushion (x = fraction of the photo's width, y = of the cart's height)
+        seatStripes: true,
+        seatBoxes: [
+            { x: [0.46, 0.755], y: [0.3, 0.531] },
+            { x: [0.46, 0.75], y: [0.531, 0.65] },
+            { x: [0.755, 0.84], y: [0.3, 0.495] },
+            { x: [0.75, 0.9], y: [0.495, 0.6] }
+        ],
         canopy: { hue: [0, 360], sat: [0, 0.35], light: [0, 0.55], box: [0, 0.17] }
     },
     'golfer-tempo-2': TEMPO_TWO_SEAT_PREVIEW,
@@ -199,6 +219,22 @@ function seatZones(base, region, cuts) {
     return zones;
 }
 
+// Seat parts given as boxes ({ x: [from, to] of the photo's width, y: [from, to] of the cart's height}), for
+// photos with more than one seat; each box gets the measured width of the seat pixels inside it
+function seatBoxZones(base, region, boxes) {
+    const height = Math.max(1, base.bottom - base.top);
+    return boxes.map(b => {
+        const y0 = base.top + b.y[0] * height, y1 = base.top + b.y[1] * height;
+        const x0 = b.x[0] * base.w, x1 = b.x[1] * base.w;
+        const xs = region.idx.filter(i => {
+            const x = i % base.w, y = Math.floor(i / base.w);
+            return y >= y0 && y < y1 && x >= x0 && x < x1;
+        }).map(i => i % base.w);
+        const [minX, maxX] = percentileSpan(xs, base.w);
+        return { y0, y1, x0, x1, minX, maxX };
+    });
+}
+
 // A region rule, or a list of rules where any one matching is enough
 function regionRule(rule) {
     if (Array.isArray(rule)) {
@@ -214,19 +250,23 @@ function regionRule(rule) {
 // Paints one region toward a target color, keeping the photo's shading.
 // `bands` (optional) paints hard vertical stripes across the region instead, for patterned seats such as
 // the Tsunami: [{ hsl, to }] where `to` is where the stripe ends, as a fraction of the region's width.
-function paintRegion(out, base, region, target, xGradient, bands) {
-    const contrast = 0.85;
+function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.85) {
     for (const i of region.idx) {
         let th = target[0], ts = target[1], tl = target[2];
         if (bands) {
             // Stripes run across the seat zone (backrest or cushion) this pixel belongs to
-            const y = Math.floor(i / base.w);
-            const zone = (region.zones && region.zones.find(z => y >= z.y0 && y < z.y1)) || region;
-            const xf = ((i % base.w) - zone.minX) / Math.max(1, zone.maxX - zone.minX);
-            // Edge pixels just past the measured width take the outer stripe; far-off specks are left alone
-            if (xf < -0.15 || xf > 1.15) continue;
-            const band = bands.find(b => Math.max(0, xf) <= b.to) || bands[bands.length - 1];
-            [th, ts, tl] = band.hsl;
+            const y = Math.floor(i / base.w), x = i % base.w;
+            const zone = region.zones
+                ? region.zones.find(z => y >= z.y0 && y < z.y1 && (z.x0 === undefined || (x >= z.x0 && x < z.x1)))
+                : region;
+            // Seat pixels outside every seat-part box (small trim pieces) take the seat's signature color
+            if (zone) {
+                const xf = (x - zone.minX) / Math.max(1, zone.maxX - zone.minX);
+                // Edge pixels just past the measured width take the outer stripe; far-off specks are left alone
+                if (xf < -0.15 || xf > 1.15) continue;
+                const band = bands.find(b => Math.max(0, xf) <= b.to) || bands[bands.length - 1];
+                [th, ts, tl] = band.hsl;
+            }
         } else if (xGradient) {
             // Multi-tone paints (chameleon, 3D) shift color across the body
             const x = (i % base.w) / base.w;
@@ -280,10 +320,11 @@ async function renderCartPreview(slug, choice) {
         // pick up the seat color and show as specks on the panels)
         const notBody = rule => {
             const test = regionRule(rule);
-            return (hh, ss, ll, y, x) => test(hh, ss, ll, y, x) && !(ss >= 0.2 && hueDistance(hh, bodyHue) <= 24);
+            return (hh, ss, ll, y, x) => test(hh, ss, ll, y, x) && !(ss >= 0.2 && hueDistance(hh, bodyHue) <= (cfg.bodyHueGap || 24));
         };
         const seat = cfg.seat ? collectRegion(base, notBody(cfg.seat)) : null;
         if (seat && cfg.seatZones) seat.zones = seatZones(base, seat, cfg.seatZones);
+        if (seat && cfg.seatBoxes) seat.zones = seatBoxZones(base, seat, cfg.seatBoxes);
         recolorRegionCache[slug] = {
             body: collectRegion(base, isBody),
             seat,
@@ -300,7 +341,7 @@ async function renderCartPreview(slug, choice) {
     const seatBands = choice.seatBands && cfg.seatStripes
         ? choice.seatBands.map(b => ({ hsl: hexToHsl(b.hex), to: b.to }))
         : null;
-    if (seat && regions.seat) paintRegion(out, base, regions.seat, seat.hsl, null, seatBands);
+    if (seat && regions.seat) paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
     const body = parseSwatch(choice.body);
     if (body) paintRegion(out, base, regions.body, body.hsl, body.gradient && body.gradient.length > 1 ? body.gradient : null);
 
