@@ -1260,7 +1260,10 @@
     /* As the homepage hero: full width, short enough that the control bar shows on a laptop screen.
        The banners' own text sits well inside the frame, so the slight crop on tall screens is safe. */
     .home-banners .banner-stage {
-        max-height: calc(100svh - 4rem - 4.5rem);
+        /* ...but never shorter than 38vw: on short windows and at high browser zoom the banner is cropped no
+           more than on a full-size laptop or desktop screen, so its text isn't cut off (the bar then sits
+           just below the fold) */
+        max-height: max(calc(100svh - 4rem - 4.5rem), 38vw);
         width: 100%;
     }
     .banner-bar {

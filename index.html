@@ -10,6 +10,16 @@
     <meta name="theme-color" content="#F6F6F2">
     <!-- Dark mode, if the visitor chose it before: applied before anything paints, so there is no light flash -->
     <script>try { if (localStorage.getItem('theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
+    <!-- No pinch or Ctrl+scroll zoom on desktop: a touchpad pinch magnifies the page like a loupe (the header
+         slides out of view and the banner looks blown up). Browsers report it as a wheel event with ctrlKey;
+         Safari as gesture events. Keyboard zoom (Ctrl + / Ctrl -) and the browser's zoom menu still work, so
+         visitors who need larger text can still get it; the layout reflows at those sizes. -->
+    <script>
+        window.addEventListener('wheel', function (e) { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+        ['gesturestart', 'gesturechange'].forEach(function (type) {
+            document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
+        });
+    </script>
     <!-- SEO:HEAD (per-page canonical, Open Graph and structured data are written here by the build) -->
 
     <link rel="preload" href="fonts/newsreader-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
