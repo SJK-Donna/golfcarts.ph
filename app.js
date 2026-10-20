@@ -32,7 +32,7 @@ const PRODUCTS_DATA = [
         battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Motor',
-        image: 'image/Products/builds/golfer-2-scratch-right.jpg',
+        image: 'image/Products/builds/golfer-2-golfer.jpg',
         gallery: ['image/Products/builds/golfer-2-golfer.jpg', 'image/Products/builds/golfer-2-scratch-right.jpg', 'image/Products/builds/golfer-2-pro.jpg'],
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
         galleryLevels: ['golf', 'scratch', 'pro'],
@@ -60,7 +60,7 @@ const PRODUCTS_DATA = [
         battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Electric Motor',
-        image: 'image/Products/builds/golfer-2-2-pro-right.jpg',
+        image: 'image/Products/builds/golfer-2-2-golfer.jpg',
         gallery: ['image/Products/builds/golfer-2-2-golfer.jpg', 'image/Products/builds/golfer-2-2-scratch.jpg', 'image/Products/builds/golfer-2-2-pro-right.jpg'],
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
         galleryLevels: ['golf', 'scratch', 'pro'],
@@ -4051,7 +4051,8 @@ function showDetailBuildView(button, index) {
     const title = document.getElementById('detail-title');
     if (title) title.textContent = buildViewName(product, level);
     const tagline = document.getElementById('detail-tagline');
-    if (tagline) tagline.textContent = level.blurb || level.tagline;
+    // The Golfer build is the model's default view, so it keeps the model's own description
+    if (tagline) tagline.textContent = index === 0 ? product.tagline : (level.blurb || level.tagline);
     const cta = document.getElementById('detail-build-cta');
     if (cta) cta.textContent = `Build your ${buildViewName(product, level)}`;
     if (detailBuild.level !== level.id) selectBuildLevel(level.id);
@@ -4219,8 +4220,8 @@ function renderProductDetailsPage() {
                         <div class="flex gap-2 justify-end" role="group" aria-label="Views">
                             ${product.gallery.map((img, i) => {
                                 const level = product.galleryLevels && buildSet && buildSet.builds.find(b => b.id === product.galleryLevels[i]);
-                                // A model with build views opens on its overview (no build picked yet); others on their first photo
-                                const pressed = level ? false : i === 0;
+                                // The page opens on the first photo: for Golfer 2 / 2+2 that is the Golfer build, the default
+                                const pressed = i === 0;
                                 return `
                                 <button type="button" onclick="${level ? `showDetailBuildView(this, ${i})` : `showDetailImage(this, '${img}')`}" aria-pressed="${pressed}" aria-label="${level ? `${buildViewName(product, level)} build` : `View ${i + 1} of ${product.gallery.length}`}" class="gallery-thumb">
                                     <img src="${img}" alt="" loading="lazy" class="w-full h-full object-contain mix-blend-multiply">
