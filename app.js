@@ -15,7 +15,7 @@ const PRODUCTS_DATA = [
     {
         id: 'golfer-tempo-2',
         slug: 'golfer-tempo-2',
-        name: 'Tempo 2',
+        name: 'Golfer 2',
         category: 'The Golfer',
         heroProduct: true,
         version: 'golfer',
@@ -29,18 +29,20 @@ const PRODUCTS_DATA = [
         seating: '2 Seats (Forward Facing)',
         range: '85 km per charge',
         speed: '30 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Golf, Scratch) or Battlite lithium (Pro)',
+        battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Motor',
-        image: 'image/Products/Premium.png',
-        gallery: ['image/Products/Premium.png', 'image/Products/Base.png', 'image/Products/Premium+.png'],
+        image: 'image/Products/builds/golfer-2-golfer.jpg',
+        gallery: ['image/Products/builds/golfer-2-golfer.jpg', 'image/Products/builds/golfer-2-scratch.jpg', 'image/Products/builds/golfer-2-pro.jpg'],
+        // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
+        buildPhotos: { golf: 'image/Products/builds/golfer-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-pro.jpg' },
         features: ['Two Forward-Facing Seats', 'Golf Bag Provision with Rear Bag Cover', 'Shatter-Resistant Foldable Windshield', 'Corrosion-Resistant Aluminum Frame'],
         specs: { 'Motor Type': '5.0 kW AC Motor', 'Controller': 'Enpower 350A Controller', 'Chassis': 'Aircraft Grade Aluminum Chassis', 'Brakes': '4-Wheel Hydraulic Brake System' }
     },
     {
         id: 'golfer-tempo-2-2',
         slug: 'golfer-tempo-2-2',
-        name: 'Tempo 2+2',
+        name: 'Golfer 2+2',
         category: 'The Golfer',
         version: 'golfer',
         layout: '2+2',
@@ -53,11 +55,13 @@ const PRODUCTS_DATA = [
         seating: '4 Seats (2 Forward + 2 Rear)',
         range: '80 km per charge',
         speed: '30 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Golf, Scratch) or Battlite lithium (Pro)',
+        battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Electric Motor',
-        image: 'image/Products/Tempo 2+2 - Golf.png',
-        gallery: ['image/Products/Tempo 2+2 - Golf.png', 'image/Products/Tempo 2+2 - Golf - Red.png', 'image/Products/Tempo 2+2 - Golf - Red 1.png'],
+        image: 'image/Products/builds/golfer-2-2-golfer.jpg',
+        gallery: ['image/Products/builds/golfer-2-2-golfer.jpg', 'image/Products/builds/golfer-2-2-scratch.jpg', 'image/Products/builds/golfer-2-2-pro.jpg'],
+        // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
+        buildPhotos: { golf: 'image/Products/builds/golfer-2-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-2-pro.jpg' },
         colorPhotos: { 'White': 'image/Products/Tempo 2+2 - Golf.png', 'Sangria': 'image/Products/Tempo 2+2 - Golf - Red.png' },
         features: ['Two Forward + Two Rear-Facing Seats', 'Compatible Rear Golf Bag Attachment', 'High-Impact Foldable Windshield', 'Corrosion-Resistant Aluminum Spaceframe'],
         specs: { 'Motor Type': '5.0 kW AC Direct Drive Motor', 'Controller': 'Curtis 350A Programmable AC Controller', 'Chassis': 'Rust-Proof Lightweight Aluminum', 'Brakes': 'Rear Mechanical Drum & Auto Park Brake' }
@@ -78,7 +82,7 @@ const PRODUCTS_DATA = [
         seating: '4 Seats (Two Forward Rows)',
         range: '85 km per charge',
         speed: '30 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Golf, Scratch) or Battlite lithium (Pro)',
+        battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Motor',
         image: 'image/Products/Club Car 4.png',
@@ -742,7 +746,7 @@ const CATEGORY_BANNERS = {
     'The Golfer': {
         title: 'The Golfer',
         headline: 'Built around the way you play.',
-        subheadline: 'Tempo 2, Tempo 2+2 and Tempo 4, each in Golf, Scratch and Pro builds.',
+        subheadline: 'Golfer 2, Golfer 2+2 and Tempo 4, each in Golfer, Scratch and Pro builds.',
         image: 'image/Products/Premium.png',
         photo: 'image/Banners/golf.jpg',
         photoFocus: '60% 60%'
@@ -802,9 +806,9 @@ const BUILD_SETS = {
 // ==========================================
 const TEMPO_LINES = {
     golfer: {
-        title: 'Golf, Scratch or Pro.',
+        title: 'Golfer, Scratch or Pro.',
         levels: [
-            { id: 'golf', name: 'Golf', fullName: 'Tempo Golf', tagline: 'Golf essentials' },
+            { id: 'golf', name: 'Golfer', fullName: 'Tempo Golf', tagline: 'Golf essentials' },
             { id: 'scratch', name: 'Scratch', fullName: 'Tempo Scratch Golf', tagline: 'Golf accessories and comfort' },
             { id: 'pro', name: 'Pro', fullName: 'Tempo Pro', tagline: 'The premium personal cart' }
         ]
@@ -902,6 +906,11 @@ const SEAT_ALIASES = {
     'Classic Premium Seat Back Camello': 'Premium Camello (Special Promo)',
     'Classic Premium Seat Back Black and Gray': 'Premium Black and Grey (Special Promo)'
 };
+
+// "Golfer 2 · Scratch": a model and its build level named together
+function buildTitle(product, level) {
+    return `${product.name} · ${level.name}`;
+}
 
 // Build line, level and layout of a Tempo model
 function isTempoVersion(product) {
@@ -1070,8 +1079,8 @@ function defaultTempoOptions(product, i) {
 // `label` (optional) is the short name shown in menus and on the pillar pages (e.g. "2 Seater");
 // `name` stays the full model name used in quotes and on the model pages.
 const VEHICLE_MODELS = {
-    'g-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/Premium.png',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
-    'g-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Golf.png',       slug: 'golfer-tempo-2-2' },
+    'g-tempo-2':     { name: 'Golfer 2', label: '2 Seater',            image: 'image/Products/builds/golfer-2-golfer.jpg',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
+    'g-tempo-2-2':   { name: 'Golfer 2+2', label: '2+2 Seater',          image: 'image/Products/builds/golfer-2-2-golfer.jpg',       slug: 'golfer-tempo-2-2' },
     'g-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'golfer-tempo-4' },
     'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/Base +.png',                 slug: 'lifestyle-tempo-2' },
     'l-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2' },
@@ -1110,10 +1119,10 @@ const NAV_SEGMENTS = [
         label: 'The Golfer',
         category: 'The Golfer',
         tagline: 'Built around the way you play.',
-        description: 'A personal cart for regular golf. Tempo 2, Tempo 2+2 and Tempo 4, each in Golf, Scratch and Pro builds.',
+        description: 'A personal cart for regular golf. Golfer 2, Golfer 2+2 and Tempo 4, each in Golfer, Scratch and Pro builds.',
         image: 'image/Products/Premium.png',
         version: 'golfer',
-        links: [{ label: 'Compare Golf / Scratch / Pro', anchor: 'compare' }],
+        links: [{ label: 'Compare Golfer / Scratch / Pro', anchor: 'compare' }],
         subcategories: [
             { id: 'models', label: 'Models', groups: [{ label: 'Models', items: ['g-tempo-2', 'g-tempo-2-2', 'g-tempo-4'] }] }
         ]
@@ -1766,7 +1775,7 @@ function getBuildDetails() {
     const buildSet = getProductBuildSet(product);
     const level = buildSet && (buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0]);
     const rows = [['Model', `${product.name} (${categoryLabel(product.category)})`]];
-    if (level) rows.push(['Build', `${product.name} ${level.name}${level.fullName && level.fullName !== level.name ? ` (${level.fullName})` : ''}`]);
+    if (level) rows.push(['Build', `${buildTitle(product, level)}${level.fullName && level.fullName !== level.name ? ` (${level.fullName})` : ''}`]);
     if (detailBodyColors(product).length) rows.push(['Body color', detailBuild.body || 'Standard']);
     if (getDetailSeatGroups(product).length) rows.push(['Seat', detailBuild.seat || 'Standard']);
     if (getDetailCanopyOptions(product).length) rows.push(['Canopy', detailBuild.canopy || 'Standard']);
@@ -3498,7 +3507,7 @@ function getBuildSummaryText() {
     const buildSet = product && getProductBuildSet(product);
     if (!buildSet) return '';
     const level = buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0];
-    const parts = [`${product.name} ${level.name}`];
+    const parts = [buildTitle(product, level)];
     if (isTempoVersion(product)) {
         const i = detailLevelIndex(product);
         const o = detailBuild.options || {};
@@ -3547,7 +3556,7 @@ function renderBuildPanel(product) {
     return `
         <div class="build-panel-head">
             <p class="text-sm text-on-band-mute">Your build</p>
-            <p class="type-md mt-1">${product.name} ${level.name}</p>
+            <p class="type-md mt-1">${buildTitle(product, level)}</p>
         </div>
         <div class="build-panel-scroll">
             <dl class="build-panel-list">
@@ -3899,7 +3908,7 @@ function renderTempoOptions(product) {
     const subs = getTempoSubGroups(product, i, o);
     const sections = [...new Set(groups.map(g => g.section))];
     return `
-        <p class="text-sm text-ink-2">Showing the <span class="text-ink font-medium">${product.name} ${level.name}</span> build. <button type="button" onclick="scrollToDetailSection('build')" class="link">Change build</button></p>
+        <p class="text-sm text-ink-2">Showing the <span class="text-ink font-medium">${buildTitle(product, level)}</span> build. <button type="button" onclick="scrollToDetailSection('build')" class="link">Change build</button></p>
         ${sections.map(section => {
             const inSection = groups.filter(g => g.section === section);
             return `
@@ -3979,9 +3988,12 @@ function renderBuildSection(product, buildSet) {
             <div class="grid grid-cols-1 md:grid-cols-${buildSet.builds.length} gap-4" role="radiogroup" aria-label="Build level">
                 ${buildSet.builds.map(b => `
                     <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} text-left p-6 lg:p-8 flex flex-col gap-5">
+                        ${product.buildPhotos && product.buildPhotos[b.id] ? `
+                            <span class="build-card-photo"><img src="${product.buildPhotos[b.id]}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
                         <span class="flex items-start justify-between gap-4">
                             <span>
-                                <span class="block type-md text-ink">${product.name} ${b.name}</span>
+                                <span class="block text-sm text-mute">${product.name}</span>
+                                <span class="block type-md text-ink">${b.name}</span>
                                 <span class="block text-sm text-mute mt-1">${b.tagline}</span>
                             </span>
                             <span class="build-card-check" aria-hidden="true"></span>
@@ -4175,13 +4187,13 @@ function renderProductDetailsPage() {
                 </div>
                 <div class="lg:col-span-7 order-1 lg:order-2">
                     <div class="aspect-[4/3] overflow-hidden flex items-center justify-center">
-                        <img id="detail-main-img" src="${product.image}" alt="${product.name}" fetchpriority="high" class="max-h-full w-auto object-contain">
+                        <img id="detail-main-img" src="${product.image}" alt="${product.name}" fetchpriority="high" class="max-h-full w-auto object-contain mix-blend-multiply">
                     </div>
                     ${product.gallery.length > 1 ? `
                         <div class="flex gap-2 justify-end" role="group" aria-label="Views">
                             ${product.gallery.map((img, i) => `
                                 <button type="button" onclick="showDetailImage(this, '${img}')" aria-pressed="${i === 0}" aria-label="View ${i + 1} of ${product.gallery.length}" class="gallery-thumb">
-                                    <img src="${img}" alt="" loading="lazy" class="w-full h-full object-contain">
+                                    <img src="${img}" alt="" loading="lazy" class="w-full h-full object-contain mix-blend-multiply">
                                 </button>
                             `).join('')}
                         </div>
@@ -4424,7 +4436,7 @@ function renderSegmentPage() {
                 <div class="grid lg:grid-cols-12 gap-6 lg:gap-12 items-end mb-10">
                     <h2 class="type-lg text-ink lg:col-span-7">Compare ${buildSet.builds.map(b => b.name).join(', ')}.</h2>
                     <p class="measure lg:col-span-5">${segment.id === 'golfer'
-                        ? 'Golf, Scratch and Pro apply across Tempo 2, Tempo 2+2 and Tempo 4. Canopy, flip seat and enclosure choices depend on the model.'
+                        ? 'Golfer, Scratch and Pro apply across Golfer 2, Golfer 2+2 and Tempo 4. Canopy, flip seat and enclosure choices depend on the model.'
                         : 'Essential, Signature and Elite apply across every lifestyle model. Canopy, flip seat and enclosure choices depend on the model.'}</p>
                 </div>
                 ${renderBuildCompareTable(buildSet)}
