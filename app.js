@@ -37,7 +37,7 @@ const PRODUCTS_DATA = [
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
         galleryLevels: ['golf', 'scratch', 'pro'],
         // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
-        buildPhotos: { golf: 'image/Products/builds/golfer-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-pro.jpg' },
+        buildPhotos: { golf: 'image/Products/builds/golfer-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-scratch-right.jpg', pro: 'image/Products/builds/golfer-2-pro.jpg' },
         features: ['Two Forward-Facing Seats', 'Golf Bag Provision with Rear Bag Cover', 'Shatter-Resistant Foldable Windshield', 'Corrosion-Resistant Aluminum Frame'],
         specs: { 'Motor Type': '5.0 kW AC Motor', 'Controller': 'Enpower 350A Controller', 'Chassis': 'Aircraft Grade Aluminum Chassis', 'Brakes': '4-Wheel Hydraulic Brake System' }
     },
@@ -65,7 +65,7 @@ const PRODUCTS_DATA = [
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
         galleryLevels: ['golf', 'scratch', 'pro'],
         // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
-        buildPhotos: { golf: 'image/Products/builds/golfer-2-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-2-pro.jpg' },
+        buildPhotos: { golf: 'image/Products/builds/golfer-2-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-2-pro-right.jpg' },
         colorPhotos: { 'White': 'image/Products/Tempo 2+2 - Golf.png', 'Sangria': 'image/Products/Tempo 2+2 - Golf - Red.png' },
         features: ['Two Forward + Two Rear-Facing Seats', 'Compatible Rear Golf Bag Attachment', 'High-Impact Foldable Windshield', 'Corrosion-Resistant Aluminum Spaceframe'],
         specs: { 'Motor Type': '5.0 kW AC Direct Drive Motor', 'Controller': 'Curtis 350A Programmable AC Controller', 'Chassis': 'Rust-Proof Lightweight Aluminum', 'Brakes': 'Rear Mechanical Drum & Auto Park Brake' }
