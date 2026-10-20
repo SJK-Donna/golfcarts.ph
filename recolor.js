@@ -67,7 +67,52 @@ const COLOR_PREVIEW = {
     'carryall-500': { base: 'image/Products/CA500.png' }
 };
 
+// The Golfer 2 / 2+2 build photos, one per build level ("<slug>:<level>"). Their paint is white, beige, grey or
+// black, so instead of color rules each has a paint map (scripts/build-masks.mjs): red = body, green = seat,
+// blue = canopy. Parts left at the photo's own color are not repainted (see app.js updateDetailPreview).
+// The striped Tsunami seats in the Scratch photos carry less of their light / dark into a new seat color.
+[
+    ['golfer-tempo-2:golf', 'golfer-2-golfer'], ['golfer-tempo-2:scratch', 'golfer-2-scratch-right', 0.35], ['golfer-tempo-2:pro', 'golfer-2-pro', undefined, 0.4],
+    ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer', undefined, 0.4], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch', 0.35], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro-right', undefined, 0.4]
+].forEach(([key, photo, seatContrast, canopyContrast]) => {
+    // Dark roofs (canopyContrast) carry less of their gloss into a lighter canopy color
+    COLOR_PREVIEW[key] = { base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, seatContrast, canopyContrast };
+});
+
 const recolorCache = {};
+
+// A paint map's pixels per channel (0 body, 1 seat, 2 canopy), at the size the photo is worked at
+function loadRecolorMask(src, w, h) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(ctx.getImageData(0, 0, w, h).data);
+        };
+        img.onerror = reject;
+        img.src = src;
+    });
+}
+
+// A region from one channel of a paint map, in the same shape collectRegion returns
+function maskRegion(base, mask, channel) {
+    const idx = [];
+    const xs = [];
+    for (let i = 0; i < base.w * base.h; i++) {
+        if (mask[i * 4 + channel] > 127) {
+            idx.push(i);
+            xs.push(i % base.w);
+        }
+    }
+    if (!idx.length) return null;
+    const [minX, maxX] = percentileSpan(xs, base.w);
+    const ls = idx.map(i => base.light[i]).sort((p, q) => p - q);
+    return { idx, meanL: ls[Math.floor(ls.length / 2)], midL: ls[Math.floor(ls.length / 2)], minX, maxX };
+}
 
 function loadRecolorBase(src) {
     if (recolorCache[src]) return recolorCache[src];
@@ -307,6 +352,10 @@ async function renderCartPreview(slug, choice) {
     if (!cfg) return null;
     const base = await loadRecolorBase(cfg.base);
 
+    if (!recolorRegionCache[slug] && cfg.mask) {
+        const mask = await loadRecolorMask(cfg.mask, base.w, base.h);
+        recolorRegionCache[slug] = { body: maskRegion(base, mask, 0), seat: maskRegion(base, mask, 1), canopy: maskRegion(base, mask, 2) };
+    }
     if (!recolorRegionCache[slug]) {
         const bodyHue = base.bodyHue;
         // Body = pixels close to the dominant paint hue. A wider band would swallow tan seats on red carts.
@@ -336,7 +385,7 @@ async function renderCartPreview(slug, choice) {
     const out = new Uint8ClampedArray(base.imageData.data);
     // Canopy and seats first so the body (the most important region) wins any overlap
     const canopy = parseSwatch(choice.canopy);
-    if (canopy && regions.canopy) paintRegion(out, base, regions.canopy, canopy.hsl, null);
+    if (canopy && regions.canopy) paintRegion(out, base, regions.canopy, canopy.hsl, null, null, cfg.canopyContrast);
     const seat = parseSwatch(choice.seat);
     const seatBands = choice.seatBands && cfg.seatStripes
         ? choice.seatBands.map(b => ({ hsl: hexToHsl(b.hex), to: b.to }))

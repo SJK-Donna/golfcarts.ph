@@ -3341,16 +3341,27 @@ let detailPreviewToken = 0;
 let livePreviewAvailable = location.protocol !== 'file:';
 
 // Repaints the color preview photo for the current body / seat / canopy choices (see recolor.js)
+// The preview photo for the open model: on Golfer 2 / 2+2, the photo of the chosen build
+function detailPreviewKey(product) {
+    const key = `${product.slug}:${detailBuild.level}`;
+    return hasLiveColorPreview(key) ? key : product.slug;
+}
+
 function updateDetailPreview() {
     const product = PRODUCTS_DATA.find(p => p.slug === currentSlug);
-    if (!product || !hasLiveColorPreview(product.slug) || !livePreviewAvailable) return;
+    if (!product || !livePreviewAvailable) return;
+    const key = detailPreviewKey(product);
+    if (!hasLiveColorPreview(key)) return;
     const body = getProductBodyColors(product).find(c => c.name === detailBuild.body);
+    // On a build photo, parts still in the photo's own colors stay exactly as photographed
+    const look = (key !== product.slug && product.buildLooks && product.buildLooks[detailBuild.level]) || {};
+    const keep = part => key !== product.slug && (!detailBuild[part] || detailBuild[part] === look[part]);
     const token = ++detailPreviewToken;
-    renderCartPreview(product.slug, {
-        body: body ? body.hex : null,
-        seat: getTrimHex('seat', detailBuild.seat),
-        seatBands: getSeatPattern(detailBuild.seat),
-        canopy: getTrimHex('canopy', detailBuild.canopy)
+    renderCartPreview(key, {
+        body: keep('body') ? null : (body ? body.hex : null),
+        seat: keep('seat') ? null : getTrimHex('seat', detailBuild.seat),
+        seatBands: keep('seat') ? null : getSeatPattern(detailBuild.seat),
+        canopy: keep('canopy') ? null : getTrimHex('canopy', detailBuild.canopy)
     }).then(url => {
         // Ignore results from an older click that finished after a newer one
         if (!url || token !== detailPreviewToken) return;
@@ -3445,7 +3456,7 @@ function selectDetailColor(index, fromVisitor) {
     if (quoteBtn) quoteBtn.dataset.color = color.name;
     // Show the real photo for this color when we have one. Carts with a live preview are then repainted by
     // updateDetailPreview(); if that can't run (e.g. the page was opened from a local file), this photo stays.
-    if (!hasLiveColorPreview(product.slug) || !livePreviewAvailable) {
+    if (!hasLiveColorPreview(detailPreviewKey(product)) || !livePreviewAvailable) {
         const img = document.getElementById('detail-color-img');
         if (img) img.src = color.image || product.image;
         const note = document.getElementById('detail-color-photo-note');
@@ -4303,7 +4314,7 @@ function renderProductDetailsPage() {
                     <div class="lg:col-span-7 lg:sticky lg:top-36">
                         <div class="relative bg-stone px-4 sm:px-8 py-8">
                             <div class="relative aspect-[4/3] overflow-hidden flex items-center justify-center">
-                                <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : (hasLiveColorPreview(product.slug) ? COLOR_PREVIEW[product.slug].base : product.image)}" alt="${product.name} color preview" class="w-full h-full object-contain">
+                                <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : (hasLiveColorPreview(detailPreviewKey(product)) ? COLOR_PREVIEW[detailPreviewKey(product)].base : product.image)}" alt="${product.name} color preview" class="w-full h-full object-contain mix-blend-multiply">
                             </div>
                             <p id="detail-color-photo-note" class="${startColor && !startColor.image ? '' : 'hidden'} text-sm text-ink-2 mt-2">Photo shows a standard finish</p>
                             <!-- Live summary of the selected body / seat / canopy colors -->
