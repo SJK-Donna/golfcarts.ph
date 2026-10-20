@@ -36,6 +36,12 @@ const PRODUCTS_DATA = [
         gallery: ['image/Products/builds/golfer-2-golfer.jpg', 'image/Products/builds/golfer-2-scratch-right.jpg', 'image/Products/builds/golfer-2-pro.jpg'],
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
         galleryLevels: ['golf', 'scratch', 'pro'],
+        // The colors in each build's photo: picking a build starts the color preview in that look
+        buildLooks: {
+            golf: { body: 'White', seat: 'White', canopy: '2 Pass Canopy White' },
+            scratch: { body: 'Cashmere', seat: 'Tsunami Silver Grey & Black', canopy: '2 Pass Canopy Beige' },
+            pro: { body: 'Platinum Grey', seat: 'Classic Premium Seat Camello', canopy: '2 Pass Canopy Black' }
+        },
         // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
         buildPhotos: { golf: 'image/Products/builds/golfer-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-scratch-right.jpg', pro: 'image/Products/builds/golfer-2-pro.jpg' },
         features: ['Two Forward-Facing Seats', 'Golf Bag Provision with Rear Bag Cover', 'Shatter-Resistant Foldable Windshield', 'Corrosion-Resistant Aluminum Frame'],
@@ -64,6 +70,12 @@ const PRODUCTS_DATA = [
         gallery: ['image/Products/builds/golfer-2-2-golfer.jpg', 'image/Products/builds/golfer-2-2-scratch.jpg', 'image/Products/builds/golfer-2-2-pro-right.jpg'],
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
         galleryLevels: ['golf', 'scratch', 'pro'],
+        // The colors in each build's photo: picking a build starts the color preview in that look
+        buildLooks: {
+            golf: { seat: 'Beige', canopy: '80" GC Canopy' },
+            scratch: { body: 'Green', seat: 'Tsunami Silver Grey & Black', canopy: '4 Pass Onward Canopy Beige' },
+            pro: { body: 'Platinum Grey', seat: 'Classic Premium Seat Camello', canopy: '4 Pass Onward Canopy Black' }
+        },
         // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
         buildPhotos: { golf: 'image/Products/builds/golfer-2-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-2-pro-right.jpg' },
         colorPhotos: { 'White': 'image/Products/Tempo 2+2 - Golf.png', 'Sangria': 'image/Products/Tempo 2+2 - Golf - Red.png' },
@@ -3360,7 +3372,8 @@ function updateDetailPreview() {
 }
 
 // Seat / canopy color buttons: same active-state behaviour as the body swatches
-function selectDetailTrim(type, value) {
+function selectDetailTrim(type, value, fromVisitor) {
+    if (fromVisitor) detailBuild.colorsPicked = true;
     detailBuild[type] = value;
     document.querySelectorAll(`.detail-trim[data-type="${type}"]`).forEach(btn => {
         const active = btn.dataset.value === value;
@@ -3415,7 +3428,8 @@ function getDetailSpecGroups(product) {
         .filter(g => g.rows.length);
 }
 
-function selectDetailColor(index) {
+function selectDetailColor(index, fromVisitor) {
+    if (fromVisitor) detailBuild.colorsPicked = true;
     const product = PRODUCTS_DATA.find(p => p.slug === currentSlug);
     if (!product) return;
     const color = detailBodyColors(product)[index];
@@ -3621,10 +3635,11 @@ function selectBuildLevel(id) {
     if (product && isTempoVersion(product)) {
         // Keep the colors the new build offers; otherwise fall back to its first body color / the standard trim
         const i = detailLevelIndex(product);
-        const bodies = detailBodyColors(product);
-        const bodyIdx = Math.max(0, bodies.findIndex(c => c.name === detailBuild.body));
         if (!TEMPO_MATRIX.seat[i].includes(detailBuild.seat)) detailBuild.seat = null;
         if (!getDetailCanopyOptions(product).includes(detailBuild.canopy)) detailBuild.canopy = null;
+        applyBuildLook(product);
+        const bodies = detailBodyColors(product);
+        const bodyIdx = Math.max(0, bodies.findIndex(c => c.name === detailBuild.body));
         detailBuild.options = carryTempoOptions(product, i, detailBuild.options || {});
         const pickers = document.getElementById('detail-color-pickers');
         if (pickers) pickers.innerHTML = renderDetailColorPickers(product);
@@ -3633,6 +3648,17 @@ function selectBuildLevel(id) {
         refreshTempoOptions();
     }
     updateBuildSummaryLine();
+}
+
+// The colors of the current build's photo, so the color preview starts out looking like that build. Once the
+// visitor picks a color themselves, their choices stay.
+function applyBuildLook(product) {
+    const look = product.buildLooks && product.buildLooks[detailBuild.level];
+    if (!look || detailBuild.colorsPicked) return;
+    const i = detailLevelIndex(product);
+    if (look.body && TEMPO_MATRIX.body[i].includes(look.body)) detailBuild.body = look.body;
+    if (look.seat && TEMPO_MATRIX.seat[i].includes(look.seat)) detailBuild.seat = look.seat;
+    if (look.canopy && getDetailCanopyOptions(product).includes(look.canopy)) detailBuild.canopy = look.canopy;
 }
 
 // --- Equipment and upgrades (Tempo builds) ---
@@ -4088,7 +4114,7 @@ function renderDetailColorPickers(product) {
                         <div class="flex flex-wrap gap-3" role="radiogroup" aria-label="${group.tier}">
                             ${group.colors.map(c => {
                                 const i = idx++;
-                                return `<button type="button" role="radio" aria-checked="${i === activeIdx}" onclick="selectDetailColor(${i})" title="${attrText(c.name)}" aria-label="${attrText(c.name)}" class="detail-swatch ${i === activeIdx ? 'detail-swatch-active' : ''}" style="background:${c.hex}"></button>`;
+                                return `<button type="button" role="radio" aria-checked="${i === activeIdx}" onclick="selectDetailColor(${i}, true)" title="${attrText(c.name)}" aria-label="${attrText(c.name)}" class="detail-swatch ${i === activeIdx ? 'detail-swatch-active' : ''}" style="background:${c.hex}"></button>`;
                             }).join('')}
                         </div>
                     </div>
@@ -4113,7 +4139,7 @@ function renderDetailColorPickers(product) {
                             ${group.options.map(opt => {
                                 const active = detailBuild[t.type] === opt;
                                 return `
-                                <button type="button" onclick="selectDetailTrim(this.dataset.type, this.dataset.value)" data-type="${t.type}" data-value="${attrText(opt)}" aria-pressed="${active}" class="detail-trim ${active ? 'detail-trim-active' : ''}">
+                                <button type="button" onclick="selectDetailTrim(this.dataset.type, this.dataset.value, true)" data-type="${t.type}" data-value="${attrText(opt)}" aria-pressed="${active}" class="detail-trim ${active ? 'detail-trim-active' : ''}">
                                     <span class="detail-trim-dot" style="background:${getTrimHex(t.type, opt) || '#D6D6CE'}"></span>${opt}
                                 </button>`;
                             }).join('')}
@@ -4158,6 +4184,7 @@ function renderProductDetailsPage() {
         options: tempo ? defaultTempoOptions(product, levelIdx) : {}
     };
     if (tempo) fixTempoSubChoices(product, levelIdx, detailBuild.options);
+    if (tempo && pendingIdx < 0) applyBuildLook(product);
     const canopyOptions = getDetailCanopyOptions(product);
     setTimeout(updateDetailBuildSummary, 0);
     setTimeout(updateBuildSummaryLine, 0);
@@ -4276,7 +4303,7 @@ function renderProductDetailsPage() {
                     <div class="lg:col-span-7 lg:sticky lg:top-36">
                         <div class="relative bg-stone px-4 sm:px-8 py-8">
                             <div class="relative aspect-[4/3] overflow-hidden flex items-center justify-center">
-                                <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : product.image}" alt="${product.name} color preview" class="w-full h-full object-contain">
+                                <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : (hasLiveColorPreview(product.slug) ? COLOR_PREVIEW[product.slug].base : product.image)}" alt="${product.name} color preview" class="w-full h-full object-contain">
                             </div>
                             <p id="detail-color-photo-note" class="${startColor && !startColor.image ? '' : 'hidden'} text-sm text-ink-2 mt-2">Photo shows a standard finish</p>
                             <!-- Live summary of the selected body / seat / canopy colors -->
