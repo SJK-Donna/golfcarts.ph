@@ -17,7 +17,9 @@ const W = 900, H = 675;
 // refs: the part's colors in the photo; tol: how far (in Lab, lightness counted 1/kL) a pixel may be
 const MASKS = {
     'golfer-2-golfer': {
-        body: { refs: ['#f1f0ee', '#dbdad6', '#c9c8c4', '#b4b3ae'], kL: 2.5, tol: 9, minL: 55, polys: [
+        body: { refs: ['#f1f0ee', '#dbdad6', '#c9c8c4', '#b4b3ae'], kL: 2.5, tol: 9, minL: 55,
+            exclude: [[[590, 402], [648, 402], [648, 432], [590, 432]]],
+            polys: [
             [[446, 330], [470, 320], [470, 418], [446, 404]],
             [[400, 322], [560, 312], [650, 318], [700, 360], [705, 408], [640, 428], [560, 438], [450, 445], [395, 425]],
             [[160, 345], [240, 335], [400, 345], [395, 470], [330, 470], [235, 468], [160, 425]]
@@ -32,7 +34,7 @@ const MASKS = {
     'golfer-2-scratch-right': {
         body: { refs: ['#ddd6cc', '#c3b8af', '#eeeadf', '#d2c9bd', '#b3a79c', '#9d9185', '#8a7f74', '#a8a097'], kL: 2.5, tol: 8, minL: 38,
             // Headlights (their white LED bars match the paint)
-            exclude: [[[536, 382], [628, 384], [632, 436], [540, 430]], [[698, 366], [728, 366], [730, 424], [700, 424]]],
+            exclude: [[[536, 382], [628, 384], [632, 436], [540, 430]], [[698, 366], [728, 366], [730, 424], [700, 424]], [[643, 400], [692, 400], [692, 426], [643, 426]]],
             polys: [
             [[442, 335], [560, 318], [650, 320], [705, 350], [727, 382], [722, 415], [640, 432], [560, 427], [520, 408], [445, 412]],
             [[146, 344], [200, 334], [234, 336], [240, 390], [456, 394], [452, 432], [410, 472], [240, 472], [148, 428]]
@@ -41,15 +43,15 @@ const MASKS = {
             // Traced on the photo; the hip restraint bar in front of the cushion is left alone
             exclude: [[[232, 328], [250, 320], [300, 382], [300, 396], [285, 396], [232, 350]]],
             polys: [
-            [[248, 222], [262, 214], [300, 214], [308, 228], [350, 226], [356, 216], [400, 216], [408, 232], [422, 248], [440, 258], [444, 300], [440, 340], [452, 352], [452, 384], [420, 392], [350, 396], [300, 396], [262, 392], [240, 385], [232, 345], [230, 300], [232, 255]]
+            [[248, 222], [262, 214], [300, 214], [308, 228], [350, 226], [356, 216], [400, 216], [408, 232], [422, 248], [440, 258], [444, 300], [440, 340], [452, 352], [452, 384], [420, 392], [350, 396], [302, 396], [286, 388], [246, 348], [232, 334], [230, 300], [232, 255]]
         ] },
         canopy: { refs: ['#a18d72', '#7a6850', '#c4b294', '#d6c7aa', '#8f7c62'], kL: 2.5, tol: 10, polys: [
             [[196, 100], [216, 74], [420, 38], [642, 72], [646, 86], [450, 132], [250, 126], [200, 112]]
         ] }
     },
     'golfer-2-pro': {
-        body: { refs: ['#828085', '#827b6c', '#d2d5e1', '#9b999e', '#6b6a6f', '#b4b4ba', '#5a595e', '#4a494e', '#e6e7ee', '#3e3d42', '#333237'], kL: 2.5, tol: 11, minL: 18,
-            exclude: [[[519, 386], [586, 378], [602, 404], [598, 432], [530, 422]], [[690, 382], [712, 372], [716, 420], [694, 426]]],
+        body: { refs: ['#828085', '#827b6c', '#d2d5e1', '#9b999e', '#6b6a6f', '#b4b4ba', '#5a595e', '#4a494e', '#e6e7ee', '#3e3d42', '#333237'], kL: 2.5, tol: 11, minL: 18, growMinL: 12,
+            exclude: [[[519, 386], [586, 378], [602, 404], [598, 432], [530, 422]], [[690, 382], [712, 372], [716, 420], [694, 426]], [[614, 400], [670, 400], [670, 431], [614, 431]]],
             polys: [
             [[448, 332], [560, 320], [650, 323], [708, 360], [720, 412], [640, 432], [520, 412], [450, 412]],
             [[155, 352], [236, 346], [240, 392], [446, 396], [440, 432], [400, 472], [230, 472], [150, 422]]
@@ -102,8 +104,8 @@ const MASKS = {
         ] }
     },
     'golfer-2-2-pro-right': {
-        body: { refs: ['#8a878d', '#7d7970', '#d5d4da', '#a2a0a6', '#6f6d73', '#b8b7bd', '#5a585e', '#4a484e', '#e6e5ea', '#3e3c42', '#333137'], kL: 2.5, tol: 11, minL: 18,
-            exclude: [[[552, 388], [612, 384], [628, 404], [626, 430], [560, 428]], [[714, 378], [730, 364], [738, 410], [720, 426]]],
+        body: { refs: ['#8a878d', '#7d7970', '#d5d4da', '#a2a0a6', '#6f6d73', '#b8b7bd', '#5a585e', '#4a484e', '#e6e5ea', '#3e3c42', '#333137'], kL: 2.5, tol: 11, minL: 18, growMinL: 12,
+            exclude: [[[552, 388], [612, 384], [628, 404], [626, 430], [560, 428]], [[714, 378], [730, 364], [738, 410], [720, 426]], [[648, 400], [704, 400], [704, 430], [648, 430]]],
             polys: [
             [[488, 332], [600, 324], [690, 334], [746, 370], [746, 420], [670, 442], [560, 426], [488, 422]],
             [[160, 372], [240, 362], [250, 396], [470, 400], [462, 440], [420, 482], [240, 482], [160, 432]]
@@ -156,6 +158,41 @@ for (const [name, parts] of Object.entries(MASKS)) {
             if (part === 'body' && (mask[i + 1] || mask[i + 2])) continue;
             const d = Math.min(...refs.map(([L2, a2, b2]) => Math.hypot((L - L2) / spec.kL, a - a2, b - b2)));
             if (d <= spec.tol) mask[i + channel[part]] = 255;
+        }
+        // Then grow out from what matched, pixel by pixel, while the color changes smoothly: shadowed and
+        // reflective paint is continuous with the panel and is taken in, while the jump to black trim, glass,
+        // wheels or the backdrop stops it. Stays inside the outline and out of the cut-outs.
+        // Outline-only parts (tol 999) are already whole. Growth never goes darker than the part's darkest
+        // sampled tone minus a margin, so it stops at black trim and badges on light carts.
+        const step = spec.tol >= 999 ? 0 : spec.grow === undefined ? 4 : spec.grow;
+        const floorL = spec.growMinL !== undefined ? spec.growMinL : Math.min(...refs.map(r => r[0])) - 14;
+        if (step) {
+            const c = channel[part];
+            const allowed = new Uint8Array(W * H);
+            const lab = new Float32Array(W * H * 3);
+            for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+                const p = y * W + x, i = p * 3;
+                if (!spec.polys.some(q => inPoly(x, y, q))) continue;
+                if (spec.exclude && spec.exclude.some(q => inPoly(x, y, q))) continue;
+                if (part === 'body' && (mask[i + 1] || mask[i + 2])) continue;
+                const v = toLab(data[i], data[i + 1], data[i + 2]);
+                if (v[0] < floorL) continue;
+                lab[i] = v[0]; lab[i + 1] = v[1]; lab[i + 2] = v[2];
+                allowed[p] = 1;
+            }
+            const queue = [];
+            for (let p = 0; p < W * H; p++) if (mask[p * 3 + c] && allowed[p]) queue.push(p);
+            while (queue.length) {
+                const p = queue.pop();
+                const x = p % W, y = (p / W) | 0;
+                for (const q of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, y > 0 ? p - W : -1, y < H - 1 ? p + W : -1]) {
+                    if (q < 0 || !allowed[q] || mask[q * 3 + c]) continue;
+                    const dl = (lab[q * 3] - lab[p * 3]) / 2, da = lab[q * 3 + 1] - lab[p * 3 + 1], db = lab[q * 3 + 2] - lab[p * 3 + 2];
+                    if (Math.hypot(dl, da, db) > step) continue;
+                    mask[q * 3 + c] = 255;
+                    queue.push(q);
+                }
+            }
         }
     }
     // Smooth the edges a little so repainted areas don't look jagged
