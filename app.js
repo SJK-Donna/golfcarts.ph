@@ -32,8 +32,10 @@ const PRODUCTS_DATA = [
         battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Motor',
-        image: 'image/Products/builds/golfer-2-golfer.jpg',
-        gallery: ['image/Products/builds/golfer-2-golfer.jpg', 'image/Products/builds/golfer-2-scratch.jpg', 'image/Products/builds/golfer-2-pro.jpg'],
+        image: 'image/Products/builds/golfer-2-scratch-right.jpg',
+        gallery: ['image/Products/builds/golfer-2-golfer.jpg', 'image/Products/builds/golfer-2-scratch-right.jpg', 'image/Products/builds/golfer-2-pro.jpg'],
+        // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
+        galleryLevels: ['golf', 'scratch', 'pro'],
         // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
         buildPhotos: { golf: 'image/Products/builds/golfer-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-pro.jpg' },
         features: ['Two Forward-Facing Seats', 'Golf Bag Provision with Rear Bag Cover', 'Shatter-Resistant Foldable Windshield', 'Corrosion-Resistant Aluminum Frame'],
@@ -58,8 +60,10 @@ const PRODUCTS_DATA = [
         battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Electric Motor',
-        image: 'image/Products/builds/golfer-2-2-golfer.jpg',
-        gallery: ['image/Products/builds/golfer-2-2-golfer.jpg', 'image/Products/builds/golfer-2-2-scratch.jpg', 'image/Products/builds/golfer-2-2-pro.jpg'],
+        image: 'image/Products/builds/golfer-2-2-pro-right.jpg',
+        gallery: ['image/Products/builds/golfer-2-2-golfer.jpg', 'image/Products/builds/golfer-2-2-scratch.jpg', 'image/Products/builds/golfer-2-2-pro-right.jpg'],
+        // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
+        galleryLevels: ['golf', 'scratch', 'pro'],
         // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
         buildPhotos: { golf: 'image/Products/builds/golfer-2-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-2-pro.jpg' },
         colorPhotos: { 'White': 'image/Products/Tempo 2+2 - Golf.png', 'Sangria': 'image/Products/Tempo 2+2 - Golf - Red.png' },
@@ -808,9 +812,9 @@ const TEMPO_LINES = {
     golfer: {
         title: 'Golfer, Scratch or Pro.',
         levels: [
-            { id: 'golf', name: 'Golfer', fullName: 'Tempo Golf', tagline: 'Golf essentials' },
-            { id: 'scratch', name: 'Scratch', fullName: 'Tempo Scratch Golf', tagline: 'Golf accessories and comfort' },
-            { id: 'pro', name: 'Pro', fullName: 'Tempo Pro', tagline: 'The premium personal cart' }
+            { id: 'golf', name: 'Golfer', fullName: 'Tempo Golf', tagline: 'Golf essentials', blurb: 'The golf essentials: a bag cover, a floor mat and a dependable lead-acid battery.' },
+            { id: 'scratch', name: 'Scratch', fullName: 'Tempo Scratch Golf', tagline: 'Golf accessories and comfort', blurb: 'Golf accessories and comfort: LED lighting, more colors and seats, and the lift kit as an option.' },
+            { id: 'pro', name: 'Pro', fullName: 'Tempo Pro', tagline: 'The premium personal cart', blurb: 'The premium personal cart: lithium power, the Club Car Deluxe light kit and premium seats.' }
         ]
     },
     lifestyle: {
@@ -3992,7 +3996,6 @@ function renderBuildSection(product, buildSet) {
                             <span class="build-card-photo"><img src="${product.buildPhotos[b.id]}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
                         <span class="flex items-start justify-between gap-4">
                             <span>
-                                <span class="block text-sm text-mute">${product.name}</span>
                                 <span class="block type-md text-ink">${b.name}</span>
                                 <span class="block text-sm text-mute mt-1">${b.tagline}</span>
                             </span>
@@ -4029,6 +4032,29 @@ function renderBuildSection(product, buildSet) {
             ${buildSet.confirmed ? '' : '<p class="text-sm text-mute mt-4">Build names and package contents are proposed and may change.</p>'}
         </section>
     `;
+}
+
+// "Scratch 2", "Pro 2+2": a golfer build named with its model's seat layout
+function buildViewName(product, level) {
+    return `${level.name} ${product.name.replace(/^Golfer /, '')}`;
+}
+
+// Header thumbnail for a build: its photo, name and description, and the builder below starts on that build
+function showDetailBuildView(button, index) {
+    const product = currentDetailProduct();
+    const buildSet = product && getProductBuildSet(product);
+    const level = buildSet && buildSet.builds.find(b => b.id === product.galleryLevels[index]);
+    if (!level) return;
+    showDetailImage(button, product.gallery[index]);
+    const img = document.getElementById('detail-main-img');
+    if (img) img.alt = `${buildViewName(product, level)} build`;
+    const title = document.getElementById('detail-title');
+    if (title) title.textContent = buildViewName(product, level);
+    const tagline = document.getElementById('detail-tagline');
+    if (tagline) tagline.textContent = level.blurb || level.tagline;
+    const cta = document.getElementById('detail-build-cta');
+    if (cta) cta.textContent = `Build your ${buildViewName(product, level)}`;
+    if (detailBuild.level !== level.id) selectBuildLevel(level.id);
 }
 
 function showDetailImage(button, src) {
@@ -4175,12 +4201,12 @@ function renderProductDetailsPage() {
                 <div class="lg:col-span-5 lg:pb-10 space-y-6 order-2 lg:order-1">
                     <a href="${routeHref('products')}" data-route="products" class="text-sm text-ink-2 hover:text-ink">All carts</a>
                     <p class="text-sm text-ink-2">${categoryLabel(product.category)}${product.heroProduct ? ' · our bestseller' : ''}</p>
-                    <h1 class="type-hero text-ink">${product.name}</h1>
-                    <p class="text-xl text-ink-2 measure">${product.tagline}</p>
+                    <h1 id="detail-title" class="type-hero text-ink">${product.name}</h1>
+                    <p id="detail-tagline" class="text-xl text-ink-2 measure">${product.tagline}</p>
                     <p class="text-sm text-ink-2">${product.priceLabel === 'Inquire for Price' || !product.priceLabel ? 'Price on request' : product.priceLabel}</p>
                     <div class="flex flex-wrap items-center gap-4 pt-2">
                         ${buildSet
-                            ? `<button type="button" onclick="scrollToDetailSection('build')" class="btn btn-primary">Build your ${product.name}</button>
+                            ? `<button type="button" id="detail-build-cta" onclick="scrollToDetailSection('build')" class="btn btn-primary">Build your ${product.name}</button>
                                <button type="button" onclick="openQuoteModal('${safeName}')" class="btn btn-outline">Get a quote</button>`
                             : `<button type="button" onclick="openQuoteModal('${safeName}')" class="btn btn-primary">Get a quote</button>`}
                     </div>
@@ -4191,11 +4217,15 @@ function renderProductDetailsPage() {
                     </div>
                     ${product.gallery.length > 1 ? `
                         <div class="flex gap-2 justify-end" role="group" aria-label="Views">
-                            ${product.gallery.map((img, i) => `
-                                <button type="button" onclick="showDetailImage(this, '${img}')" aria-pressed="${i === 0}" aria-label="View ${i + 1} of ${product.gallery.length}" class="gallery-thumb">
+                            ${product.gallery.map((img, i) => {
+                                const level = product.galleryLevels && buildSet && buildSet.builds.find(b => b.id === product.galleryLevels[i]);
+                                // A model with build views opens on its overview (no build picked yet); others on their first photo
+                                const pressed = level ? false : i === 0;
+                                return `
+                                <button type="button" onclick="${level ? `showDetailBuildView(this, ${i})` : `showDetailImage(this, '${img}')`}" aria-pressed="${pressed}" aria-label="${level ? `${buildViewName(product, level)} build` : `View ${i + 1} of ${product.gallery.length}`}" class="gallery-thumb">
                                     <img src="${img}" alt="" loading="lazy" class="w-full h-full object-contain mix-blend-multiply">
-                                </button>
-                            `).join('')}
+                                </button>`;
+                            }).join('')}
                         </div>
                     ` : ''}
                 </div>
