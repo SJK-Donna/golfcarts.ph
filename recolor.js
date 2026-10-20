@@ -67,6 +67,8 @@ const COLOR_PREVIEW = {
     'carryall-500': { base: 'image/Products/CA500.png' }
 };
 
+const SEAT_TONES = { 'golfer-2-scratch-right': [0.27, 0.5], 'golfer-2-2-scratch': [0.25, 0.42] };
+
 // The Golfer 2 / 2+2 build photos, one per build level ("<slug>:<level>"). Their paint is white, beige, grey or
 // black, so instead of color rules each has a paint map (scripts/build-masks.mjs): red = body, green = seat,
 // blue = canopy. Parts left at the photo's own color are not repainted (see app.js updateDetailPreview).
@@ -77,6 +79,8 @@ const COLOR_PREVIEW = {
 ].forEach(([key, photo, seatContrast, canopyContrast, bodyContrast]) => {
     // Dark roofs (canopyContrast) carry less of their gloss into a lighter canopy color
     COLOR_PREVIEW[key] = { base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, seatContrast, canopyContrast, bodyContrast };
+    // Striped Tsunami seats: lightness splits between black bolsters, grey panels and silver piping
+    if (SEAT_TONES[photo]) COLOR_PREVIEW[key].seatTones = SEAT_TONES[photo];
 });
 
 const recolorCache = {};
@@ -333,6 +337,106 @@ function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.8
     }
 }
 
+// Seats photographed striped (the Tsunami seats in the Scratch build photos: black bolsters, grey panels,
+// silver piping). Each seat pixel is sorted into a tone by its lightness: dark (< tones[0]), panel, or
+// light (> tones[1]). A patterned choice paints each tone with the pattern's matching color (darkest,
+// middle, lightest), so Tsunami Red keeps its black and silver and only the panels turn red. A one-color seat
+// paints every tone the same color, each shaded against its own tone's middle, so the stripes disappear but
+// the seat's folds and shading stay.
+function paintToneSeat(out, base, region, target, bands, tones) {
+    if (!region.toneL) {
+        // Tone is judged against the seat's local average lightness (over about 20 px), not absolute
+        // lightness, so light falling unevenly across the seat doesn't flip a panel into a bolster
+        const { w, h } = base;
+        const S = new Float64Array((w + 1) * (h + 1)), N = new Float64Array((w + 1) * (h + 1));
+        const inSeat = new Uint8Array(w * h);
+        for (const i of region.idx) inSeat[i] = 1;
+        for (let y = 0; y < h; y++) {
+            let rs = 0, rn = 0;
+            for (let x = 0; x < w; x++) {
+                const i = y * w + x;
+                if (inSeat[i]) { rs += base.light[i]; rn++; }
+                S[(y + 1) * (w + 1) + x + 1] = S[y * (w + 1) + x + 1] + rs;
+                N[(y + 1) * (w + 1) + x + 1] = N[y * (w + 1) + x + 1] + rn;
+            }
+        }
+        const r = 20;
+        const all = region.idx.map(i => base.light[i]).sort((p, q) => p - q);
+        const mid = all[Math.floor(all.length / 2)];
+        region.toneL = new Map();
+        for (const i of region.idx) {
+            const x = i % w, y = Math.floor(i / w);
+            const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1), y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+            const box = (A) => A[y1 * (w + 1) + x1] - A[y0 * (w + 1) + x1] - A[y1 * (w + 1) + x0] + A[y0 * (w + 1) + x0];
+            region.toneL.set(i, base.light[i] - box(S) / box(N) + mid);
+        }
+    }
+    if (!region.toneMid) {
+        const groups = [[], [], []];
+        for (const i of region.idx) groups[seatTone(region.toneL.get(i), tones)].push(base.light[i]);
+        region.toneMid = groups.map(g => { g.sort((p, q) => p - q); return g.length ? g[Math.floor(g.length / 2)] : 0.5; });
+    }
+    // The pattern's colors from darkest to lightest; a two-color pattern paints panel and light alike
+    let palette = [target, target, target];
+    if (bands && bands.length) {
+        const cols = [...new Set(bands.map(b => b.hex))].map(hexToHsl).sort((p, q) => p[2] - q[2]);
+        palette = cols.length >= 3 ? [cols[0], cols[1], cols[cols.length - 1]] : [cols[0], cols[cols.length - 1], cols[cols.length - 1]];
+    }
+    // A patterned seat keeps its contrast; a one-color seat carries less of the stripes' light / dark and
+    // blends its tones over a wider band, so the old stripe edges don't show as outlines. Each tone blends into
+    // the next, so tone edges are smooth instead of stepped and speckled.
+    const patterned = bands && bands.length;
+    const contrast = patterned ? 0.8 : 0.55;
+    const soft = patterned ? 0.06 : 0.12;
+    const step = (edge, l) => Math.max(0, Math.min(1, (l - edge + soft) / (2 * soft)));
+    if (patterned) {
+        // Patterned choice: keep the photo's own light and dark (black bolsters stay black, silver piping
+        // stays silver) and tint the mid tones with the pattern's color, smoothly, so nothing turns blotchy
+        const panel = palette[1];
+        const [lo, hi] = [tones[0] - 0.12, tones[1] + 0.12];
+        const pm = region.toneMid[1];
+        for (const i of region.idx) {
+            const L = base.light[i];
+            if (L > 0.92 && base.sat[i] < 0.12) continue;
+            const T = region.toneL.get(i);
+            const rise = Math.max(0, Math.min(1, (T - lo) / (tones[0] + 0.06 - lo)));
+            const fall = Math.max(0, Math.min(1, (hi - T) / (hi - (tones[1] - 0.04))));
+            // A floor of tint everywhere but the silver piping, so a panel pixel read as dark shades deeper instead
+            // of breaking into a black patch
+            const k = Math.max(rise, 0.45) * fall;
+            const l = Math.max(0.02, Math.min(0.98, L + (panel[2] - pm) * k * 0.7));
+            const chroma = panel[1] * (1 - Math.abs(2 * panel[2] - 1)) * k;
+            const s = Math.min(1, chroma / Math.max(0.001, 1 - Math.abs(2 * l - 1)));
+            const [r, g, b] = hslToRgb(panel[0], s, l);
+            out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b;
+        }
+        return;
+    }
+    for (const i of region.idx) {
+        const L = base.light[i];
+        // Studio white caught at the seat's outline is background, not seat
+        if (L > 0.92 && base.sat[i] < 0.12) continue;
+        const T = region.toneL.get(i);
+        const up1 = step(tones[0], T), up2 = step(tones[1], T);
+        const w = [1 - up1, up1 * (1 - up2), up2];
+        let R = 0, G = 0, B = 0;
+        for (let t = 0; t < 3; t++) {
+            if (!w[t]) continue;
+            const [th, ts, tl] = palette[t];
+            const l = Math.max(0.02, Math.min(0.98, tl + (L - region.toneMid[t]) * contrast));
+            const chroma = ts * (1 - Math.abs(2 * tl - 1));
+            const s = Math.min(1, chroma / Math.max(0.001, 1 - Math.abs(2 * l - 1)));
+            const [r, g, b] = hslToRgb(th, s, l);
+            R += r * w[t]; G += g * w[t]; B += b * w[t];
+        }
+        out[i * 4] = R; out[i * 4 + 1] = G; out[i * 4 + 2] = B;
+    }
+}
+
+function seatTone(l, tones) {
+    return l < tones[0] ? 0 : l > tones[1] ? 2 : 1;
+}
+
 // Swatch value -> { hsl } or { gradient: [hsl, ...] } (gradients come from the custom-paint swatches)
 function parseSwatch(value) {
     if (!value) return null;
@@ -390,7 +494,8 @@ async function renderCartPreview(slug, choice) {
     const seatBands = choice.seatBands && cfg.seatStripes
         ? choice.seatBands.map(b => ({ hsl: hexToHsl(b.hex), to: b.to }))
         : null;
-    if (seat && regions.seat) paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
+    if (seat && regions.seat && cfg.seatTones) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatTones);
+    else if (seat && regions.seat) paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
     const body = parseSwatch(choice.body);
     if (body) paintRegion(out, base, regions.body, body.hsl, body.gradient && body.gradient.length > 1 ? body.gradient : null, null, cfg.bodyContrast);
 
