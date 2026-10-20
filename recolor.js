@@ -73,10 +73,10 @@ const COLOR_PREVIEW = {
 // The striped Tsunami seats in the Scratch photos carry less of their light / dark into a new seat color.
 [
     ['golfer-tempo-2:golf', 'golfer-2-golfer'], ['golfer-tempo-2:scratch', 'golfer-2-scratch-right', 0.35], ['golfer-tempo-2:pro', 'golfer-2-pro', undefined, 0.4],
-    ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer', undefined, 0.4], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch', 0.35], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro-right', undefined, 0.4]
-].forEach(([key, photo, seatContrast, canopyContrast]) => {
+    ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer', undefined, 0.4, 0.3], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch', 0.35, undefined, 0.3], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro-right', undefined, 0.4]
+].forEach(([key, photo, seatContrast, canopyContrast, bodyContrast]) => {
     // Dark roofs (canopyContrast) carry less of their gloss into a lighter canopy color
-    COLOR_PREVIEW[key] = { base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, seatContrast, canopyContrast };
+    COLOR_PREVIEW[key] = { base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, seatContrast, canopyContrast, bodyContrast };
 });
 
 const recolorCache = {};
@@ -392,7 +392,7 @@ async function renderCartPreview(slug, choice) {
         : null;
     if (seat && regions.seat) paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
     const body = parseSwatch(choice.body);
-    if (body) paintRegion(out, base, regions.body, body.hsl, body.gradient && body.gradient.length > 1 ? body.gradient : null);
+    if (body) paintRegion(out, base, regions.body, body.hsl, body.gradient && body.gradient.length > 1 ? body.gradient : null, null, cfg.bodyContrast);
 
     const canvas = document.createElement('canvas');
     canvas.width = base.w;
