@@ -3244,11 +3244,12 @@ const TRIM_COLOR_HEX = {
     // High-back seats
     'High-Back Sport Black Carbon Fiber with Silver Inlay': 'linear-gradient(135deg, #2A2928 60%, #C1BFBC 60%)',
     'High-Back Luxury Honey Beige with Black Inlay': 'linear-gradient(135deg, #CF955A 60%, #1C1B1D 60%)',
-    'High-Back Luxury Briar Brown': 'linear-gradient(135deg, #5A2D25 60%, #9A7C6A 60%)',
+    // Briar Brown is one colour all over (no inlay); the dark red in its photo is the cart body, not the seat
+    'High-Back Luxury Briar Brown': '#7D6152',
     // Premium GC seats. Tsunami: mostly black, a coloured side panel and a silver stripe (see the seat photos).
     // Bands are roughly in the photo's proportions, colour panel first so the preview shows the option's colour.
     'Tsunami Silver Red & Black': 'linear-gradient(135deg, #B83F33 40%, #36352F 40% 82%, #B5B3AC 82%)',
-    'Tsunami Silver Grey & Black': 'linear-gradient(135deg, #78766F 40%, #2B2A27 40% 82%, #BDB9B0 82%)',
+    'Tsunami Silver Grey & Black': 'linear-gradient(135deg, #5B5955 40%, #2B2A27 40% 82%, #BDB9B0 82%)',
     'Tsunami Silver Blue & Black': 'linear-gradient(135deg, #3A3D72 40%, #363533 40% 82%, #B8B4AC 82%)',
     // GC arm-rest seats. The sheet's "GC Beige" photo is a caramel tan, so its swatch follows the photo.
     'GC White with Arm Rest': '#E8E9EC', 'GC Beige with Arm Rest': '#D9976C', 'GC Dark Brown with Arm Rest': '#765850',
@@ -3286,7 +3287,7 @@ function twoToneBands(outer, center) {
 }
 const SEAT_PATTERNS = {
     'Tsunami Silver Red & Black': tsunamiBands('#B83F33', '#B5B3AC', '#36352F'),
-    'Tsunami Silver Grey & Black': tsunamiBands('#78766F', '#BDB9B0', '#2B2A27'),
+    'Tsunami Silver Grey & Black': tsunamiBands('#5B5955', '#BDB9B0', '#2B2A27'),
     'Tsunami Silver Blue & Black': tsunamiBands('#3A3D72', '#B8B4AC', '#363533'),
     'Premium Black and Grey': twoToneBands('#2D2E2E', '#9A9693'),
     'Premium Black and Grey (Special Promo)': twoToneBands('#2A2A2A', '#8C8C8C'),
