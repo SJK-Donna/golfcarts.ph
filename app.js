@@ -3349,9 +3349,56 @@ function detailPreviewKey(product) {
     return product.slug;
 }
 
+// Golfer 2 / 2+2: the preview shows either the chosen build's own photo ('build') or the color preview on the
+// studio cart ('color'). Picking a build shows its photo; picking a color shows the color preview.
+let detailPreviewMode = 'build';
+
+function hasBuildPhotoView(product) {
+    return !!(product && product.buildPhotos && product.buildPhotos[detailBuild.level]);
+}
+
+function setDetailPreviewMode(mode) {
+    const product = currentDetailProduct();
+    detailPreviewMode = hasBuildPhotoView(product) ? mode : 'color';
+    updatePreviewToggle(product);
+    if (detailPreviewMode === 'build') showBuildPhotoView(product);
+    else updateDetailPreview();
+}
+
+function updatePreviewToggle(product) {
+    const box = document.getElementById('detail-preview-toggle');
+    if (!box) return;
+    const show = hasBuildPhotoView(product);
+    box.hidden = !show;
+    if (!show) return;
+    const buildSet = getProductBuildSet(product);
+    const level = buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0];
+    box.querySelector('[data-mode="build"]').textContent = `${buildViewName(product, level)} build`;
+    box.querySelectorAll('button').forEach(b => {
+        const on = b.dataset.mode === detailPreviewMode;
+        b.classList.toggle('opt-seg-active', on);
+        b.setAttribute('aria-pressed', String(on));
+    });
+}
+
+function showBuildPhotoView(product) {
+    ++detailPreviewToken; // drop any color preview still being drawn
+    const buildSet = getProductBuildSet(product);
+    const level = buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0];
+    const img = document.getElementById('detail-color-img');
+    if (img) { img.src = product.buildPhotos[level.id]; img.alt = `${buildViewName(product, level)} build`; }
+    const note = document.getElementById('detail-color-photo-note');
+    if (note) {
+        note.textContent = `The ${buildViewName(product, level)} build as photographed · pick a color to see it in your colors`;
+        note.classList.remove('hidden');
+    }
+}
+
 function updateDetailPreview() {
     const product = PRODUCTS_DATA.find(p => p.slug === currentSlug);
-    if (!product || !livePreviewAvailable) return;
+    if (!product) return;
+    if (detailPreviewMode === 'build' && hasBuildPhotoView(product)) { showBuildPhotoView(product); return; }
+    if (!livePreviewAvailable) return;
     const key = detailPreviewKey(product);
     if (!hasLiveColorPreview(key)) return;
     const body = getProductBodyColors(product).find(c => c.name === detailBuild.body);
@@ -3386,7 +3433,7 @@ function updateDetailPreview() {
 
 // Seat / canopy color buttons: same active-state behaviour as the body swatches
 function selectDetailTrim(type, value, fromVisitor) {
-    if (fromVisitor) detailBuild.colorsPicked = true;
+    if (fromVisitor) { detailBuild.colorsPicked = true; detailPreviewMode = 'color'; updatePreviewToggle(currentDetailProduct()); }
     detailBuild[type] = value;
     document.querySelectorAll(`.detail-trim[data-type="${type}"]`).forEach(btn => {
         const active = btn.dataset.value === value;
@@ -3442,7 +3489,7 @@ function getDetailSpecGroups(product) {
 }
 
 function selectDetailColor(index, fromVisitor) {
-    if (fromVisitor) detailBuild.colorsPicked = true;
+    if (fromVisitor) { detailBuild.colorsPicked = true; detailPreviewMode = 'color'; updatePreviewToggle(currentDetailProduct()); }
     const product = PRODUCTS_DATA.find(p => p.slug === currentSlug);
     if (!product) return;
     const color = detailBodyColors(product)[index];
@@ -3639,6 +3686,8 @@ function fixTempoSubChoices(product, i, o) {
 
 function selectBuildLevel(id) {
     detailBuild.level = id;
+    detailPreviewMode = 'build';
+    updatePreviewToggle(currentDetailProduct());
     document.querySelectorAll('.build-card').forEach(card => {
         const active = card.dataset.build === id;
         card.classList.toggle('build-card-active', active);
@@ -4198,6 +4247,8 @@ function renderProductDetailsPage() {
     };
     if (tempo) fixTempoSubChoices(product, levelIdx, detailBuild.options);
     if (tempo && pendingIdx < 0) applyBuildLook(product);
+    detailPreviewMode = product.buildPhotos && pendingIdx < 0 ? 'build' : 'color';
+    setTimeout(() => updatePreviewToggle(product), 0);
     const canopyOptions = getDetailCanopyOptions(product);
     setTimeout(updateDetailBuildSummary, 0);
     setTimeout(updateBuildSummaryLine, 0);
@@ -4315,8 +4366,12 @@ function renderProductDetailsPage() {
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
                     <div class="lg:col-span-7 lg:sticky lg:top-36">
                         <div class="relative bg-stone px-4 sm:px-8 py-8">
+                            <div id="detail-preview-toggle" class="opt-seg mb-4" role="group" aria-label="Preview" ${product.buildPhotos ? '' : 'hidden'}>
+                                <button type="button" data-mode="build" onclick="setDetailPreviewMode('build')" class="opt-seg-btn opt-seg-active" aria-pressed="true">Build photo</button>
+                                <button type="button" data-mode="color" onclick="setDetailPreviewMode('color')" class="opt-seg-btn" aria-pressed="false">Your colors</button>
+                            </div>
                             <div class="relative aspect-[4/3] overflow-hidden flex items-center justify-center">
-                                <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : (hasLiveColorPreview(detailPreviewKey(product)) ? COLOR_PREVIEW[detailPreviewKey(product)].base : product.image)}" alt="${product.name} color preview" class="w-full h-full object-contain mix-blend-multiply">
+                                <img id="detail-color-img" src="${product.buildPhotos && product.buildPhotos[detailBuild.level] ? product.buildPhotos[detailBuild.level] : startColor && startColor.image ? startColor.image : (hasLiveColorPreview(detailPreviewKey(product)) ? COLOR_PREVIEW[detailPreviewKey(product)].base : product.image)}" alt="${product.name} color preview" class="w-full h-full object-contain mix-blend-multiply">
                             </div>
                             <p id="detail-color-photo-note" class="${startColor && !startColor.image ? '' : 'hidden'} text-sm text-ink-2 mt-2">Photo shows a standard finish</p>
                             <!-- Live summary of the selected body / seat / canopy colors -->
