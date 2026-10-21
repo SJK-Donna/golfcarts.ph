@@ -2167,13 +2167,12 @@ function renderHomeUses() {
                     <div class="lg:col-span-5 lg:col-start-2">
                         ${renderHomeUseTile('resort', '', 'aspect-[4/3]')}
                     </div>
-                    <a href="${routeHref('segment', 'remanufactured')}" data-route="segment" data-slug="remanufactured" class="group lg:col-span-5 lg:col-start-8 self-end border-t border-ink pt-6 grid grid-cols-[1fr_auto] gap-6 items-start">
-                        <div class="space-y-3">
-                            <h3 class="type-lg text-ink">${reman.label}</h3>
-                            <p class="measure">Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.</p>
-                            <span class="link inline-block">See available builds</span>
-                        </div>
-                        <img src="image/Products/reman 4.png" alt="" loading="lazy" decoding="async" class="w-28 sm:w-40 object-contain">
+                    <a href="${routeHref('segment', 'remanufactured')}" data-route="segment" data-slug="remanufactured" class="group lg:col-span-5 lg:col-start-8 self-end border-t border-ink pt-6 space-y-3">
+                        <!-- A rebuilt cart above the heading: "Remanufactured" is one long word, so there's no room beside it -->
+                        <img src="image/Products/reman 4.png" alt="" loading="lazy" decoding="async" class="w-40 sm:w-48 h-auto object-contain mix-blend-multiply">
+                        <h3 class="type-lg text-ink">${reman.label}</h3>
+                        <p class="measure">Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.</p>
+                        <span class="link inline-block">See available builds</span>
                     </a>
                 </div>
             </div>
