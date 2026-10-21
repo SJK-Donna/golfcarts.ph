@@ -324,7 +324,8 @@ function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.8
             const ra = hslToRgb(a[0], a[1], a[2]), rb = hslToRgb(b[0], b[1], b[2]);
             [th, ts, tl] = rgbToHsl(...ra.map((v, k) => v + (rb[k] - v) * t));
         }
-        const shade = shading ? (shading.light[i] - shading.mid) * shading.gain : base.light[i] - region.midL;
+        let shade = shading ? (shading.light[i] - shading.mid) * shading.gain : base.light[i] - region.midL;
+        if (shading && Math.abs(shade) > shading.knee) shade = Math.sign(shade) * (shading.knee + (Math.abs(shade) - shading.knee) * 0.3);
         const l = Math.max(0.02, Math.min(0.98, tl + shade * contrast));
         // Keep the swatch's colorfulness (chroma) through the shading. A fixed HSL saturation would grey out
         // every pixel lighter or darker than the swatch, so the panel read duller than the chosen color.
@@ -435,7 +436,9 @@ function buildShading(base, region, referenceSpread, smooth) {
         const light = smooth ? smoothLight(base) : base.light;
         const ls = region.idx.map(i => light[i]).sort((p, q) => p - q);
         const own = lightSpread(light, region);
-        region.shading = { light, mid: ls[Math.floor(ls.length / 2)], gain: own > 0.001 ? referenceSpread / own : 1 };
+        // knee: past this much light / dark, extra reflection or shadow is compressed, so every build photo keeps the
+        // same range as the reference (Scratch and Pro have far stronger highlights and specks than the Golfer photo)
+        region.shading = { light, mid: ls[Math.floor(ls.length / 2)], gain: own > 0.001 ? referenceSpread / own : 1, knee: referenceSpread * 0.6 };
     }
     return region.shading;
 }
