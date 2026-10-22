@@ -113,7 +113,7 @@ const PRODUCTS_DATA = [
     {
         id: 'lifestyle-tempo-2',
         slug: 'lifestyle-tempo-2',
-        name: 'Tempo 2',
+        name: 'Essential 2',
         category: 'Lifestyle & Private Use',
         version: 'lifestyle',
         layout: '2',
@@ -137,7 +137,7 @@ const PRODUCTS_DATA = [
     {
         id: 'lifestyle-tempo-2-2',
         slug: 'lifestyle-tempo-2-2',
-        name: 'Tempo 2+2',
+        name: 'Essential 2+2',
         category: 'Lifestyle & Private Use',
         version: 'lifestyle',
         layout: '2+2',
@@ -162,7 +162,7 @@ const PRODUCTS_DATA = [
     {
         id: 'lifestyle-tempo-4',
         slug: 'lifestyle-tempo-4',
-        name: 'Tempo 4',
+        name: 'Essential 4',
         category: 'Lifestyle & Private Use',
         version: 'lifestyle',
         layout: '4',
@@ -186,7 +186,7 @@ const PRODUCTS_DATA = [
     {
         id: 'lifestyle-tempo-4-2',
         slug: 'lifestyle-tempo-4-2',
-        name: 'Tempo 4+2',
+        name: 'Essential 4+2',
         category: 'Lifestyle & Private Use',
         version: 'lifestyle',
         layout: '4+2',
