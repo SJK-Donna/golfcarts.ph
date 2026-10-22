@@ -67,32 +67,38 @@ const COLOR_PREVIEW = {
     'carryall-500': { base: 'image/Products/CA500.png' }
 };
 
-// Each seat of the bench on the Pro photos (left / right backrest and cushion; [x0, x1, y0, y1] in pixels at the
-// 900 px working size), so a two-tone pattern runs down each seat instead of across the angled bench
-const SEAT_SEATS = {
-    'golfer-2-pro': [[232, 335, 222, 334], [335, 452, 222, 334], [238, 356, 342, 402], [356, 458, 342, 402]],
-    'golfer-2-2-pro-right': [[240, 346, 232, 342], [346, 458, 232, 342], [248, 366, 348, 404], [366, 472, 348, 404]]
-};
-
+// The Golfer 2 / 2+2 build photos, one per build level ("<slug>:<level>"). Their paint is white, cream, grey,
+// black or dark green, so instead of color rules each has a paint map (scripts/build-masks.mjs): red = body,
+// green = seat, blue = canopy. These are painted with `shade` (see shadeRegion): the photo's own light and
+// reflections over the chosen color, which holds up when a white cart turns black or a black one turns white.
+// Parts left at the photo's own color are not repainted (see app.js updateDetailPreview).
+// The striped Tsunami seats in the Scratch photos (`seatTones`) are painted tone by tone (see paintToneSeat).
+// The Pro photos' seats are one color (Camello); a two-tone choice (Black and Gray) is drawn as stripes across
+// each seat part (`seatBoxes`, x as fractions of the photo's width, y of its height), as on the studio photos.
 const SEAT_TONES = { 'golfer-2-scratch-right': [0.27, 0.5], 'golfer-2-2-scratch': [0.25, 0.42] };
-
-// The Golfer 2 / 2+2 build photos, one per build level ("<slug>:<level>"). Their paint is white, beige, grey or
-// black, so instead of color rules each has a paint map (scripts/build-masks.mjs): red = body, green = seat,
-// blue = canopy. Parts left at the photo's own color are not repainted (see app.js updateDetailPreview).
-// The striped Tsunami seats in the Scratch photos carry less of their light / dark into a new seat color.
+const SEAT_BOXES = {
+    // Backrest (a split bench: two halves), cushion
+    'golfer-2-pro': [{ x: [0.256, 0.494], y: [0.338, 0.496] }, { x: [0.275, 0.497], y: [0.496, 0.583] }],
+    // Backrest, cushion, and the rear-facing seat's back and cushion
+    'golfer-2-2-pro-right': [
+        { x: [0.266, 0.5], y: [0.354, 0.496] }, { x: [0.306, 0.525], y: [0.496, 0.592] },
+        { x: [0.225, 0.269], y: [0.358, 0.492] }, { x: [0.162, 0.225], y: [0.462, 0.504] }
+    ]
+};
 [
-    ['golfer-tempo-2:golf', 'golfer-2-golfer'], ['golfer-tempo-2:scratch', 'golfer-2-scratch-right', 0.35], ['golfer-tempo-2:pro', 'golfer-2-pro', undefined, 0.4],
-    ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer', undefined, 0.4], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch', 0.35], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro-right', undefined, 0.4]
-].forEach(([key, photo, seatContrast, canopyContrast]) => {
-    // Dark roofs (canopyContrast) carry less of their gloss into a lighter canopy color
-    // Striped Tsunami seats (Scratch photos) paint by tone; plain seats paint patterns as bands across the bench
-    COLOR_PREVIEW[key] = { base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, seatContrast, canopyContrast,
-        seatTones: SEAT_TONES[photo], seatStripes: !SEAT_TONES[photo], seatSeats: SEAT_SEATS[photo] };
+    ['golfer-tempo-2:golf', 'golfer-2-golfer'], ['golfer-tempo-2:scratch', 'golfer-2-scratch-right'], ['golfer-tempo-2:pro', 'golfer-2-pro'],
+    ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer'], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch'], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro-right']
+].forEach(([key, photo]) => {
+    COLOR_PREVIEW[key] = {
+        base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, shade: true,
+        seatTones: SEAT_TONES[photo], seatBoxes: SEAT_BOXES[photo], seatStripes: Boolean(SEAT_BOXES[photo])
+    };
 });
 
 const recolorCache = {};
 
-// A paint map's pixels per channel (0 body, 1 seat, 2 canopy), at the size the photo is worked at
+// A paint map at the size the photo is worked at. Scaling it down softens its edges, so each pixel's
+// value (0-255) says how much of it belongs to the part.
 function loadRecolorMask(src, w, h) {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -109,21 +115,123 @@ function loadRecolorMask(src, w, h) {
     });
 }
 
-// A region from one channel of a paint map, in the same shape collectRegion returns
+// A region from one channel of a paint map (0 body, 1 seat, 2 canopy), in the shape collectRegion returns,
+// plus each pixel's weight and the region's typical (median) linear brightness
 function maskRegion(base, mask, channel) {
     const idx = [];
+    const weight = [];
     const xs = [];
     for (let i = 0; i < base.w * base.h; i++) {
-        if (mask[i * 4 + channel] > 127) {
+        const m = mask[i * 4 + channel];
+        if (m > 8) {
             idx.push(i);
+            weight.push(m / 255);
             xs.push(i % base.w);
         }
     }
     if (!idx.length) return null;
     const [minX, maxX] = percentileSpan(xs, base.w);
     const ls = idx.map(i => base.light[i]).sort((p, q) => p - q);
-    return { idx, meanL: ls[Math.floor(ls.length / 2)], midL: ls[Math.floor(ls.length / 2)], minX, maxX };
+    const px = base.imageData.data;
+    const ys = idx.filter((_, k) => weight[k] > 0.5).map(i => linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2])).sort((p, q) => p - q);
+    return { idx, weight, meanL: ls[Math.floor(ls.length / 2)], midL: ls[Math.floor(ls.length / 2)], refY: ys[Math.floor(ys.length / 2)] || 0.5, minX, maxX };
 }
+
+const toLinear = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+const toSrgb = c => 255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+
+function linearLuma(r, g, b) {
+    return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
+}
+
+// Paints a region of a build photo with a color, the way light falls on it: each pixel's brightness against
+// the part's typical brightness shades the color (shadows darken it), and whatever is brighter than typical
+// (gloss, sky reflections) is added on top as light. Works in linear light, so a white panel painted black
+// reads as glossy black paint, not grey, and a black panel painted white keeps its reflections.
+// On a dark photo (black or deep green paint) the light is almost all sharp reflections, which would turn a
+// light color into chrome; there a light color takes its shading from the panel's broad light instead
+// (`form`, the brightness averaged over the part), with only a trace of the reflections.
+// `target` is an [h, s, l] color, or a list of them blended across the region (multi-tone paints).
+// `bands` (optional) paints stripes across each seat part instead, as paintRegion does.
+function shadeRegion(out, base, region, target, gradient, bands) {
+    const px = base.imageData.data;
+    const toRgb = hsl => hslToRgb(...hsl).map(toLinear);
+    const solid = toRgb(target);
+    const stops = gradient && gradient.map(toRgb);
+    const refY = region.refY;
+    const dark = Math.max(0, Math.min(1, (0.12 - refY) / 0.06));
+    const form = dark ? regionForm(base, region) : null;
+    const bandRgb = bands && bands.map(b => ({ rgb: toRgb(b.hsl), to: b.to }));
+    region.idx.forEach((i, k) => {
+        let t = solid;
+        if (bandRgb && region.zones) {
+            const y = Math.floor(i / base.w), x = i % base.w;
+            const zone = region.zones.find(z => y >= z.y0 && y < z.y1 && x >= z.x0 && x < z.x1);
+            // Seat pixels outside every seat part (small trim pieces) take the seat's signature color
+            if (zone) {
+                const xf = Math.max(0, (x - zone.minX) / Math.max(1, zone.maxX - zone.minX));
+                t = (bandRgb.find(b => xf <= b.to) || bandRgb[bandRgb.length - 1]).rgb;
+            }
+        } else if (stops) {
+            const pos = Math.min(stops.length - 1.001, ((i % base.w) / base.w) * (stops.length - 1));
+            const a = stops[Math.floor(pos)], b = stops[Math.floor(pos) + 1], f = pos - Math.floor(pos);
+            t = a.map((v, c) => v + (b[c] - v) * f);
+        }
+        const tY = 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2];
+        const Y = linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+        const shade = Math.min(1, Y / refY);
+        // Reflections show more strongly on dark paint
+        const gloss = Math.max(0, Y - refY) * (0.6 + 0.4 * (1 - tY));
+        let rgb = t.map(v => v * shade + gloss);
+        // The lighter the color, the more it follows the panel's broad light on a dark photo
+        const light = dark * Math.max(0, Math.min(1, (tY - 0.05) / 0.5));
+        if (light) {
+            const B = form.blur[k];
+            const lum = Math.max(0, Math.min(1, Math.cbrt(tY) + (Math.cbrt(B) - Math.cbrt(form.ref)) * 0.7 + (Math.cbrt(Y) - Math.cbrt(B)) * 0.25)) ** 3;
+            const shine = Math.max(0, Y - Math.max(B, refY) * 1.5) * 0.35;
+            rgb = rgb.map((v, c) => v + (t[c] * lum / Math.max(tY, 1e-4) + shine - v) * light);
+        }
+        const w = region.weight[k];
+        for (let c = 0; c < 3; c++) {
+            const painted = toSrgb(Math.min(1, rgb[c]));
+            out[i * 4 + c] = px[i * 4 + c] + (painted - px[i * 4 + c]) * w;
+        }
+    });
+}
+
+// A region's broad light: each pixel's linear brightness averaged over the part within 12 px (pixels outside
+// the part don't count, so black trim doesn't darken the panel's edges), and the typical (median) value of it.
+// Box sums come from summed-area tables, so this is one pass however wide the box is.
+function regionForm(base, region) {
+    if (region.form) return region.form;
+    const { w, h } = base;
+    const px = base.imageData.data;
+    const W1 = w + 1;
+    const SY = new Float64Array(W1 * (h + 1)), SW = new Float64Array(W1 * (h + 1));
+    const weight = new Float32Array(w * h);
+    region.idx.forEach((i, k) => { weight[i] = region.weight[k]; });
+    for (let y = 0; y < h; y++) {
+        let ry = 0, rw = 0;
+        for (let x = 0; x < w; x++) {
+            const i = y * w + x;
+            const m = weight[i];
+            if (m) { ry += m * linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]); rw += m; }
+            SY[(y + 1) * W1 + x + 1] = SY[y * W1 + x + 1] + ry;
+            SW[(y + 1) * W1 + x + 1] = SW[y * W1 + x + 1] + rw;
+        }
+    }
+    const r = 12;
+    const blur = region.idx.map(i => {
+        const x = i % w, y = Math.floor(i / w);
+        const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1), y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
+        const box = A => A[y1 * W1 + x1] - A[y0 * W1 + x1] - A[y1 * W1 + x0] + A[y0 * W1 + x0];
+        return box(SY) / Math.max(1e-6, box(SW));
+    });
+    const sorted = blur.filter((_, k) => region.weight[k] > 0.5).sort((p, q) => p - q);
+    region.form = { blur, ref: sorted[Math.floor(sorted.length / 2)] || region.refY };
+    return region.form;
+}
+
 
 function loadRecolorBase(src) {
     if (recolorCache[src]) return recolorCache[src];
@@ -306,8 +414,7 @@ function regionRule(rule) {
 // Paints one region toward a target color, keeping the photo's shading.
 // `bands` (optional) paints hard vertical stripes across the region instead, for patterned seats such as
 // the Tsunami: [{ hsl, to }] where `to` is where the stripe ends, as a fraction of the region's width.
-// `shading` (optional, build photos only): smoothed light scaled to the homepage photo's depth, see buildShading().
-function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.85, shading = null) {
+function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.85) {
     for (const i of region.idx) {
         let th = target[0], ts = target[1], tl = target[2];
         if (bands) {
@@ -335,9 +442,7 @@ function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.8
             const ra = hslToRgb(a[0], a[1], a[2]), rb = hslToRgb(b[0], b[1], b[2]);
             [th, ts, tl] = rgbToHsl(...ra.map((v, k) => v + (rb[k] - v) * t));
         }
-        let shade = shading ? (shading.light[i] - shading.mid) * shading.gain : base.light[i] - region.midL;
-        if (shading && Math.abs(shade) > shading.knee) shade = Math.sign(shade) * (shading.knee + (Math.abs(shade) - shading.knee) * 0.3);
-        const l = Math.max(0.02, Math.min(0.98, tl + shade * contrast));
+        const l = Math.max(0.02, Math.min(0.98, tl + (base.light[i] - region.midL) * contrast));
         // Keep the swatch's colorfulness (chroma) through the shading. A fixed HSL saturation would grey out
         // every pixel lighter or darker than the swatch, so the panel read duller than the chosen color.
         const chroma = ts * (1 - Math.abs(2 * tl - 1));
@@ -459,13 +564,18 @@ function parseSwatch(value) {
 
 const recolorRegionCache = {};
 
-// The body / seat / canopy pixels of a preview photo, found once per photo
-async function getRecolorRegions(slug) {
+// Returns a data URL of the cart repainted with the given body / seat / canopy swatch values.
+// `choice.seatBands` (optional) paints the seat as vertical stripes instead of one colour.
+async function renderCartPreview(slug, choice) {
     const cfg = COLOR_PREVIEW[slug];
+    if (!cfg) return null;
     const base = await loadRecolorBase(cfg.base);
+
     if (!recolorRegionCache[slug] && cfg.mask) {
         const mask = await loadRecolorMask(cfg.mask, base.w, base.h);
         recolorRegionCache[slug] = { body: maskRegion(base, mask, 0), seat: maskRegion(base, mask, 1), canopy: maskRegion(base, mask, 2) };
+        const seat = recolorRegionCache[slug].seat;
+        if (seat && cfg.seatBoxes) seat.zones = seatBoxZones(base, seat, cfg.seatBoxes);
     }
     if (!recolorRegionCache[slug]) {
         const bodyHue = base.bodyHue;
@@ -491,107 +601,31 @@ async function getRecolorRegions(slug) {
             canopy: cfg.canopy ? collectRegion(base, notBody(cfg.canopy)) : null
         };
     }
-    return recolorRegionCache[slug];
-}
-
-// Build photos (paint maps) show white, beige, grey or black carts under flat studio light. Their parts have a
-// different light-to-dark spread than the homepage photo's glossy red (the cream Scratch body about half; the
-// striped Tsunami seat several times more), so a new colour on them looked flat, like a tint over the photo, and
-// the seat's own stripes showed through. They paint with their own shading, scaled so each part spreads as much as
-// the same part on the homepage photo. Body and canopy are lightly smoothed first (JPEG noise and the paint's flat
-// studio speckle out, the panels' form kept); seats keep full detail for their seams and stitching.
-// The middle tone still lands exactly on the swatch.
-const TONE_REFERENCE = 'golfer-tempo-2';
-let referenceSpreadsPromise = null;
-
-// Lightness spread of a part: the gap between its 10th and 90th percentile
-function lightSpread(light, region) {
-    const ls = region.idx.map(i => light[i]).sort((p, q) => p - q);
-    return ls[Math.floor(ls.length * 0.9)] - ls[Math.floor(ls.length * 0.1)];
-}
-
-function referenceSpreads() {
-    if (!referenceSpreadsPromise) {
-        referenceSpreadsPromise = (async () => {
-            const base = await loadRecolorBase(COLOR_PREVIEW[TONE_REFERENCE].base);
-            const regions = await getRecolorRegions(TONE_REFERENCE);
-            const spread = part => regions[part] ? lightSpread(base.light, regions[part]) : null;
-            return { body: spread('body'), seat: spread('seat'), canopy: spread('canopy') };
-        })();
-    }
-    return referenceSpreadsPromise;
-}
-
-// The photo's lightness with a 5 x 5 box blur, worked out once per photo
-function smoothLight(base) {
-    if (base.smoothLight) return base.smoothLight;
-    const { w, h, light } = base;
-    const tmp = new Float32Array(w * h), out = new Float32Array(w * h), r = 2;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        let sum = 0, n = 0;
-        for (let k = Math.max(0, x - r); k <= Math.min(w - 1, x + r); k++) { sum += light[y * w + k]; n++; }
-        tmp[y * w + x] = sum / n;
-    }
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        let sum = 0, n = 0;
-        for (let k = Math.max(0, y - r); k <= Math.min(h - 1, y + r); k++) { sum += tmp[k * w + x]; n++; }
-        out[y * w + x] = sum / n;
-    }
-    return (base.smoothLight = out);
-}
-
-// Shading for one part of a build photo: its light (smoothed or not), middle tone, and gain to the reference spread
-function buildShading(base, region, referenceSpread, smooth) {
-    if (!region || !referenceSpread) return null;
-    if (!region.shading) {
-        const light = smooth ? smoothLight(base) : base.light;
-        const ls = region.idx.map(i => light[i]).sort((p, q) => p - q);
-        const own = lightSpread(light, region);
-        // knee: past this much light / dark, extra reflection or shadow is compressed, so every build photo keeps the
-        // same range as the reference (Scratch and Pro have far stronger highlights and specks than the Golfer photo)
-        region.shading = { light, mid: ls[Math.floor(ls.length / 2)], gain: own > 0.001 ? referenceSpread / own : 1, knee: referenceSpread * 0.6 };
-    }
-    return region.shading;
-}
-
-// Returns a data URL of the cart repainted with the given body / seat / canopy swatch values.
-// `choice.seatBands` (optional) paints the seat as vertical stripes instead of one colour.
-async function renderCartPreview(slug, choice) {
-    const cfg = COLOR_PREVIEW[slug];
-    if (!cfg) return null;
-    const base = await loadRecolorBase(cfg.base);
-    const regions = await getRecolorRegions(slug);
-    // Build photos paint with their shading scaled to the homepage photo's depth, at its strength (see buildShading)
-    const spreads = cfg.mask ? await referenceSpreads() : null;
-    const shading = part => spreads && buildShading(base, regions[part], spreads[part], part !== 'seat');
+    const regions = recolorRegionCache[slug];
 
     const out = new Uint8ClampedArray(base.imageData.data);
     // Canopy and seats first so the body (the most important region) wins any overlap
     const canopy = parseSwatch(choice.canopy);
-    if (canopy && regions.canopy) paintRegion(out, base, regions.canopy, canopy.hsl, null, null, spreads ? 0.85 : cfg.canopyContrast, shading('canopy'));
+    const gradient = swatch => swatch.gradient && swatch.gradient.length > 1 ? swatch.gradient : null;
+    if (canopy && regions.canopy) {
+        if (cfg.shade) shadeRegion(out, base, regions.canopy, canopy.hsl, null);
+        else paintRegion(out, base, regions.canopy, canopy.hsl, null);
+    }
     const seat = parseSwatch(choice.seat);
-    let seatBands = choice.seatBands && cfg.seatStripes
+    const seatBands = choice.seatBands && cfg.seatStripes
         ? choice.seatBands.map(b => ({ hsl: hexToHsl(b.hex), to: b.to }))
         : null;
-    if (regions.seat && cfg.seatSeats) {
-        // Per seat: the bench pattern's first half (outer bolster, centre panel, inner bolster) runs across each
-        // seat of the angled bench, instead of across the whole bench
-        if (!regions.seat.seatZones) regions.seat.seatZones = cfg.seatSeats.map(([x0, x1, y0, y1]) => {
-            const xs = regions.seat.idx.filter(i => { const x = i % base.w, y = (i / base.w) | 0; return x >= x0 && x < x1 && y >= y0 && y < y1; }).map(i => i % base.w);
-            const [minX, maxX] = percentileSpan(xs, base.w);
-            return { x0, x1, y0, y1, minX, maxX };
-        });
-        regions.seat.zones = seatBands ? regions.seat.seatZones : null;
-        if (seatBands) {
-            const half = seatBands.filter(b => b.to <= 0.6).map(b => ({ ...b, to: Math.min(1, b.to * 2) }));
-            half[half.length - 1].to = 1;
-            seatBands = half;
-        }
+    if (seat && regions.seat) {
+        // Patterned seats (Tsunami) keep the photographed seat's stripes; one-color seats are shaded like paint
+        if (cfg.seatTones && choice.seatBands && choice.seatBands.length) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatTones);
+        else if (cfg.shade) shadeRegion(out, base, regions.seat, seat.hsl, null, seatBands);
+        else paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
     }
-    if (seat && regions.seat && cfg.seatTones) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatTones);
-    else if (seat && regions.seat) paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, spreads ? 0.85 : cfg.seatContrast, shading('seat'));
     const body = parseSwatch(choice.body);
-    if (body) paintRegion(out, base, regions.body, body.hsl, body.gradient && body.gradient.length > 1 ? body.gradient : null, null, 0.85, shading('body'));
+    if (body && regions.body) {
+        if (cfg.shade) shadeRegion(out, base, regions.body, body.hsl, gradient(body));
+        else paintRegion(out, base, regions.body, body.hsl, gradient(body));
+    }
 
     const canvas = document.createElement('canvas');
     canvas.width = base.w;
