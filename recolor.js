@@ -73,12 +73,26 @@ const COLOR_PREVIEW = {
 // reflections over the chosen color, which holds up when a white cart turns black or a black one turns white.
 // Parts left at the photo's own color are not repainted (see app.js updateDetailPreview).
 // The striped Tsunami seats in the Scratch photos (`seatTones`) are painted tone by tone (see paintToneSeat).
+// The Pro photos' seats are one color (Camello); a two-tone choice (Black and Gray) is drawn as stripes across
+// each seat part (`seatBoxes`, x as fractions of the photo's width, y of its height), as on the studio photos.
 const SEAT_TONES = { 'golfer-2-scratch-right': [0.27, 0.5], 'golfer-2-2-scratch': [0.25, 0.42] };
+const SEAT_BOXES = {
+    // Backrest (a split bench: two halves), cushion
+    'golfer-2-pro': [{ x: [0.256, 0.494], y: [0.338, 0.496] }, { x: [0.275, 0.497], y: [0.496, 0.583] }],
+    // Backrest, cushion, and the rear-facing seat's back and cushion
+    'golfer-2-2-pro-right': [
+        { x: [0.266, 0.5], y: [0.354, 0.496] }, { x: [0.306, 0.525], y: [0.496, 0.592] },
+        { x: [0.225, 0.269], y: [0.358, 0.492] }, { x: [0.162, 0.225], y: [0.462, 0.504] }
+    ]
+};
 [
     ['golfer-tempo-2:golf', 'golfer-2-golfer'], ['golfer-tempo-2:scratch', 'golfer-2-scratch-right'], ['golfer-tempo-2:pro', 'golfer-2-pro'],
     ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer'], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch'], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro-right']
 ].forEach(([key, photo]) => {
-    COLOR_PREVIEW[key] = { base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, shade: true, seatTones: SEAT_TONES[photo] };
+    COLOR_PREVIEW[key] = {
+        base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, shade: true,
+        seatTones: SEAT_TONES[photo], seatBoxes: SEAT_BOXES[photo], seatStripes: Boolean(SEAT_BOXES[photo])
+    };
 });
 
 const recolorCache = {};
@@ -138,7 +152,8 @@ function linearLuma(r, g, b) {
 // light color into chrome; there a light color takes its shading from the panel's broad light instead
 // (`form`, the brightness averaged over the part), with only a trace of the reflections.
 // `target` is an [h, s, l] color, or a list of them blended across the region (multi-tone paints).
-function shadeRegion(out, base, region, target, gradient) {
+// `bands` (optional) paints stripes across each seat part instead, as paintRegion does.
+function shadeRegion(out, base, region, target, gradient, bands) {
     const px = base.imageData.data;
     const toRgb = hsl => hslToRgb(...hsl).map(toLinear);
     const solid = toRgb(target);
@@ -146,9 +161,18 @@ function shadeRegion(out, base, region, target, gradient) {
     const refY = region.refY;
     const dark = Math.max(0, Math.min(1, (0.12 - refY) / 0.06));
     const form = dark ? regionForm(base, region) : null;
+    const bandRgb = bands && bands.map(b => ({ rgb: toRgb(b.hsl), to: b.to }));
     region.idx.forEach((i, k) => {
         let t = solid;
-        if (stops) {
+        if (bandRgb && region.zones) {
+            const y = Math.floor(i / base.w), x = i % base.w;
+            const zone = region.zones.find(z => y >= z.y0 && y < z.y1 && x >= z.x0 && x < z.x1);
+            // Seat pixels outside every seat part (small trim pieces) take the seat's signature color
+            if (zone) {
+                const xf = Math.max(0, (x - zone.minX) / Math.max(1, zone.maxX - zone.minX));
+                t = (bandRgb.find(b => xf <= b.to) || bandRgb[bandRgb.length - 1]).rgb;
+            }
+        } else if (stops) {
             const pos = Math.min(stops.length - 1.001, ((i % base.w) / base.w) * (stops.length - 1));
             const a = stops[Math.floor(pos)], b = stops[Math.floor(pos) + 1], f = pos - Math.floor(pos);
             t = a.map((v, c) => v + (b[c] - v) * f);
@@ -550,6 +574,8 @@ async function renderCartPreview(slug, choice) {
     if (!recolorRegionCache[slug] && cfg.mask) {
         const mask = await loadRecolorMask(cfg.mask, base.w, base.h);
         recolorRegionCache[slug] = { body: maskRegion(base, mask, 0), seat: maskRegion(base, mask, 1), canopy: maskRegion(base, mask, 2) };
+        const seat = recolorRegionCache[slug].seat;
+        if (seat && cfg.seatBoxes) seat.zones = seatBoxZones(base, seat, cfg.seatBoxes);
     }
     if (!recolorRegionCache[slug]) {
         const bodyHue = base.bodyHue;
@@ -592,7 +618,7 @@ async function renderCartPreview(slug, choice) {
     if (seat && regions.seat) {
         // Patterned seats (Tsunami) keep the photographed seat's stripes; one-color seats are shaded like paint
         if (cfg.seatTones && choice.seatBands && choice.seatBands.length) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatTones);
-        else if (cfg.shade) shadeRegion(out, base, regions.seat, seat.hsl, null);
+        else if (cfg.shade) shadeRegion(out, base, regions.seat, seat.hsl, null, seatBands);
         else paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
     }
     const body = parseSwatch(choice.body);
