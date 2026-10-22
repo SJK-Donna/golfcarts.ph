@@ -71,9 +71,13 @@ const MASKS = {
         seat: { refs: ['#c58a6a', '#e2a589', '#a86f50', '#8a5a40', '#d99a78'], kL: 3, tol: 16, polys: [
             [[230, 246], [250, 226], [422, 226], [446, 256], [446, 345], [452, 392], [300, 394], [240, 372], [230, 300]]
         ] },
-        // The black roof's shell only: the visor and mirror under it stay as they are
-        canopy: { refs: ['#2c2c27'], kL: 1, tol: 999, full: true, polys: [
-            [[335, 125], [500, 60], [800, 40], [1100, 80], [1150, 130], [1145, 140], [1000, 122], [780, 114], [600, 127], [420, 157], [335, 170]]
+        // The black roof's shell and the liner under it, back to the visor and speaker bar, which stay as they are,
+        // as does the roof post in front of the liner
+        canopy: { refs: ['#2c2c27'], kL: 1, tol: 999, full: true,
+            exclude: [[[700, 112], [732, 112], [748, 182], [712, 182]]],
+            polys: [
+            [[335, 125], [500, 60], [800, 40], [1100, 80], [1150, 130], [1145, 140], [1000, 122], [780, 114], [600, 127], [420, 157], [335, 170]],
+            [[390, 168], [450, 150], [600, 120], [780, 105], [790, 128], [720, 150], [600, 170], [400, 178]]
         ] }
     },
     'golfer-2-2-golfer': {
@@ -135,9 +139,14 @@ const MASKS = {
             [[204, 253], [222, 241], [243, 239], [243, 338], [204, 338]],
             [[148, 314], [215, 308], [222, 340], [148, 346]]
         ] },
-        // The black roof's shell only: the visor and mirror under it stay as they are
-        canopy: { refs: ['#2c2c27'], kL: 1, tol: 999, full: true, polys: [
-            [[355, 180], [400, 135], [600, 80], [770, 60], [900, 65], [1100, 100], [1168, 135], [1165, 157], [1080, 137], [900, 107], [750, 112], [600, 132], [450, 177], [355, 197]]
+        // The black roof's shell and the liner under it; the speaker bar and mirror stay as they are
+        canopy: { refs: ['#2c2c27'], kL: 1, tol: 999, full: true,
+            // The roof post in front of the liner stays as it is
+            exclude: [[[750, 120], [785, 120], [805, 240], [770, 240]]],
+            polys: [
+            [[355, 180], [400, 135], [600, 80], [770, 60], [900, 65], [1100, 100], [1168, 135], [1165, 157], [1080, 137], [900, 107], [750, 112], [600, 132], [450, 177], [355, 197]],
+            // The liner under it, back to the speaker bar
+            [[385, 195], [450, 160], [600, 122], [760, 105], [780, 108], [790, 150], [805, 228], [770, 232], [700, 224], [500, 210], [400, 202]]
         ] }
     }
 };
