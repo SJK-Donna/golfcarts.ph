@@ -50,7 +50,7 @@ function escapeAttr(value) {
 // ---- 1. Clean and copy ----
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
-for (const f of ['app.js', 'recolor.js', '.nojekyll', 'favicon.ico', 'image', 'video']) copy(f);
+for (const f of ['app.js', 'recolor.js', '.nojekyll', '.htaccess', 'favicon.ico', 'image', 'video']) copy(f);
 
 const fontFiles = {
     '@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2': 'newsreader-latin-opsz-normal.woff2',
