@@ -3342,11 +3342,11 @@ let detailPreviewToken = 0;
 let livePreviewAvailable = location.protocol !== 'file:';
 
 // Repaints the color preview photo for the current body / seat / canopy choices (see recolor.js)
-// The photo the color preview repaints: the studio photo of the model (the same engine as the homepage
-// preview). The build photos (white, cream and grey carts) can't be repainted cleanly, so they are shown in the
-// header and build cards instead.
+// The photo the color preview repaints: on Golfer 2 / 2+2, the photo of the chosen build (Golfer, Scratch or
+// Pro); on other models, the model's studio photo (the same engine as the homepage preview)
 function detailPreviewKey(product) {
-    return product.slug;
+    const key = `${product.slug}:${detailBuild.level}`;
+    return hasLiveColorPreview(key) ? key : product.slug;
 }
 
 function updateDetailPreview() {
