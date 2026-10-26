@@ -1876,6 +1876,9 @@ function initRevealOnScroll() {
         items.forEach(el => el.classList.add('is-visible'));
         return;
     }
+    // Shown once its top is 15% of the screen into view. A share of the section's own height (threshold 0.15)
+    // never comes for a section taller than about 6.5 screens, such as the Scratch / Pro equipment list, which then
+    // stayed invisible.
     const observer = new IntersectionObserver(entries => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -1883,7 +1886,7 @@ function initRevealOnScroll() {
                 observer.unobserve(entry.target);
             }
         });
-    }, { threshold: 0.15 });
+    }, { rootMargin: '0px 0px -15% 0px' });
     items.forEach(el => observer.observe(el));
 }
 
@@ -3641,7 +3644,7 @@ function selectBuildLevel(id) {
     document.querySelectorAll('.build-card').forEach(card => {
         const active = card.dataset.build === id;
         card.classList.toggle('build-card-active', active);
-        card.setAttribute('aria-checked', active ? 'true' : 'false');
+        card.querySelector('[role="radio"]').setAttribute('aria-checked', active ? 'true' : 'false');
     });
     const product = currentDetailProduct();
     if (product && isTempoVersion(product)) {
@@ -3709,6 +3712,50 @@ function toggleTempoOption(id, index) {
     refreshTempoOptions();
 }
 
+// The upgrades a build card's checkbox adds (the ones its note lists), by level: Equipment groups switched on
+const TEMPO_UPGRADE_PACKAGE = [
+    [],
+    ['lift', 'wheels', 'mirrors', 'storage', 'enclosure', 'cooling'],
+    ['lift', 'wheels', 'mirrors', 'storage', 'enclosure', 'cooling', 'electronics', 'steering']
+];
+
+// The package's groups on this model and level, each with the value it gets: the group's first choice (wheels:
+// the first upgrade past the included wheels); the Pro audio is the sound bar and Apple CarPlay its note names
+function tempoPackageValues(product, i) {
+    const ids = TEMPO_UPGRADE_PACKAGE[i];
+    return getTempoOptionGroups(product, i).filter(g => ids.includes(g.id)).map(g => {
+        let value = [g.options && g.options[0]];
+        if (g.type === 'flag') value = true;
+        if (g.type === 'optional') value = g.options[0];
+        if (g.type === 'single') value = g.options[g.upgradeFrom || 0];
+        if (g.id === 'electronics') value = g.options.filter(x => x === 'Club Car Premium Sound Bar' || x === 'Apple CarPlay');
+        return { g, value };
+    });
+}
+
+// Ticked when every upgrade in the level's package is on, however the visitor then set it in Equipment
+function tempoPackageOn(product, i) {
+    const o = detailBuild.options || {};
+    const items = tempoPackageValues(product, i);
+    return items.length > 0 && items.every(({ g }) => {
+        const v = o[g.id];
+        if (g.type === 'single') return g.options.indexOf(v) >= (g.upgradeFrom || 0);
+        if (g.type === 'multi') return !!(v && v.length);
+        return !!v;
+    });
+}
+
+// Build card checkbox: picks that build, then switches its upgrades on (or back off) in Equipment
+function toggleTempoPackage(levelId, on) {
+    if (detailBuild.level !== levelId) selectBuildLevel(levelId);
+    const product = currentDetailProduct();
+    const i = detailLevelIndex(product);
+    const defaults = defaultTempoOptions(product, i);
+    tempoPackageValues(product, i).forEach(({ g, value }) => { detailBuild.options[g.id] = on ? value : defaults[g.id]; });
+    fixTempoSubChoices(product, i, detailBuild.options);
+    refreshTempoOptions();
+}
+
 function setTempoQty(id, n) {
     detailBuild.options[id] = n;
     refreshTempoOptions();
@@ -3735,6 +3782,10 @@ function refreshTempoOptions() {
             if (again) again.focus();
         }
     }
+    if (product && isTempoVersion(product)) {
+        const on = tempoPackageOn(product, detailLevelIndex(product));
+        document.querySelectorAll('.build-package-check').forEach(c => { c.checked = on && c.dataset.build === detailBuild.level; });
+    }
     updateBuildSummaryLine();
 }
 
@@ -3746,6 +3797,7 @@ const OPTION_PHOTOS = {
     'Trojan FLA 8V lead-acid': 'battery-trojan-8v',
     'Battlite lithium': 'battery-battlite',
     // Lighting
+    'No headlights': 'light-none', // the Tempo base front (Golf build photo), with no lamps
     'GC Apex Tempo LED Headlights & Tail Lights': 'light-gc-apex',
     'Club Car Tempo Deluxe Light Kit': 'light-cc-deluxe',
     // Wheels and tires
@@ -4028,8 +4080,13 @@ function renderBuildSection(product, buildSet) {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-${buildSet.builds.length} gap-4" role="radiogroup" aria-label="Build level">
-                ${buildSet.builds.map(b => `
-                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} text-left p-6 lg:p-8 flex flex-col gap-5">
+                ${buildSet.builds.map((b, k) => {
+                    // Tempo Scratch / Pro: the note's upgrades are a checkbox, kept outside the card's select button
+                    const pkg = isTempoVersion(product) && TEMPO_UPGRADE_PACKAGE[k].length > 0;
+                    const pkgOn = pkg && b.id === detailBuild.level && tempoPackageOn(product, k);
+                    return `
+                    <div data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} flex flex-col">
+                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" class="text-left p-6 lg:p-8 ${pkg ? 'pb-5 lg:pb-5' : ''} flex flex-col gap-5 flex-1">
                         ${product.buildPhotos && product.buildPhotos[b.id] ? `
                             <span class="build-card-photo"><img src="${product.buildPhotos[b.id]}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
                         <span class="flex items-start justify-between gap-4">
@@ -4042,10 +4099,16 @@ function renderBuildSection(product, buildSet) {
                         <ul class="home-list text-[0.9375rem]">
                             ${b.includes.map(x => `<li>${x}</li>`).join('')}
                         </ul>
-                        ${b.note ? `<span class="block text-sm text-mute mt-auto">${b.note}</span>` : ''}
+                        ${b.note && !pkg ? `<span class="block text-sm text-mute mt-auto">${b.note}</span>` : ''}
                         ${b.proposed ? '<span class="block text-sm text-green-text font-medium">Proposed package, confirmed in your quote</span>' : ''}
                     </button>
-                `).join('')}
+                    ${pkg ? `
+                        <label class="flex items-start gap-3 px-6 lg:px-8 pb-6 lg:pb-8 text-sm text-ink-2 cursor-pointer">
+                            <input type="checkbox" data-build="${b.id}" ${pkgOn ? 'checked' : ''} onchange="toggleTempoPackage('${b.id}', this.checked)" class="build-package-check w-4 h-4 mt-0.5 accent-[#151714] flex-shrink-0">
+                            <span>${b.note}</span>
+                        </label>` : ''}
+                    </div>`;
+                }).join('')}
             </div>
 
             ${isTempoVersion(product) ? `
@@ -4555,7 +4618,7 @@ function renderSolutionsPage() {
                 <p class="measure lg:col-span-5">Tell us how your operation runs. We'll recommend the vehicles, the service plan and the replacement schedule.</p>
             </div>
             <div class="mt-12 aspect-[16/9] md:aspect-[21/9] overflow-hidden">
-                <img src="image/Banners/industrial.jpg" alt="Utility carts at an industrial site" fetchpriority="high" class="w-full h-full object-cover">
+                <img src="image/4.png" alt="A fleet of Tempo carts lined up for delivery under palm trees" width="1920" height="1080" fetchpriority="high" class="w-full h-full object-cover object-[50%_80%]">
             </div>
         </section>
 

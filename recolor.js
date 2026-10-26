@@ -500,33 +500,12 @@ function paintToneSeat(out, base, region, target, bands, tones) {
     // A patterned seat keeps its contrast; a one-color seat carries less of the stripes' light / dark and
     // blends its tones over a wider band, so the old stripe edges don't show as outlines. Each tone blends into
     // the next, so tone edges are smooth instead of stepped and speckled.
+    // Patterned seats paint every tone with its own color too: tinting the whole seat with the panel color
+    // turned Tsunami Red's black bolsters dark red and its silver stripes pink.
     const patterned = bands && bands.length;
     const contrast = patterned ? 0.8 : 0.55;
-    const soft = patterned ? 0.06 : 0.12;
+    const soft = patterned ? 0.08 : 0.12;
     const step = (edge, l) => Math.max(0, Math.min(1, (l - edge + soft) / (2 * soft)));
-    if (patterned) {
-        // Patterned choice: keep the photo's own light and dark (black bolsters stay black, silver piping
-        // stays silver) and tint the mid tones with the pattern's color, smoothly, so nothing turns blotchy
-        const panel = palette[1];
-        const [lo, hi] = [tones[0] - 0.12, tones[1] + 0.12];
-        const pm = region.toneMid[1];
-        for (const i of region.idx) {
-            const L = base.light[i];
-            if (L > 0.92 && base.sat[i] < 0.12) continue;
-            const T = region.toneL.get(i);
-            const rise = Math.max(0, Math.min(1, (T - lo) / (tones[0] + 0.06 - lo)));
-            const fall = Math.max(0, Math.min(1, (hi - T) / (hi - (tones[1] - 0.04))));
-            // A floor of tint everywhere but the silver piping, so a panel pixel read as dark shades deeper instead
-            // of breaking into a black patch
-            const k = Math.max(rise, 0.45) * fall;
-            const l = Math.max(0.02, Math.min(0.98, L + (panel[2] - pm) * k * 0.7));
-            const chroma = panel[1] * (1 - Math.abs(2 * panel[2] - 1)) * k;
-            const s = Math.min(1, chroma / Math.max(0.001, 1 - Math.abs(2 * l - 1)));
-            const [r, g, b] = hslToRgb(panel[0], s, l);
-            out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b;
-        }
-        return;
-    }
     for (const i of region.idx) {
         const L = base.light[i];
         // Studio white caught at the seat's outline is background, not seat
@@ -616,8 +595,9 @@ async function renderCartPreview(slug, choice) {
         ? choice.seatBands.map(b => ({ hsl: hexToHsl(b.hex), to: b.to }))
         : null;
     if (seat && regions.seat) {
-        // Patterned seats (Tsunami) keep the photographed seat's stripes; one-color seats are shaded like paint
-        if (cfg.seatTones && choice.seatBands && choice.seatBands.length) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatTones);
+        // Seats photographed striped (Scratch) are painted tone by tone, so a one-color seat loses the photo's
+        // stripes; shading them like paint kept the black-and-grey Tsunami stripes under every color
+        if (cfg.seatTones) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatTones);
         else if (cfg.shade) shadeRegion(out, base, regions.seat, seat.hsl, null, seatBands);
         else paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
     }

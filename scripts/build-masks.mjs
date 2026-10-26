@@ -85,8 +85,8 @@ const MASKS = {
         // the same cart, shot from the same camera position, in green paint
         body: { from: 'golfer-2-2-scratch' },
         seat: { refs: ['#b49a83', '#bba08a', '#cdb5a0', '#9a826d', '#a58c76'], kL: 3, tol: 14,
-            // The hip restraint bar is left alone (the dark roof post doesn't match the tan seat)
-            exclude: [[[236, 296], [252, 292], [302, 370], [302, 392], [290, 392], [236, 318]]],
+            // The hip restraint bar is left alone, both legs and its foot (the dark roof post doesn't match the tan seat)
+            exclude: [[[234, 295], [252, 291], [302, 365], [305, 392], [290, 394], [262, 375], [250, 366], [241, 348], [235, 325]]],
             polys: [
             [[240, 242], [260, 230], [440, 235], [466, 265], [460, 330], [420, 345], [432, 392], [280, 392], [245, 350]],
             // The rear-facing seat: its back (behind the front seat) and its cushion
@@ -116,8 +116,8 @@ const MASKS = {
             [[176, 356], [192, 352], [188, 370], [180, 372]]
         ] },
         seat: { refs: ['#656660', '#777672', '#666561', '#2a2a28', '#1c1c1a', '#9c9b96', '#4a4a46'], kL: 2, tol: 12,
-            // Traced on the photo; the hip restraint bar and the roof post in front of the seat are left alone
-            exclude: [[[236, 296], [252, 292], [302, 370], [302, 392], [290, 392], [236, 318]], [[403, 191], [415, 191], [464, 405], [453, 405]]],
+            // Traced on the photo; the hip restraint bar (both legs and its foot) and the roof post in front of the seat are left alone
+            exclude: [[[234, 295], [252, 291], [302, 365], [305, 392], [290, 394], [262, 375], [250, 366], [241, 348], [235, 325]], [[403, 191], [415, 191], [464, 405], [453, 405]]],
             polys: [
             [[262, 214], [275, 207], [322, 207], [330, 222], [372, 222], [380, 210], [428, 210], [436, 226], [455, 248], [464, 275], [462, 320], [445, 342], [446, 384], [420, 390], [300, 392], [275, 388], [258, 370], [243, 330], [244, 262]],
             [[214, 240], [244, 228], [244, 320], [214, 316]],
