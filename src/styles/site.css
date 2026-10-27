@@ -887,7 +887,17 @@
     .opt-card-active,
     .opt-card-active:hover {
         border-color: var(--ink);
+    }
+    /* The chosen card's second ring of outline sits above the photo tile (an inset shadow on the card itself was
+       painted under the tile, so the outline showed doubled only around the name) */
+    .opt-card-active::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 3;
+        border-radius: inherit;
         box-shadow: inset 0 0 0 1px var(--ink);
+        pointer-events: none;
     }
     .opt-card:disabled {
         cursor: not-allowed;
