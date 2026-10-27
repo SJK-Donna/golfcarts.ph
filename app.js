@@ -2275,7 +2275,9 @@ function renderHomeUses() {
                     </div>
                     <a href="${routeHref('segment', 'remanufactured')}" data-route="segment" data-slug="remanufactured" class="group lg:col-span-5 lg:col-start-8 self-end border-t border-ink pt-6 space-y-3">
                         <!-- A rebuilt cart above the heading: "Remanufactured" is one long word, so there's no room beside it -->
-                        <img src="image/Products/reman 4.png" alt="" loading="lazy" decoding="async" class="w-40 sm:w-48 h-auto object-contain mix-blend-multiply">
+                        <div class="media-zoom edge-light aspect-[16/10]">
+                            <img src="image/Products/reman-street.jpg" alt="A black remanufactured Club Car 2+2 parked on a residential street" width="1600" height="1000" loading="lazy" decoding="async" class="w-full h-full object-cover">
+                        </div>
                         <h3 class="type-lg text-ink">${reman.label}</h3>
                         <p class="measure">Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.</p>
                         <span class="link inline-block">See available builds</span>
@@ -2615,7 +2617,12 @@ function renderHomeEvents() {
                     <div class="space-y-4">
                         <p class="text-sm text-mute">Events · ${e.date}</p>
                         <h2 id="home-events-title" class="type-md text-ink">${e.title}</h2>
-                        ${e.text.map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${p}</p>`).join('')}
+                        <!-- The first paragraph shows; Read more opens the rest -->
+                        ${e.text.slice(0, 1).map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${p}</p>`).join('')}
+                        <div id="home-events-more" class="space-y-4" hidden>
+                            ${e.text.slice(1).map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${p}</p>`).join('')}
+                        </div>
+                        <button type="button" class="link text-sm block" aria-expanded="false" aria-controls="home-events-more" onclick="toggleEventStory(this)">Read more</button>
                         <a href="./#home-quote" onclick="event.preventDefault(); goToHomeSection('home-quote')" class="btn btn-primary">Bring carts to your event</a>
                     </div>
                     <div class="events-carousel" role="group" aria-label="${e.title} photos">
@@ -2625,6 +2632,15 @@ function renderHomeEvents() {
             </div>
         </section>
     `;
+}
+
+// Events story: Read more opens the rest of the text, Read less closes it again
+function toggleEventStory(button) {
+    const more = document.getElementById('home-events-more');
+    if (!more) return;
+    more.hidden = !more.hidden;
+    button.setAttribute('aria-expanded', String(!more.hidden));
+    button.textContent = more.hidden ? 'Read more' : 'Read less';
 }
 
 function renderHomeQuote() {
