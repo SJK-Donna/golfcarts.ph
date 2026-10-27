@@ -811,6 +811,26 @@
     .opt-subpanel + .opt-group {
         margin-top: 0.5rem;
     }
+    /* Two groups that share the cart's mounts (ball washer and cooler), side by side from tablet width */
+    .opt-pair {
+        display: grid;
+        gap: 0 1rem;
+    }
+    @media (min-width: 768px) {
+        .opt-pair {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    .opt-pair + .opt-group,
+    .opt-group + .opt-pair {
+        margin-top: 0.5rem;
+    }
+    /* The pair's two groups start on the same line (the usual gap between stacked groups pushed the second down) */
+    @media (min-width: 768px) {
+        .opt-pair > .opt-group + .opt-group {
+            margin-top: 0;
+        }
+    }
     .opt-group-head {
         display: flex;
         align-items: baseline;
@@ -836,6 +856,11 @@
     @media (min-width: 768px) {
         .opt-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+    @media (min-width: 1024px) {
+        .opt-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
         }
     }
     .opt-grid-label {
@@ -868,6 +893,26 @@
         cursor: not-allowed;
         opacity: 0.5;
     }
+    /* A 14" wheel while the 14" upgrade is off: dimmed, but clicking it explains the upgrade */
+    .opt-card[data-locked] .opt-card-media,
+    .opt-card[data-locked] .opt-card-name,
+    .opt-card[data-locked] .opt-card-detail {
+        opacity: 0.45;
+    }
+    .opt-card[data-locked] .opt-card-check {
+        visibility: hidden;
+    }
+    /* The 14" heading with its On / Off upgrade switch */
+    .opt-upgrade-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding-top: 1.25rem;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        color: var(--ink);
+    }
     .opt-card:disabled:hover {
         border-color: var(--line);
     }
@@ -876,7 +921,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        aspect-ratio: 4 / 3;
+        aspect-ratio: 16 / 10;
         padding: 0.75rem;
         background: #EFEFEA; /* stays light in dark mode: the product photos are shot on white */
     }
@@ -954,7 +999,7 @@
     /* Single items with an amount or a mounting side: photo beside the name and a segmented control */
     .opt-item {
         display: grid;
-        grid-template-columns: 7.5rem minmax(0, 1fr);
+        grid-template-columns: 5.5rem minmax(0, 1fr);
         align-items: center;
         border: 1px solid var(--line);
         border-radius: var(--radius);
@@ -965,7 +1010,7 @@
     .opt-item .opt-card-media {
         height: 100%;
         aspect-ratio: auto;
-        min-height: 6rem;
+        min-height: 4.5rem;
     }
     .opt-item-body {
         display: flex;
@@ -1276,6 +1321,241 @@
         }
     }
 
+    /* ---- Red Series promo (HOME_PROMO in app.js): the line-up on the Red Series background, names in white ---- */
+    .promo-stage {
+        position: relative;
+        overflow: hidden;
+        background: #B30F12 url('../image/Promo/red-series-stage.jpg') center / cover no-repeat;
+    }
+    .lineup-promo {
+        aspect-ratio: 3.33 / 1;
+        margin-top: 0;
+    }
+    /* The Red Series banner over the carts (togglePromoCover in app.js): slides away left to reveal them */
+    .promo-cover {
+        position: absolute;
+        inset: 0;
+        z-index: 10;
+        background: #B30F12;
+        transition: transform 0.8s var(--ease);
+    }
+    .promo-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: left center;
+    }
+    .promo-stage.is-open .promo-cover {
+        transform: translateX(-100%);
+    }
+    .promo-arrow {
+        position: absolute;
+        bottom: 1.5rem;
+        z-index: 11;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        min-height: 3rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.94);
+        color: #8E1B22;
+        font-weight: 600;
+        box-shadow: 0 6px 20px rgba(60, 0, 0, 0.35);
+        transition: background-color 0.25s var(--ease), transform 0.25s var(--ease);
+    }
+    .promo-arrow:hover {
+        background: #fff;
+    }
+    /* "See the Red Series", centered under the banner's title, nudging toward the carts */
+    .promo-open {
+        left: 50%;
+        padding: 0 1.25rem 0 1.5rem;
+        transform: translateX(-50%);
+        animation: promo-nudge 1.8s ease-in-out infinite;
+    }
+    @keyframes promo-nudge {
+        0%, 100% { transform: translateX(-50%); }
+        50% { transform: translateX(calc(-50% + 6px)); }
+    }
+    .promo-back {
+        left: 1.5rem;
+        width: 3rem;
+    }
+    .promo-back[hidden] {
+        display: none;
+    }
+    @media (max-width: 639px) {
+        .promo-arrow {
+            bottom: 0.75rem;
+            min-height: 2.5rem;
+            font-size: 0.875rem;
+        }
+        .promo-back {
+            left: 0.75rem;
+            width: 2.5rem;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .promo-cover {
+            transition: none;
+        }
+        .promo-open {
+            animation: none;
+        }
+    }
+    /* Snowflakes and holly leaves drifting down, sparkles twinkling: behind the carts, never in the way of a click */
+    .promo-fx {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+    }
+    .promo-fall {
+        position: absolute;
+        top: -8%;
+        left: var(--x);
+        width: var(--size);
+        height: var(--size);
+        animation: promo-fall var(--dur) linear var(--delay) infinite;
+    }
+    .promo-flake {
+        border-radius: 50%;
+        background: radial-gradient(circle, #fff 0 35%, rgba(255, 255, 255, 0.5) 55%, transparent 72%);
+        opacity: 0.85;
+    }
+    .promo-leaf {
+        filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+    }
+    /* Falls from above the stage to below it (top, so it follows the stage's own height), swaying and turning */
+    @keyframes promo-fall {
+        0% { top: -8%; transform: translateX(0) rotate(0deg); }
+        25% { transform: translateX(var(--sway)) rotate(90deg); }
+        50% { transform: translateX(0) rotate(180deg); }
+        75% { transform: translateX(calc(var(--sway) * -1)) rotate(270deg); }
+        100% { top: 108%; transform: translateX(0) rotate(360deg); }
+    }
+    .promo-sparkle {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        width: var(--size);
+        height: var(--size);
+        color: #fff;
+        filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+        animation: promo-twinkle var(--dur) ease-in-out var(--delay) infinite;
+    }
+    .promo-sparkle-gold {
+        color: #FFD66B;
+        filter: drop-shadow(0 0 6px rgba(255, 200, 80, 0.9));
+    }
+    @keyframes promo-twinkle {
+        0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+        50% { opacity: 1; transform: scale(1) rotate(45deg); }
+    }
+    /* Still for visitors who ask for less motion: a few sparkles, no falling */
+    @media (prefers-reduced-motion: reduce) {
+        .promo-fall {
+            display: none;
+        }
+        .promo-sparkle {
+            animation: none;
+            opacity: 0.7;
+        }
+    }
+    .lineup-promo::before {
+        display: none;
+    }
+    /* The three names always show, hovered or not, with a soft shadow so they read over the sparkles */
+    .lineup.lineup-promo .lineup-label {
+        bottom: calc(100% + 0.25rem);
+        opacity: 1;
+        transform: translate(-50%, 0);
+        text-shadow: 0 1px 6px rgba(60, 0, 0, 0.6);
+    }
+    .lineup-promo .lineup-name,
+    .lineup-promo .lineup-seats {
+        color: #fff;
+    }
+    /* On hover the other carts dim but stay solid (fading them showed the red through them) */
+    @media (hover: hover) {
+        .lineup.lineup-promo:hover .lineup-cart,
+        .lineup.lineup-promo:focus-within .lineup-cart {
+            opacity: 1;
+            filter: brightness(0.55);
+            transition: transform 0.5s var(--ease), filter 0.4s var(--ease);
+        }
+        .lineup.lineup-promo .lineup-cart:hover,
+        .lineup.lineup-promo .lineup-cart:focus-visible {
+            filter: none;
+        }
+    }
+    /* Phones: the three carts in one row on the red, names underneath */
+    @media (max-width: 639px) {
+        .promo-stage {
+            background-position: left top;
+        }
+        .lineup-promo {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+            padding: 4.5rem 0.75rem 1rem; /* room for the background's "Red Series" title */
+        }
+        .lineup-promo .lineup-cart img {
+            padding: 0;
+            background: none;
+        }
+        .lineup-promo .lineup-name {
+            font-size: 1rem;
+        }
+        .lineup-promo .lineup-seats {
+            font-size: 0.75rem;
+        }
+    }
+
+    /* ---- Events carousel (renderHomeEvents in app.js): two columns of photos scrolling up and down without
+            stopping; as tall as the story beside them on wide screens, a fixed height on phones ---- */
+    .events-carousel {
+        position: relative;
+        min-height: 26rem;
+    }
+    .events-frame {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        overflow: hidden;
+        border-radius: var(--radius);
+        -webkit-mask-image: linear-gradient(transparent, #000 8%, #000 92%, transparent);
+        mask-image: linear-gradient(transparent, #000 8%, #000 92%, transparent);
+    }
+    .events-col {
+        overflow: hidden;
+    }
+    .events-track {
+        display: grid;
+        gap: 0.75rem;
+        animation: events-scroll 45s linear infinite;
+    }
+    .events-col-down .events-track {
+        animation-direction: reverse;
+    }
+    .events-track img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: var(--radius);
+    }
+    /* One full set of photos (half the track, plus half a gap) per loop */
+    @keyframes events-scroll {
+        from { transform: translateY(0); }
+        to { transform: translateY(calc(-50% - 0.375rem)); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .events-track {
+            animation: none;
+        }
+    }
+
     /* ---- Banner slider (renderHomeBanners / initHomeBanners in app.js) ---- */
     .banner-stage {
         position: relative;
@@ -1283,14 +1563,10 @@
         overflow: hidden;
         background: var(--stone);
     }
-    /* As the homepage hero: full width, short enough that the control bar shows on a laptop screen.
-       The banners' own text sits well inside the frame, so the slight crop on tall screens is safe. */
+    /* As the homepage hero: full width, in the banners' own shape (2880 x 864), so each fills it edge to edge */
     .home-banners .banner-stage {
-        /* ...but never shorter than 38vw: on short windows and at high browser zoom the banner is cropped no
-           more than on a full-size laptop or desktop screen, so its text isn't cut off (the bar then sits
-           just below the fold) */
-        max-height: max(calc(100svh - 4rem - 4.5rem), 38vw);
         width: 100%;
+        aspect-ratio: 2880 / 864;
     }
     .banner-bar {
         background: var(--paper);

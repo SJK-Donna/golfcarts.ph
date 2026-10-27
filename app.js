@@ -85,7 +85,7 @@ const PRODUCTS_DATA = [
     {
         id: 'golfer-tempo-4',
         slug: 'golfer-tempo-4',
-        name: 'Tempo 4',
+        name: 'Golfer 4',
         category: 'The Golfer',
         version: 'golfer',
         layout: '4',
@@ -762,7 +762,7 @@ const CATEGORY_BANNERS = {
     'The Golfer': {
         title: 'The Golfer',
         headline: 'Built around the way you play.',
-        subheadline: 'Golfer 2, Golfer 2+2 and Tempo 4, each in Golfer, Scratch and Pro builds.',
+        subheadline: 'Golfer 2, Golfer 2+2 and Golfer 4, each in Golfer, Scratch and Pro builds.',
         image: 'image/Products/Premium.png',
         photo: 'image/Banners/golf.jpg',
         photoFocus: '60% 60%'
@@ -825,16 +825,20 @@ const TEMPO_LINES = {
         title: 'Golfer, Scratch or Pro.',
         levels: [
             { id: 'golf', name: 'Golfer', fullName: 'Tempo Golf', tagline: 'Golf essentials', blurb: 'The golf essentials: a bag cover, a floor mat and a dependable lead-acid battery.' },
-            { id: 'scratch', name: 'Scratch', fullName: 'Tempo Scratch Golf', tagline: 'Golf accessories and comfort', blurb: 'Golf accessories and comfort: LED lighting, more colors and seats, and the lift kit as an option.' },
-            { id: 'pro', name: 'Pro', fullName: 'Tempo Pro', tagline: 'The premium personal cart', blurb: 'The premium personal cart: lithium power, the Club Car Deluxe light kit and premium seats.' }
+            { id: 'scratch', name: 'Scratch', fullName: 'Tempo Scratch Golf', tagline: 'Golf accessories and comfort', blurb: 'Golf accessories, LED lighting and more colors.',
+                about: 'Adds LED lighting, golf accessories and more colors and seats.' },
+            { id: 'pro', name: 'Pro', fullName: 'Tempo Pro', tagline: 'The premium personal cart', blurb: 'Lithium power and premium finishes.',
+                about: 'Adds lithium power, premium lights and premium seats.' }
         ]
     },
     lifestyle: {
         title: 'Essential, Signature or Elite.',
         levels: [
             { id: 'essential', name: 'Essential', fullName: 'Essential', tagline: 'Everyday practicality' },
-            { id: 'signature', name: 'Signature', fullName: 'Signature', tagline: 'Comfort and style' },
-            { id: 'elite', name: 'Elite', fullName: 'Elite', tagline: 'The premium personal cart' }
+            { id: 'signature', name: 'Signature', fullName: 'Signature', tagline: 'Comfort and style', blurb: 'More colors, LED lighting and comfort.',
+                about: 'Adds LED lighting, a cooler and more colors and seats.' },
+            { id: 'elite', name: 'Elite', fullName: 'Elite', tagline: 'The premium personal cart', blurb: 'Lithium power and premium finishes.',
+                about: 'Adds lithium power, premium lights and premium seats.' }
         ]
     }
 };
@@ -970,7 +974,7 @@ function tempoLevelNote(i) {
     return [
         'Rear flip seat available on +2 models.',
         'Upgrades: lift kit, 14" wheels, mirrors, storage, rain enclosure and cooling.',
-        'Upgrades: everything in the level before, plus sound bars, Apple CarPlay and a premium steering wheel.'
+        'Upgrades: everything in the level before, plus audio (a sound bar or Apple CarPlay) and a premium steering wheel.'
     ][i];
 }
 
@@ -989,16 +993,16 @@ function getProductBuildSet(product) {
     return isTempoVersion(product) ? tempoBuildSet(product.version) : BUILD_SETS[product.buildSet] || null;
 }
 
-// Mounting sides for the ball washer and Caddy Master cooler: the value, its label and the sides it takes
+// Mounting sides for the ball washer and Caddy Master cooler: the value, its label and the sides it takes.
+// Nothing chosen is ''; tapping the chosen side again clears it.
 const TEMPO_SIDES = [
-    { value: '', label: 'None', sides: [] },
     { value: 'both', label: 'Both', sides: ['left', 'right'] },
     { value: 'left', label: 'Left', sides: ['left'] },
     { value: 'right', label: 'Right', sides: ['right'] }
 ];
 
 function tempoSidesOf(value) {
-    return (TEMPO_SIDES.find(s => s.value === value) || TEMPO_SIDES[0]).sides;
+    return (TEMPO_SIDES.find(s => s.value === value) || { sides: [] }).sides;
 }
 
 // True when a side choice would use a mount the other side-mounted accessory already has
@@ -1010,7 +1014,8 @@ function tempoSideTaken(group, value, o) {
 
 // Option groups for a Tempo model at a build level. Types: fixed (shown, nothing to pick), single (pick
 // one, the first is the default), optional (pick one or none), multi (any number), qty (none, 1 or 2),
-// side (none, both, left or right mount, shared with the group named in `shares`), flag (on / off).
+// side (none, or the mounts in `sides`, shared with the group named in `shares`), flag (on / off).
+// Optional, qty and side groups have no "None" choice: tapping the chosen one again clears it.
 // `section` groups them on the page.
 function getTempoOptionGroups(product, i) {
     const m = TEMPO_MATRIX;
@@ -1022,18 +1027,27 @@ function getTempoOptionGroups(product, i) {
 
     add({ id: 'battery', section: 'Included', title: 'Battery', type: 'fixed', value: m.battery[i] });
     add({ id: 'floorMat', section: 'Included', title: 'Floor mat', type: 'fixed', value: 'GC floor mat' });
+    // Lighting: where lights are optional ("No headlights" in the sheet), the kits are an optional pick; a build
+    // without lights has no lighting row
     const lights = m.lighting[line][i];
-    if (lights.length > 1) add({ id: 'lighting', section: 'Wheels and lighting', title: 'Lighting', type: 'single', options: lights });
-    else add({ id: 'lighting', section: 'Included', title: 'Lighting', type: 'fixed', value: lights[0] || 'No headlights' });
+    const kits = lights.filter(l => l !== 'No headlights');
+    if (kits.length < lights.length && kits.length) add({ id: 'lighting', section: 'Wheels and lighting', title: 'Lighting', type: 'optional', options: kits });
+    else if (kits.length > 1) add({ id: 'lighting', section: 'Wheels and lighting', title: 'Lighting', type: 'single', options: kits });
+    else if (kits.length) add({ id: 'lighting', section: 'Included', title: 'Lighting', type: 'fixed', value: kits[0] });
+    // Wheels: 8" to 12" are the standard choices; 14" wheels are an upgrade, locked until the visitor turns
+    // the 14" upgrade on (`wheelUpgrade`)
+    const allWheels = [...m.wheels[i], ...m.wheelUpgrades[i]];
+    const wheelSize = w => parseInt(w, 10);
+    const standardWheels = allWheels.filter(w => wheelSize(w) <= 12), upgradeWheels = allWheels.filter(w => wheelSize(w) > 12);
     add({ id: 'wheels', section: 'Wheels and lighting', title: 'Wheels and tires', type: 'single',
-        options: [...m.wheels[i], ...m.wheelUpgrades[i]], upgradeFrom: m.wheels[i].length });
+        options: [...standardWheels, ...upgradeWheels], upgradeFrom: upgradeWheels.length ? standardWheels.length : undefined });
 
     if (line === 'golfer') {
         add({ id: 'bagCover', section: 'Accessories', title: 'Bag cover', type: 'single', options: m.bagCover[i] });
         if (m.golfExtras[i]) {
             add({ id: 'sandBottle', section: 'Accessories', title: 'Sand bottle (with mounting bracket)', type: 'qty' });
-            add({ id: 'ballWasher', section: 'Accessories', title: 'Ball washer', type: 'side', shares: 'cooler', sharesTitle: 'Caddy Master cooler' });
-            add({ id: 'cooler', section: 'Accessories', title: 'Caddy Master cooler', type: 'side', shares: 'ballWasher', sharesTitle: 'ball washer' });
+            add({ id: 'ballWasher', section: 'Accessories', title: 'Ball washer', type: 'side', sides: ['left', 'right'], shares: 'cooler', sharesTitle: 'Caddy Master cooler' });
+            add({ id: 'cooler', section: 'Accessories', title: 'Caddy Master cooler', type: 'side', sides: ['both', 'left', 'right'], shares: 'ballWasher', sharesTitle: 'ball washer' });
         }
         if (layout === '2') add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
     } else if (m.lifestyleCooler[i]) {
@@ -1047,7 +1061,7 @@ function getTempoOptionGroups(product, i) {
         if (bags.length) add({ id: 'bagAttachment', section: 'Upgrades', title: 'Golf bag attachment', type: 'optional', options: bags });
     }
     if (m.electronics[i].length) {
-        add({ id: 'electronics', section: 'Upgrades', title: 'Audio', type: 'multi', options: m.electronics[i] });
+        add({ id: 'electronics', section: 'Upgrades', title: 'Audio', type: 'optional', options: m.electronics[i] });
         add({ id: 'charging', section: 'Upgrades', title: 'Charging', type: 'multi', options: m.electronicsAddOns[i] });
     }
     if (m.steering[i].length) add({ id: 'steering', section: 'Upgrades', title: 'Steering wheel', type: 'flag', label: m.steering[i][0] });
@@ -1084,6 +1098,7 @@ function defaultTempoOptions(product, i) {
         if (g.type === 'qty') o[g.id] = 0;
         if (g.type === 'flag') o[g.id] = false;
     });
+    o.wheelUpgrade = false;
     o.liftFender = TEMPO_MATRIX.liftFenders[0];
     o.liftAddOns = [];
     o.flipSeatColor = '';
@@ -1097,7 +1112,7 @@ function defaultTempoOptions(product, i) {
 const VEHICLE_MODELS = {
     'g-tempo-2':     { name: 'Golfer 2', label: '2 Seater',            image: 'image/Products/builds/golfer-2-golfer.jpg',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
     'g-tempo-2-2':   { name: 'Golfer 2+2', label: '2+2 Seater',          image: 'image/Products/builds/golfer-2-2-golfer.jpg',       slug: 'golfer-tempo-2-2' },
-    'g-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'golfer-tempo-4' },
+    'g-tempo-4':     { name: 'Golfer 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'golfer-tempo-4' },
     'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/Base +.png',                 slug: 'lifestyle-tempo-2' },
     'l-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2' },
     'l-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'lifestyle-tempo-4' },
@@ -1135,7 +1150,7 @@ const NAV_SEGMENTS = [
         label: 'The Golfer',
         category: 'The Golfer',
         tagline: 'Built around the way you play.',
-        description: 'A personal cart for regular golf. Golfer 2, Golfer 2+2 and Tempo 4, each in Golfer, Scratch and Pro builds.',
+        description: 'A personal cart for regular golf. Golfer 2, Golfer 2+2 and Golfer 4, each in Golfer, Scratch and Pro builds.',
         image: 'image/Products/Premium.png',
         version: 'golfer',
         links: [{ label: 'Compare Golfer / Scratch / Pro', anchor: 'compare' }],
@@ -1533,6 +1548,7 @@ function initMobileMenu() {
         if (e.key === 'Escape') {
             toggleMobileMenu(false);
             closeQuoteModal();
+            closeWheelUpgrade();
         }
     });
 }
@@ -1796,7 +1812,11 @@ function getBuildDetails() {
     if (getDetailSeatGroups(product).length) rows.push(['Seat', detailBuild.seat || 'Standard']);
     if (getDetailCanopyOptions(product).length) rows.push(['Canopy', detailBuild.canopy || 'Standard']);
     if (isTempoVersion(product)) rows.push(...getTempoOptionRows(product));
-    return { slug: product.slug, rows };
+    // Build options decided on the model page; the quote's accessory list doesn't offer them again
+    const covered = isTempoVersion(product)
+        ? ['floorMat', ...getTempoOptionGroups(product, detailLevelIndex(product)).map(g => g.id)]
+        : [];
+    return { slug: product.slug, rows, covered, lifted: !!(detailBuild.options && detailBuild.options.lift) };
 }
 
 // Rows for the model currently selected in the quote form (the build only applies to the model it came from)
@@ -1844,6 +1864,9 @@ function renderApp() {
         bindProductsFilterEvents();
     } else if (currentPage === 'product-details') {
         viewport.innerHTML = renderProductDetailsPage();
+        // A Tempo can open on a later build (the homepage color is only offered there): name it as that build
+        const opened = currentDetailProduct();
+        if (opened && detailBuild.level) updateDetailBuildText(opened);
     } else if (currentPage === 'segment') {
         viewport.innerHTML = renderSegmentPage();
     } else if (currentPage === 'solutions') {
@@ -1981,13 +2004,16 @@ function homeSpecLine(p) {
 
 // Promotional banners (the original homepage slider). The text is part of each image, so `alt`
 // repeats it for screen readers; each banner has its own action under the slider.
+// The homepage header banners (image/Hero/hero1-6.png, shown from their web-size copies hero1-6.jpg)
 const HOME_BANNERS = [
-    { image: 'image/Hero/hero-1.jpg', alt: 'Fairway? Covered. Quiet, smooth, and ready to roll. Upgrade your ride with us!', cta: 'Explore The Golfer', route: 'segment', slug: 'golfer' },
-    { image: 'image/Hero/hero-2.webp', alt: 'End of Year Sale: 5% off', cta: 'Shop the sale', route: 'products', slug: null },
-    { image: 'image/Hero/hero-3.webp', alt: 'More than just golf carts. We keep you rolling. Message us to learn how we can help!', cta: 'Book a service', route: 'service', slug: null },
-    { image: 'image/Hero/hero-5.png', alt: 'One cart is great. A whole fleet? Even better. Outfit your golf course, resort, subdivision, or campus with carts that keep up all day.', cta: 'Request a fleet proposal', route: 'solutions', slug: null }
+    { image: 'image/Hero/hero1.jpg', alt: 'Fairway? Covered. Quiet, smooth, and ready to roll. Upgrade your ride with us!', cta: 'Explore The Golfer', route: 'segment', slug: 'golfer' },
+    { image: 'image/Hero/hero2.jpg', alt: 'Golf Carts Halloween: a red golf cart dressed up with cobwebs and a skull', cta: 'Shop golf carts', route: 'products', slug: null },
+    { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' },
+    { image: 'image/Hero/hero4.jpg', alt: 'Two Tempo golf carts, red and silver, on a golf course', cta: 'Build your Tempo', route: 'product-details', slug: 'golfer-tempo-2' },
+    { image: 'image/Hero/hero5.jpg', alt: 'More than just golf carts. We keep you rolling. Message us to learn how we can help!', cta: 'Book a service', route: 'service', slug: null },
+    { image: 'image/Hero/hero6.jpg', alt: 'A fleet of white golf carts lined up at a resort entrance', cta: 'Request a fleet proposal', route: 'solutions', slug: null }
 ];
-const HOME_BANNER_MS = 6000;
+const HOME_BANNER_MS = 5000;
 let homeBanners = null;
 
 function renderHomeBanners() {
@@ -1998,7 +2024,7 @@ function renderHomeBanners() {
             <div id="home-banners" class="banner-stage">
                 ${HOME_BANNERS.map((b, i) => `
                     <div class="banner-slide ${i === 0 ? 'is-active' : ''}" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${total}" ${i === 0 ? '' : 'aria-hidden="true" inert'}>
-                        <img src="${b.image}" alt="${b.alt}" width="1920" height="1080" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">
+                        <img src="${b.image}" alt="${b.alt}" width="2880" height="864" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">
                     </div>
                 `).join('')}
             </div>
@@ -2138,6 +2164,83 @@ function renderHomeRange() {
             </div>
         </section>
     `;
+}
+
+// The Red Series promo: the three red carts standing on the Red Series background, set out like the range
+// line-up (HOME_LINEUP). Cut-outs from scripts/cut-promo.mjs; all three were shot at one scale, so each keeps its
+// height in the photo. Positions are percentages of the 3.33 : 1 background, which runs the full page width; the
+// carts stand right of its title, side by side without covering each other.
+const HOME_PROMO = [
+    { name: 'Golfer 4', seats: '4 seats in two forward rows', image: 'image/Promo/cutouts/red-series-tempo-4.png', slug: 'golfer-tempo-4', left: 28.5, width: 28.5, height: 70 },
+    { name: 'Golfer 2+2', seats: '2 forward and 2 rear seats', image: 'image/Promo/cutouts/red-series-tempo-2-2.png', slug: 'golfer-tempo-2-2', left: 58, width: 20.7, height: 66.2 },
+    { name: 'Golfer 2', seats: '2 seats', image: 'image/Promo/cutouts/red-series-tempo-2.png', slug: 'golfer-tempo-2', left: 79.5, width: 19.6, height: 66.1 }
+];
+
+// Festive effects behind the carts: snowflakes and holly leaves drifting down, and sparkles twinkling. Spread by a
+// fixed pattern (not random) so the pre-rendered page and the live page match.
+const PROMO_HOLLY = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#1F7A3A" d="M12 2c1 2 3 2 4 1 0 2 1 3 3 3-1 1-1 3 0 4-2 0-3 1-3 3 1 1 1 3 0 4-1-1-3-1-4 1-1-2-3-2-4-1 0-2-1-3-3-3 1-1 1-3 0-4 2 0 3-1 3-3-1-1-1-3 0-4 1 1 3 1 4-1z"/><circle cx="12" cy="20" r="2.2" fill="#D7262C"/></svg>';
+const PROMO_SPARKLE = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="currentColor" d="M12 0c.6 6.5 5.5 11.4 12 12-6.5.6-11.4 5.5-12 12-.6-6.5-5.5-11.4-12-12C6.5 11.4 11.4 6.5 12 0z"/></svg>';
+
+function renderPromoEffects() {
+    const at = (i, n, spread) => ((i * spread) % n) / n;
+    const falling = Array.from({ length: 26 }, (_, i) => {
+        const leaf = i % 4 === 3;
+        const style = `--x:${(at(i, 26, 11) * 100).toFixed(1)}%; --size:${leaf ? 16 + (i % 3) * 4 : 6 + (i % 5) * 3}px; --dur:${(9 + (i % 7) * 1.6).toFixed(1)}s; --delay:-${(at(i, 26, 7) * 14).toFixed(1)}s; --sway:${(i % 2 ? 1 : -1) * (14 + (i % 4) * 8)}px`;
+        return leaf
+            ? `<span class="promo-fall promo-leaf" style="${style}">${PROMO_HOLLY}</span>`
+            : `<span class="promo-fall promo-flake" style="${style}"></span>`;
+    }).join('');
+    const sparkles = Array.from({ length: 16 }, (_, i) => {
+        const style = `--x:${(4 + at(i, 16, 7) * 92).toFixed(1)}%; --y:${(6 + at(i, 16, 5) * 60).toFixed(1)}%; --size:${10 + (i % 4) * 6}px; --dur:${(2.2 + (i % 5) * 0.6).toFixed(1)}s; --delay:-${(at(i, 16, 3) * 3).toFixed(1)}s`;
+        return `<span class="promo-sparkle ${i % 3 ? '' : 'promo-sparkle-gold'}" style="${style}">${PROMO_SPARKLE}</span>`;
+    }).join('');
+    return `<div class="promo-fx" aria-hidden="true">${sparkles}${falling}</div>`;
+}
+
+function renderHomePromo() {
+    return `
+        <section class="rise home-section" aria-labelledby="home-promo-title">
+            <div class="promo-stage">
+                <h2 id="home-promo-title" class="sr-only">Red Series</h2>
+                ${renderPromoEffects()}
+                <div class="promo-cover">
+                    <img src="image/Promo/red-series-cover.jpg" alt="Red Series" loading="lazy" decoding="async">
+                    <button type="button" class="promo-arrow promo-open" onclick="togglePromoCover(true)">
+                        See the Red Series
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    </button>
+                </div>
+                <button type="button" class="promo-arrow promo-back" onclick="togglePromoCover(false)" aria-label="Back to the Red Series banner" hidden>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+                </button>
+                <ul class="lineup lineup-promo" aria-label="Red Series carts" inert>
+                    ${HOME_PROMO.map((c, i) => `
+                        <li class="lineup-item" style="--left:${c.left}%; --width:${c.width}%; --height:${c.height}%; z-index:${i + 1}">
+                            <a href="${routeHref('product-details', c.slug)}" data-route="product-details" data-slug="${c.slug}" class="lineup-cart">
+                                <img src="${c.image}" alt="" loading="lazy" decoding="async">
+                                <span class="lineup-label">
+                                    <span class="lineup-name">${c.name}</span>
+                                    <span class="lineup-seats">${c.seats}</span>
+                                </span>
+                            </a>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        </section>
+    `;
+}
+
+// Red Series cover: the banner lies over the carts; its arrow slides it away to show them, the back arrow returns it
+function togglePromoCover(open) {
+    const stage = document.querySelector('.promo-stage');
+    if (!stage) return;
+    stage.classList.toggle('is-open', open);
+    const back = stage.querySelector('.promo-back');
+    stage.querySelector('.promo-cover').inert = open;
+    stage.querySelector('.lineup-promo').inert = !open;
+    back.hidden = !open;
+    (open ? back : stage.querySelector('.promo-open')).focus();
 }
 
 function renderHomeUseTile(id, sizeClass, imageClass) {
@@ -2468,6 +2571,62 @@ function renderHomeTrust() {
     `;
 }
 
+// Events: a header banner for the current event, then its story beside its photos. The photos scroll upward
+// and downward without stopping, in two columns as tall as the story. Web-size copies in image/Event/web
+// (originals in image/Event).
+const HOME_EVENT = {
+    title: 'Halloween on Wheels: Golf Carts in Quezon City',
+    header: 'image/Event/halloween-on-wheels.png',
+    date: 'October 24, 2026 · Quezon City',
+    text: [
+        'On October 24, 2026, Quezon City got a little spookier and a lot more fun as our golf carts joined the Halloween festivities. Instead of the usual walk from house to house, the kids went trick-or-treating in style, riding our Villager 6 and Reman 2+2.',
+        'The Villager 6 was the star of the group ride. With room for the whole squad, it carried costumed kids together: tiny witches, superheroes, skeletons, and pumpkins, all laughing and comparing candy hauls along the way. The Reman 2+2 was a hit with smaller groups and families. Its compact, comfortable seating made it perfect for parents and little ones who wanted to enjoy the night side by side.',
+        'Both carts quietly rolled through the streets, so the kids could focus on the fun: waving at neighbors, collecting treats, and posing for photos. For parents, it meant less walking and more peace of mind, since everyone stayed together, seated, and easy to keep an eye on.',
+        'The night showed how golf carts can be more than a way to get around a course or a village. They can turn an ordinary evening into a memorable family moment. From all of us at GolfCartPH, Happy Halloween!'
+    ],
+    photos: [
+        { image: 'image/Event/web/halloween-1.jpg', alt: 'A red lifted golf cart decorated with cobwebs, a skull and a giant spider' },
+        { image: 'image/Event/web/halloween-2.jpg', alt: 'A beige Villager decorated with cobwebs, flowers and Halloween lanterns' },
+        { image: 'image/Event/web/halloween-3.jpg', alt: 'A family riding the decorated Villager in costume' },
+        { image: 'image/Event/web/halloween-4.jpg', alt: 'Driving the decorated red cart behind its cobweb windshield' },
+        { image: 'image/Event/web/halloween-5.jpg', alt: 'A child in costume riding in the back of the decorated Villager' }
+    ]
+};
+
+function renderHomeEvents() {
+    const e = HOME_EVENT;
+    // Each column shows every photo twice in a row, so its scroll loops seamlessly; the second column starts
+    // partway through, so the two never line up
+    const column = (start, down) => {
+        const photos = [...e.photos.slice(start), ...e.photos.slice(0, start)];
+        return `
+            <div class="events-col ${down ? 'events-col-down' : ''}">
+                <div class="events-track">
+                    ${[...photos, ...photos].map((p, i) => `<img src="${p.image}" alt="${i < photos.length && !down ? p.alt : ''}" loading="lazy" decoding="async">`).join('')}
+                </div>
+            </div>`;
+    };
+    return `
+        <section class="rise home-section" aria-labelledby="home-events-title">
+            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
+                <img src="${e.header}" alt="${e.title}" loading="lazy" decoding="async" class="w-full h-auto block">
+                <!-- The event's story on the left, its photos on the right (stacked on phones) -->
+                <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 mt-8">
+                    <div class="space-y-4">
+                        <p class="text-sm text-mute">Events · ${e.date}</p>
+                        <h2 id="home-events-title" class="type-md text-ink">${e.title}</h2>
+                        ${e.text.map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${p}</p>`).join('')}
+                        <a href="./#home-quote" onclick="event.preventDefault(); goToHomeSection('home-quote')" class="btn btn-primary">Bring carts to your event</a>
+                    </div>
+                    <div class="events-carousel" role="group" aria-label="${e.title} photos">
+                        <div class="events-frame">${column(0, false)}${column(2, true)}</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    `;
+}
+
 function renderHomeQuote() {
     const vehicleOptions = PRODUCTS_DATA.filter(p => p.category !== 'Accessories');
     return `
@@ -2771,10 +2930,12 @@ function renderHomePage() {
 
         ${renderHomeRange()}
         ${renderHomeUses()}
+        ${renderHomePromo()}
         ${renderHomeConfigurator()}
         ${renderHomeInside()}
         ${renderHomeBatteryCompare()}
         ${renderHomeTrust()}
+        ${renderHomeEvents()}
         ${renderHomeQuote()}
         ${renderHomeBranches()}
         ${renderHomeFaq()}
@@ -3032,94 +3193,97 @@ function getDetailCanopyOptions(product) {
 }
 
 // Accessory options from the "Versions" cart-builder sheet (STEP 4 ACCESSORIES tab).
+// Each item can also say: `slot`, a kind a cart takes only one of (a second pick replaces the first);
+// `builder`, the Tempo build option that covers it (chosen in the build, so not offered again here);
+// `includedOn`, model tags whose carts already come with it; `needsLift`, only offered for a lifted cart.
 // `fits` lists the product accessoryTags each item is compatible with, based on the item names
 // (e.g. "Villager 6 Rain Enclosure"); Precedent-only items are omitted. `product` links a catalog photo.
 const ACCESSORY_CATALOG = [
     { group: 'Windshield', items: [
-        { id: 'ws-clear', name: 'Clear Hinged Windshield', sku: 'SJK-0066', fits: ['tempo'] },
-        { id: 'ws-tinted', name: 'Tinted Hinged Windshield', sku: 'SJK-1854', fits: ['tempo'] },
-        { id: 'ws-premium-clear', name: 'Premium Clear Hinged Windshield', sku: 'SJK-1042', fits: ['onward'] },
-        { id: 'ws-premium-tinted', name: 'Premium Tinted Hinged Windshield', sku: 'SJK-1043', fits: ['onward'] }
+        { id: 'ws-clear', slot: 'windshield', includedOn: ['tempo'], name: 'Clear Hinged Windshield', sku: 'SJK-0066', fits: ['tempo'] },
+        { id: 'ws-tinted', slot: 'windshield', name: 'Tinted Hinged Windshield', sku: 'SJK-1854', fits: ['tempo'] },
+        { id: 'ws-premium-clear', slot: 'windshield', name: 'Premium Clear Hinged Windshield', sku: 'SJK-1042', fits: ['onward'] },
+        { id: 'ws-premium-tinted', slot: 'windshield', name: 'Premium Tinted Hinged Windshield', sku: 'SJK-1043', fits: ['onward'] }
     ] },
     { group: 'Lighting', items: [
-        { id: 'lt-cc-tempo', name: 'CC Tempo Lights (Head Lights)', sku: 'SJK-0249', fits: ['tempo'], product: 'acc-deluxe-lights' },
-        { id: 'lt-gc-tempo', name: 'GC Tempo Light Kit', sku: 'SJK-1921', fits: ['tempo'] },
-        { id: 'lt-gc-tempo-full', name: 'GC Tempo Full Light Kit', sku: 'SJK-1573', fits: ['tempo'] },
-        { id: 'lt-gc-tempo-rgb', name: 'GC Tempo Full Light Kit RGB', sku: 'SJK-1548', fits: ['tempo'] }
+        { id: 'lt-cc-tempo', slot: 'lighting', builder: 'lighting', name: 'CC Tempo Lights (Head Lights)', sku: 'SJK-0249', fits: ['tempo'], product: 'acc-deluxe-lights' },
+        { id: 'lt-gc-tempo', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Light Kit', sku: 'SJK-1921', fits: ['tempo'] },
+        { id: 'lt-gc-tempo-full', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit', sku: 'SJK-1573', fits: ['tempo'] },
+        { id: 'lt-gc-tempo-rgb', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit RGB', sku: 'SJK-1548', fits: ['tempo'] }
     ] },
     { group: 'Golf Accessories', items: [
-        { id: 'golf-sand', name: 'Sand Bottle', sku: 'SJK-0332', fits: ['golf'], product: 'acc-divot-sand-bottle' },
-        { id: 'golf-washer', name: 'Ball Washer', sku: 'SJK-0248', fits: ['golf'], product: 'acc-ball-cleaner' },
-        { id: 'golf-cooler', name: 'Caddie Cooler', sku: 'SJK-0257', fits: ['golf'], product: 'acc-cooler' },
-        { id: 'golf-cooler-premium', name: 'Premium Caddie Cooler', sku: 'SJK-1363', fits: ['golf'] },
-        { id: 'golf-caddie', name: 'Caddie Carrier', sku: 'SJK-1374', fits: ['golf'] },
-        { id: 'golf-bag-mag-black', name: 'Premium Magnetic Bag Cover (Black)', sku: 'SJK-0344', fits: ['golf'], product: 'acc-bag-cover' },
-        { id: 'golf-bag-mag-beige', name: 'Premium Magnetic Bag Cover (Beige)', sku: 'SJK-0347', fits: ['golf'], product: 'acc-bag-cover' },
-        { id: 'golf-bag-black', name: 'Bag Cover (Black)', sku: 'SJK-0136', fits: ['golf'], product: 'acc-bag-cover' },
-        { id: 'golf-bag-beige', name: 'Bag Cover (Beige)', sku: 'SJK-1038', fits: ['golf'], product: 'acc-bag-cover' },
-        { id: 'golf-bag-white', name: 'Bag Cover (White)', sku: 'SJK-1040', fits: ['golf'], product: 'acc-bag-cover' }
+        { id: 'golf-sand', builder: 'sandBottle', name: 'Sand Bottle', sku: 'SJK-0332', fits: ['golf'], product: 'acc-divot-sand-bottle' },
+        { id: 'golf-washer', builder: 'ballWasher', name: 'Ball Washer', sku: 'SJK-0248', fits: ['golf'], product: 'acc-ball-cleaner' },
+        { id: 'golf-cooler', slot: 'cooler', builder: 'cooler', name: 'Caddie Cooler', sku: 'SJK-0257', fits: ['golf'], product: 'acc-cooler' },
+        { id: 'golf-cooler-premium', slot: 'cooler', builder: 'cooler', name: 'Premium Caddie Cooler', sku: 'SJK-1363', fits: ['golf'] },
+        { id: 'golf-caddie', slot: 'caddie', name: 'Caddie Carrier', sku: 'SJK-1374', fits: ['golf'] },
+        { id: 'golf-bag-mag-black', slot: 'bagCover', builder: 'bagCover', name: 'Premium Magnetic Bag Cover (Black)', sku: 'SJK-0344', fits: ['golf'], product: 'acc-bag-cover' },
+        { id: 'golf-bag-mag-beige', slot: 'bagCover', builder: 'bagCover', name: 'Premium Magnetic Bag Cover (Beige)', sku: 'SJK-0347', fits: ['golf'], product: 'acc-bag-cover' },
+        { id: 'golf-bag-black', slot: 'bagCover', builder: 'bagCover', name: 'Bag Cover (Black)', sku: 'SJK-0136', fits: ['golf'], product: 'acc-bag-cover' },
+        { id: 'golf-bag-beige', slot: 'bagCover', builder: 'bagCover', name: 'Bag Cover (Beige)', sku: 'SJK-1038', fits: ['golf'], product: 'acc-bag-cover' },
+        { id: 'golf-bag-white', slot: 'bagCover', builder: 'bagCover', name: 'Bag Cover (White)', sku: 'SJK-1040', fits: ['golf'], product: 'acc-bag-cover' }
     ] },
     { group: 'Mirrors', items: [
-        { id: 'mir-side', name: 'Side Mirrors', sku: 'SJK-1146', fits: ['tempo', 'onward', 'villager', 'utility'] },
-        { id: 'mir-side-blinker', name: 'Side Mirrors with Blinkers', sku: 'SJK-1545', fits: ['tempo', 'onward', 'villager', 'utility'], product: 'acc-side-mirror' },
-        { id: 'mir-5-panel', name: '5 Panel Rear Mirror', sku: 'SJK-0154', fits: ['tempo', 'onward', 'villager'], product: 'acc-5-panel-mirror' },
-        { id: 'mir-convex', name: 'Convex Rear Mirror', sku: 'SJK-1461', fits: ['tempo', 'onward', 'villager', 'utility'] }
+        { id: 'mir-side', slot: 'sideMirrors', builder: 'mirrors', name: 'Side Mirrors', sku: 'SJK-1146', fits: ['tempo', 'onward', 'villager', 'utility'] },
+        { id: 'mir-side-blinker', slot: 'sideMirrors', builder: 'mirrors', name: 'Side Mirrors with Blinkers', sku: 'SJK-1545', fits: ['tempo', 'onward', 'villager', 'utility'], product: 'acc-side-mirror' },
+        { id: 'mir-5-panel', slot: 'rearMirror', builder: 'mirrors', name: '5 Panel Rear Mirror', sku: 'SJK-0154', fits: ['tempo', 'onward', 'villager'], product: 'acc-5-panel-mirror' },
+        { id: 'mir-convex', slot: 'rearMirror', builder: 'mirrors', name: 'Convex Rear Mirror', sku: 'SJK-1461', fits: ['tempo', 'onward', 'villager', 'utility'] }
     ] },
     { group: 'Storage', items: [
-        { id: 'sto-overhead', name: 'Overhead Storage Console', sku: 'SJK-0880', fits: ['tempo', 'onward'] },
-        { id: 'sto-underseat', name: 'Rear Under Seat Storage Bucket', sku: 'SJK-1002', fits: ['tempo', 'onward'] },
+        { id: 'sto-overhead', builder: 'storage', name: 'Overhead Storage Console', sku: 'SJK-0880', fits: ['tempo', 'onward'] },
+        { id: 'sto-underseat', builder: 'storage', name: 'Rear Under Seat Storage Bucket', sku: 'SJK-1002', fits: ['tempo', 'onward'] },
         { id: 'sto-glovebox', name: 'Onward Locking Glove Box Kit', sku: 'SJK-0881', fits: ['onward'] }
     ] },
     { group: 'Rain Enclosures', items: [
-        { id: 'enc-onward-black', name: 'Two-Sided Rain Enclosure (Black)', fits: ['onward'] },
-        { id: 'enc-2-beige', name: 'Three-Sided Rain Enclosure (Beige)', sku: 'SJK-1855', fits: ['tempo-2'], product: 'acc-golf-cover' },
-        { id: 'enc-2-white', name: 'Three-Sided Rain Enclosure (White)', sku: 'SJK-1856', fits: ['tempo-2'], product: 'acc-golf-cover' },
-        { id: 'enc-2-black', name: 'Three-Sided Rain Enclosure (Black)', sku: 'SJK-1509', fits: ['tempo-2'], product: 'acc-golf-cover' },
-        { id: 'enc-22-black', name: '2+2 Three-Sided Rain Enclosure (Black)', sku: 'SJK-0467', fits: ['tempo-2+2'] },
-        { id: 'enc-22-beige', name: '2+2 Three-Sided Rain Enclosure (Beige)', fits: ['tempo-2+2'] },
-        { id: 'enc-22-white', name: '2+2 Three-Sided Rain Enclosure (White)', sku: 'SJK-1905', fits: ['tempo-2+2'] },
-        { id: 'enc-4-black', name: 'Tempo 4 Rain Enclosure (Black)', fits: ['tempo-4'] },
-        { id: 'enc-4-beige', name: 'Tempo 4 Rain Enclosure (Beige)', fits: ['tempo-4'] },
-        { id: 'enc-42-black', name: 'Tempo 4+2 Rain Enclosure (Black)', fits: ['tempo-4+2'] },
-        { id: 'enc-42-beige', name: 'Tempo 4+2 Rain Enclosure (Beige)', fits: ['tempo-4+2'] },
-        { id: 'enc-v6-white', name: 'Villager 6 Rain Enclosure (White)', sku: 'SJK-1814', fits: ['villager-6'] },
-        { id: 'enc-v6-beige', name: 'Villager 6 Rain Enclosure (Beige)', sku: 'SJK-1815', fits: ['villager-6'] },
-        { id: 'enc-v6-white-fold', name: 'Villager 6 Rain Enclosure, Fold Down (White)', fits: ['villager-6'] },
-        { id: 'enc-v6-beige-fold', name: 'Villager 6 Rain Enclosure, Fold Down (Beige)', fits: ['villager-6'] },
-        { id: 'enc-v8-white', name: 'Villager 8 Rain Enclosure (White)', sku: 'SJK-1816', fits: ['villager-8'] },
-        { id: 'enc-v8-beige', name: 'Villager 8 Rain Enclosure (Beige)', sku: 'SJK-1817', fits: ['villager-8'] },
-        { id: 'enc-v8-white-fold', name: 'Villager 8 Rain Enclosure, Fold Down (White)', fits: ['villager-8'] },
-        { id: 'enc-v8-beige-fold', name: 'Villager 8 Rain Enclosure, Fold Down (Beige)', fits: ['villager-8'] },
-        { id: 'enc-t4-white', name: 'Transporter 4 Long Rain Enclosure (White)', fits: ['transporter-4'] },
-        { id: 'enc-t4-black', name: 'Transporter 4 Long Rain Enclosure (Black)', fits: ['transporter-4'] },
-        { id: 'enc-t4-beige', name: 'Transporter 4 Long Rain Enclosure (Beige)', fits: ['transporter-4'] },
-        { id: 'enc-ca-white', name: 'Carryall Rain Enclosure (White)', sku: 'SJK-1248', fits: ['carryall'] },
-        { id: 'enc-ca-black', name: 'Carryall Rain Enclosure (Black)', fits: ['carryall'] },
-        { id: 'enc-ca-beige', name: 'Carryall Rain Enclosure (Beige)', fits: ['carryall'] },
-        { id: 'enc-mb14-black', name: 'Minibus 14 Rain Enclosure (Black)', fits: ['minibus'] },
-        { id: 'enc-mb14-beige', name: 'Minibus 14 Rain Enclosure (Beige)', fits: ['minibus'] }
+        { id: 'enc-onward-black', slot: 'enclosure', builder: 'enclosure', name: 'Two-Sided Rain Enclosure (Black)', fits: ['onward'] },
+        { id: 'enc-2-beige', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Beige)', sku: 'SJK-1855', fits: ['tempo-2'], product: 'acc-golf-cover' },
+        { id: 'enc-2-white', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (White)', sku: 'SJK-1856', fits: ['tempo-2'], product: 'acc-golf-cover' },
+        { id: 'enc-2-black', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Black)', sku: 'SJK-1509', fits: ['tempo-2'], product: 'acc-golf-cover' },
+        { id: 'enc-22-black', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Black)', sku: 'SJK-0467', fits: ['tempo-2+2'] },
+        { id: 'enc-22-beige', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Beige)', fits: ['tempo-2+2'] },
+        { id: 'enc-22-white', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (White)', sku: 'SJK-1905', fits: ['tempo-2+2'] },
+        { id: 'enc-4-black', slot: 'enclosure', builder: 'enclosure', name: 'Tempo 4 Rain Enclosure (Black)', fits: ['tempo-4'] },
+        { id: 'enc-4-beige', slot: 'enclosure', builder: 'enclosure', name: 'Tempo 4 Rain Enclosure (Beige)', fits: ['tempo-4'] },
+        { id: 'enc-42-black', slot: 'enclosure', builder: 'enclosure', name: 'Tempo 4+2 Rain Enclosure (Black)', fits: ['tempo-4+2'] },
+        { id: 'enc-42-beige', slot: 'enclosure', builder: 'enclosure', name: 'Tempo 4+2 Rain Enclosure (Beige)', fits: ['tempo-4+2'] },
+        { id: 'enc-v6-white', slot: 'enclosure', builder: 'enclosure', name: 'Villager 6 Rain Enclosure (White)', sku: 'SJK-1814', fits: ['villager-6'] },
+        { id: 'enc-v6-beige', slot: 'enclosure', builder: 'enclosure', name: 'Villager 6 Rain Enclosure (Beige)', sku: 'SJK-1815', fits: ['villager-6'] },
+        { id: 'enc-v6-white-fold', slot: 'enclosure', builder: 'enclosure', name: 'Villager 6 Rain Enclosure, Fold Down (White)', fits: ['villager-6'] },
+        { id: 'enc-v6-beige-fold', slot: 'enclosure', builder: 'enclosure', name: 'Villager 6 Rain Enclosure, Fold Down (Beige)', fits: ['villager-6'] },
+        { id: 'enc-v8-white', slot: 'enclosure', builder: 'enclosure', name: 'Villager 8 Rain Enclosure (White)', sku: 'SJK-1816', fits: ['villager-8'] },
+        { id: 'enc-v8-beige', slot: 'enclosure', builder: 'enclosure', name: 'Villager 8 Rain Enclosure (Beige)', sku: 'SJK-1817', fits: ['villager-8'] },
+        { id: 'enc-v8-white-fold', slot: 'enclosure', builder: 'enclosure', name: 'Villager 8 Rain Enclosure, Fold Down (White)', fits: ['villager-8'] },
+        { id: 'enc-v8-beige-fold', slot: 'enclosure', builder: 'enclosure', name: 'Villager 8 Rain Enclosure, Fold Down (Beige)', fits: ['villager-8'] },
+        { id: 'enc-t4-white', slot: 'enclosure', builder: 'enclosure', name: 'Transporter 4 Long Rain Enclosure (White)', fits: ['transporter-4'] },
+        { id: 'enc-t4-black', slot: 'enclosure', builder: 'enclosure', name: 'Transporter 4 Long Rain Enclosure (Black)', fits: ['transporter-4'] },
+        { id: 'enc-t4-beige', slot: 'enclosure', builder: 'enclosure', name: 'Transporter 4 Long Rain Enclosure (Beige)', fits: ['transporter-4'] },
+        { id: 'enc-ca-white', slot: 'enclosure', builder: 'enclosure', name: 'Carryall Rain Enclosure (White)', sku: 'SJK-1248', fits: ['carryall'] },
+        { id: 'enc-ca-black', slot: 'enclosure', builder: 'enclosure', name: 'Carryall Rain Enclosure (Black)', fits: ['carryall'] },
+        { id: 'enc-ca-beige', slot: 'enclosure', builder: 'enclosure', name: 'Carryall Rain Enclosure (Beige)', fits: ['carryall'] },
+        { id: 'enc-mb14-black', slot: 'enclosure', builder: 'enclosure', name: 'Minibus 14 Rain Enclosure (Black)', fits: ['minibus'] },
+        { id: 'enc-mb14-beige', slot: 'enclosure', builder: 'enclosure', name: 'Minibus 14 Rain Enclosure (Beige)', fits: ['minibus'] }
     ] },
     { group: 'Electronics', items: [
-        { id: 'el-cc-soundbar', name: 'Club Car Premium Sound Bar', sku: 'SJK-0787', fits: ['tempo', 'onward', 'villager'], product: 'acc-premium-speaker' },
-        { id: 'el-gc-soundbar', name: 'GC Sound Bar 27" RGB', sku: 'SJK-1564', fits: ['tempo', 'onward', 'villager'] },
-        { id: 'el-wireless', name: 'Wireless Charging', sku: 'SJK-1510', fits: ['tempo', 'onward'] },
-        { id: 'el-usb-premium', name: 'Premium USB-C Charging Port', sku: 'SJK-1178', fits: ['tempo', 'onward', 'villager', 'utility'] },
-        { id: 'el-usb-gc', name: 'GC USB-C Charging Port QC3.0 with Volt Meter', fits: ['tempo', 'onward', 'villager', 'utility'] }
+        { id: 'el-cc-soundbar', slot: 'audio', builder: 'electronics', name: 'Club Car Premium Sound Bar', sku: 'SJK-0787', fits: ['tempo', 'onward', 'villager'], product: 'acc-premium-speaker' },
+        { id: 'el-gc-soundbar', slot: 'audio', builder: 'electronics', name: 'GC Sound Bar 27" RGB', sku: 'SJK-1564', fits: ['tempo', 'onward', 'villager'] },
+        { id: 'el-wireless', builder: 'charging', name: 'Wireless Charging', sku: 'SJK-1510', fits: ['tempo', 'onward'] },
+        { id: 'el-usb-premium', slot: 'usb', builder: 'charging', name: 'Premium USB-C Charging Port', sku: 'SJK-1178', fits: ['tempo', 'onward', 'villager', 'utility'] },
+        { id: 'el-usb-gc', slot: 'usb', builder: 'charging', name: 'GC USB-C Charging Port QC3.0 with Volt Meter', fits: ['tempo', 'onward', 'villager', 'utility'] }
     ] },
     { group: 'Driver Accessories', items: [
-        { id: 'drv-wheel', name: 'Premium Steering Wheel', sku: 'SJK-1355', fits: ['tempo', 'onward'] },
-        { id: 'drv-wheel-scorecard', name: 'Premium Steering Wheel with Scorecard', sku: 'SJK-1354', fits: ['golf'] },
-        { id: 'drv-floormat', name: 'GC Floor Mat', sku: 'SJK-1375', fits: ['tempo', 'onward', 'villager'] }
+        { id: 'drv-wheel', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel', sku: 'SJK-1355', fits: ['tempo', 'onward'] },
+        { id: 'drv-wheel-scorecard', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel with Scorecard', sku: 'SJK-1354', fits: ['golf'] },
+        { id: 'drv-floormat', includedOn: ['tempo'], name: 'GC Floor Mat', sku: 'SJK-1375', fits: ['tempo', 'onward', 'villager'] }
     ] },
     { group: 'Exterior', items: [
-        { id: 'ext-fender-3', name: 'Tempo Fenders 3"', sku: 'SJK-1542', fits: ['tempo'] },
-        { id: 'ext-fender-15', name: 'Tempo Fenders 1.5"', fits: ['tempo'] },
-        { id: 'ext-fender-onward', name: 'Onward Fenders', sku: 'SJK-1885', fits: ['onward'] },
-        { id: 'ext-brush-guard', name: 'Brush Guard', sku: 'SJK-0119', fits: ['tempo', 'onward', 'utility'], product: 'acc-brush-guard' }
+        { id: 'ext-fender-3', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 3"', sku: 'SJK-1542', fits: ['tempo'] },
+        { id: 'ext-fender-15', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 1.5"', fits: ['tempo'] },
+        { id: 'ext-fender-onward', slot: 'fenders', name: 'Onward Fenders', sku: 'SJK-1885', fits: ['onward'] },
+        { id: 'ext-brush-guard', builder: 'lift', name: 'Brush Guard', sku: 'SJK-0119', fits: ['tempo', 'onward', 'utility'], product: 'acc-brush-guard' }
     ] },
     { group: 'Lifted Accessories', items: [
-        { id: 'lift-4', name: '4" Lift Kit', sku: 'SJK-0330', fits: ['tempo'] },
-        { id: 'lift-nerf', name: 'Nerf Bar', sku: 'SJK-0377', fits: ['lifted'] }
+        { id: 'lift-4', slot: 'lift', builder: 'lift', name: '4" Lift Kit', sku: 'SJK-0330', fits: ['tempo'] },
+        { id: 'lift-nerf', builder: 'lift', needsLift: true, name: 'Nerf Bar', sku: 'SJK-0377', fits: ['lifted'] }
     ] }
 ];
 
@@ -3133,12 +3297,27 @@ function findAccessory(id) {
     return null;
 }
 
-// Accessory groups that fit a model, looked up by the product name shown in the quote form
+// The build the quote came from, when it is for the model selected in the quote form
+function quoteBuildFor(productName) {
+    const product = findProductRef(productName);
+    return quoteBuild && product && quoteBuild.slug === product.slug ? quoteBuild : null;
+}
+
+// Accessory groups a cart can still take, looked up by the product name shown in the quote form: those that
+// fit the model, minus what it already comes with, what its build already decides, and lift parts for a cart
+// that isn't lifted (by its build, or by a lift kit picked here)
 function getCompatibleAccessoryGroups(productName) {
     const product = findProductRef(productName);
     const tags = (product && product.accessoryTags) || [];
+    const build = quoteBuildFor(productName);
+    const covered = build ? build.covered : [];
+    const lifted = tags.includes('lifted') || (build && build.lifted) || [...quoteAccessories].some(id => (findAccessory(id) || {}).slot === 'lift');
     return ACCESSORY_CATALOG
-        .map(g => ({ group: g.group, items: g.items.filter(i => i.fits.some(t => tags.includes(t))) }))
+        .map(g => ({ group: g.group, items: g.items.filter(i =>
+            i.fits.some(t => tags.includes(t) || (t === 'lifted' && lifted)) &&
+            !(i.includedOn && i.includedOn.some(t => tags.includes(t))) &&
+            !(i.builder && covered.includes(i.builder)) &&
+            !(i.needsLift && !lifted)) }))
         .filter(g => g.items.length);
 }
 
@@ -3147,10 +3326,13 @@ function renderAccessoryPicker() {
     const select = document.getElementById('modal-product-select');
     if (!picker || !select) return;
     const groups = getCompatibleAccessoryGroups(select.value);
+    // A group whose items are all one kind takes one; a group with a few kinds (side and rear mirrors) one of each
+    const onlyOne = g => g.items.length > 1 && g.items.every(i => i.slot && i.slot === g.items[0].slot);
+    const oneEach = g => !onlyOne(g) && g.items.some(i => i.slot && g.items.filter(j => j.slot === i.slot).length > 1);
 
-    picker.innerHTML = groups.length ? groups.map(g => `
+    picker.innerHTML = (groups.length ? groups.map(g => `
         <fieldset class="space-y-2">
-            <legend class="text-sm text-ink-2 mb-2">${g.group}</legend>
+            <legend class="text-sm text-ink-2 mb-2">${g.group}${onlyOne(g) ? ' <span class="text-mute">(choose one)</span>' : oneEach(g) ? ' <span class="text-mute">(one of each kind)</span>' : ''}</legend>
             ${g.items.map(item => {
                 const photo = item.product && (PRODUCTS_DATA.find(p => p.slug === item.product) || {}).image;
                 return `
@@ -3167,7 +3349,7 @@ function renderAccessoryPicker() {
             }).join('')}
         </fieldset>
     `).join('') + '<p class="text-sm text-ink-2">We confirm fitment before quoting.</p>'
-        : '<p class="text-sm text-ink-2">No accessories are listed for this model yet. Tell us what you need in the notes.</p>';
+        : '<p class="text-sm text-ink-2">No more accessories to add for this build. Tell us anything else you need in the notes.</p>');
 }
 
 function renderAccessoryChips() {
@@ -3187,8 +3369,16 @@ function renderAccessoryChips() {
 }
 
 function toggleQuoteAccessory(id) {
+    const item = findAccessory(id);
     if (quoteAccessories.has(id)) quoteAccessories.delete(id);
-    else quoteAccessories.add(id);
+    else {
+        if (item && item.slot) quoteAccessories.forEach(other => { if ((findAccessory(other) || {}).slot === item.slot) quoteAccessories.delete(other); });
+        quoteAccessories.add(id);
+    }
+    // Drops picks that no longer fit (fenders and the nerf bar once the lift kit is removed)
+    const select = document.getElementById('modal-product-select');
+    const fitting = new Set(getCompatibleAccessoryGroups(select ? select.value : '').flatMap(g => g.items.map(i => i.id)));
+    quoteAccessories = new Set([...quoteAccessories].filter(x => fitting.has(x)));
     renderAccessoryChips();
     renderQuoteSummary();
     const picker = document.getElementById('modal-accessory-picker');
@@ -3626,6 +3816,9 @@ function carryTempoOptions(product, i, prev) {
         if (g.type === 'multi') next[g.id] = v.filter(x => g.options.includes(x));
         if (g.type === 'qty' || g.type === 'flag' || g.type === 'side') next[g.id] = v;
     });
+    const wheels = getTempoOptionGroups(product, i).find(g => g.id === 'wheels');
+    next.wheelUpgrade = !!(prev.wheelUpgrade && wheels && wheels.upgradeFrom);
+    if (wheels && !next.wheelUpgrade && wheels.options.indexOf(next.wheels) >= (wheels.upgradeFrom || Infinity)) next.wheels = wheels.options[0];
     if (prev.liftFender) next.liftFender = prev.liftFender;
     if (prev.liftAddOns) next.liftAddOns = prev.liftAddOns.slice();
     fixTempoSubChoices(product, i, next);
@@ -3662,6 +3855,7 @@ function selectBuildLevel(id) {
         selectDetailColor(bodyIdx);
         refreshTempoOptions();
     }
+    if (product) updateDetailBuildText(product);
     updateBuildSummaryLine();
 }
 
@@ -3683,13 +3877,18 @@ function findTempoGroup(product, i, id) {
     return [...getTempoOptionGroups(product, i), ...getTempoSubGroups(product, i, o)].find(g => g.id === id) || null;
 }
 
-// Pick-one groups; index -1 clears an optional group
+// Pick-one groups; picking an optional group's chosen option again clears it
 function pickTempoOption(id, index) {
     const product = currentDetailProduct();
     const i = detailLevelIndex(product);
     const group = findTempoGroup(product, i, id);
     if (!group) return;
-    detailBuild.options[id] = index < 0 ? '' : group.options[index];
+    if (group.upgradeFrom && index >= group.upgradeFrom && !detailBuild.options.wheelUpgrade) {
+        openWheelUpgrade(index);
+        return;
+    }
+    const value = group.options[index];
+    detailBuild.options[id] = group.type === 'optional' && detailBuild.options[id] === value ? '' : value;
     fixTempoSubChoices(product, i, detailBuild.options);
     refreshTempoOptions();
 }
@@ -3720,7 +3919,7 @@ const TEMPO_UPGRADE_PACKAGE = [
 ];
 
 // The package's groups on this model and level, each with the value it gets: the group's first choice (wheels:
-// the first upgrade past the included wheels); the Pro audio is the sound bar and Apple CarPlay its note names
+// the first upgrade past the included wheels; audio: the Club Car Premium Sound Bar)
 function tempoPackageValues(product, i) {
     const ids = TEMPO_UPGRADE_PACKAGE[i];
     return getTempoOptionGroups(product, i).filter(g => ids.includes(g.id)).map(g => {
@@ -3728,7 +3927,6 @@ function tempoPackageValues(product, i) {
         if (g.type === 'flag') value = true;
         if (g.type === 'optional') value = g.options[0];
         if (g.type === 'single') value = g.options[g.upgradeFrom || 0];
-        if (g.id === 'electronics') value = g.options.filter(x => x === 'Club Car Premium Sound Bar' || x === 'Apple CarPlay');
         return { g, value };
     });
 }
@@ -3751,13 +3949,83 @@ function toggleTempoPackage(levelId, on) {
     const product = currentDetailProduct();
     const i = detailLevelIndex(product);
     const defaults = defaultTempoOptions(product, i);
-    tempoPackageValues(product, i).forEach(({ g, value }) => { detailBuild.options[g.id] = on ? value : defaults[g.id]; });
+    tempoPackageValues(product, i).forEach(({ g, value }) => {
+        detailBuild.options[g.id] = on ? value : defaults[g.id];
+        if (g.id === 'wheels') detailBuild.options.wheelUpgrade = on && !!g.upgradeFrom;
+    });
     fixTempoSubChoices(product, i, detailBuild.options);
     refreshTempoOptions();
 }
 
+// The 14" wheel upgrade: on, the 14" wheels can be picked; off, they lock again and a 14" choice goes back to
+// the standard wheel
+function setWheelUpgrade(on) {
+    const product = currentDetailProduct();
+    const group = findTempoGroup(product, detailLevelIndex(product), 'wheels');
+    if (!group || !group.upgradeFrom) return;
+    const o = detailBuild.options;
+    o.wheelUpgrade = on;
+    if (!on && group.options.indexOf(o.wheels) >= group.upgradeFrom) o.wheels = group.options[0];
+    refreshTempoOptions();
+}
+
+// Pop-up for a locked 14" wheel: says it's an upgrade, and can turn the upgrade on with that wheel picked
+let wheelUpgradePick = -1;
+let wheelUpgradeReturnFocus = null;
+
+function openWheelUpgrade(index) {
+    const product = currentDetailProduct();
+    const group = findTempoGroup(product, detailLevelIndex(product), 'wheels');
+    if (!group) return;
+    wheelUpgradePick = index;
+    let modal = document.getElementById('wheel-upgrade-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'wheel-upgrade-modal';
+        modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-5 sm:p-6 flex items-center justify-center';
+        modal.onclick = e => { if (e.target === modal) closeWheelUpgrade(); };
+        document.body.appendChild(modal);
+    }
+    const [name, detail] = splitOptionName(group.options[index]);
+    const photo = optionPhoto(group.options[index]);
+    modal.innerHTML = `
+        <div role="dialog" aria-modal="true" aria-labelledby="wheel-upgrade-title" class="w-full max-w-md bg-paper border border-line">
+            ${photo ? `<div class="bg-stone aspect-[4/3] flex items-center justify-center p-6"><img src="${photo}" alt="" class="max-h-full object-contain mix-blend-multiply"></div>` : ''}
+            <div class="p-6 space-y-3">
+                <p class="text-sm text-mute">14" wheel upgrade</p>
+                <h2 id="wheel-upgrade-title" class="type-md text-ink">${name}</h2>
+                ${detail ? `<p class="text-sm text-ink-2">${detail}</p>` : ''}
+                <p class="text-ink-2">14" wheels are an upgrade over the standard 8" to 12" wheels, priced on top of the build. Add the 14" upgrade to choose this wheel.</p>
+                <div class="flex flex-wrap gap-3 pt-3">
+                    <button type="button" onclick="confirmWheelUpgrade()" class="btn btn-primary">Add 14" upgrade</button>
+                    <button type="button" onclick="closeWheelUpgrade()" class="btn btn-outline">Not now</button>
+                </div>
+            </div>
+        </div>`;
+    wheelUpgradeReturnFocus = document.activeElement;
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    const first = modal.querySelector('.btn-primary');
+    if (first) first.focus();
+}
+
+function closeWheelUpgrade() {
+    const modal = document.getElementById('wheel-upgrade-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+    if (wheelUpgradeReturnFocus && wheelUpgradeReturnFocus.focus) wheelUpgradeReturnFocus.focus();
+}
+
+function confirmWheelUpgrade() {
+    const index = wheelUpgradePick;
+    closeWheelUpgrade();
+    detailBuild.options.wheelUpgrade = true;
+    pickTempoOption('wheels', index);
+}
+
 function setTempoQty(id, n) {
-    detailBuild.options[id] = n;
+    detailBuild.options[id] = detailBuild.options[id] === n ? 0 : n;
     refreshTempoOptions();
 }
 
@@ -3766,7 +4034,7 @@ function setTempoSide(id, value) {
     const product = currentDetailProduct();
     const group = findTempoGroup(product, detailLevelIndex(product), id);
     if (!group || tempoSideTaken(group, value, detailBuild.options)) return;
-    detailBuild.options[id] = value;
+    detailBuild.options[id] = detailBuild.options[id] === value ? '' : value;
     refreshTempoOptions();
 }
 
@@ -3797,7 +4065,6 @@ const OPTION_PHOTOS = {
     'Trojan FLA 8V lead-acid': 'battery-trojan-8v',
     'Battlite lithium': 'battery-battlite',
     // Lighting
-    'No headlights': 'light-none', // the Tempo base front (Golf build photo), with no lamps
     'GC Apex Tempo LED Headlights & Tail Lights': 'light-gc-apex',
     'Club Car Tempo Deluxe Light Kit': 'light-cc-deluxe',
     // Wheels and tires
@@ -3868,15 +4135,15 @@ function splitOptionName(text) {
     return at > 0 ? [text.slice(0, at), text.slice(at + 2)] : [text, ''];
 }
 
-// The picture area of a card: the photo, or a plain tile with a picture glyph when there's none (a dash for
-// "None"); the photo covers the glyph, which shows again if the photo fails to load
+// The picture area of a card: the photo, or a plain tile with a picture glyph when there's none; the photo
+// covers the glyph, which shows again if the photo fails to load
 const OPTION_PLACEHOLDER = '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.25"><rect x="3.5" y="5" width="17" height="14" rx="1"/><circle cx="9" cy="10" r="1.75"/><path d="M4 17.5l5-4.5 3.5 3 3-2.5 4.5 4"/></svg>';
 
-function optionMedia(photo, label) {
+function optionMedia(photo) {
     return `
         <span class="opt-card-media">
             ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async" onerror="this.nextElementSibling.hidden=false;this.remove()">` : ''}
-            <span class="opt-card-initials" aria-hidden="true" ${photo ? 'hidden' : ''}>${label === 'None' ? '&mdash;' : OPTION_PLACEHOLDER}</span>
+            <span class="opt-card-initials" aria-hidden="true" ${photo ? 'hidden' : ''}>${OPTION_PLACEHOLDER}</span>
         </span>`;
 }
 
@@ -3885,7 +4152,7 @@ function optionCard({ key, label, photo, active, onclick, kind, note = '', extra
     const [name, detail] = splitOptionName(label);
     return `
         <button type="button" onclick="${onclick}" data-opt-key="${key}" aria-pressed="${active}" class="opt-card ${active ? 'opt-card-active' : ''}" ${extra}>
-            ${optionMedia(photo, name)}
+            ${optionMedia(photo)}
             <span class="opt-card-check ${kind === 'check' ? 'opt-card-check-check' : 'opt-card-check-radio'}" aria-hidden="true"></span>
             <span class="opt-card-body">
                 <span class="opt-card-name">${name}</span>
@@ -3895,7 +4162,7 @@ function optionCard({ key, label, photo, active, onclick, kind, note = '', extra
         </button>`;
 }
 
-// A small segmented control (None / 1 / 2, or None / Both / Left / Right) under a single-item card
+// A small segmented control (1 / 2, or Both / Left / Right) under a single-item card
 function optionSegments(items) {
     return `<span class="opt-seg" role="group">${items.map(it => `
         <button type="button" onclick="${it.onclick}" data-opt-key="${it.key}" aria-pressed="${it.active}" class="opt-seg-btn ${it.active ? 'opt-seg-active' : ''}" ${it.disabled ? 'disabled' : ''}>${it.label}</button>`).join('')}
@@ -3904,11 +4171,11 @@ function optionSegments(items) {
 
 // What the visitor can do in a group, shown under its title
 function optionGroupHint(g) {
-    if (g.type === 'single') return 'Choose one';
-    if (g.type === 'optional') return 'Optional, choose one';
+    if (g.type === 'single') return g.upgradeFrom ? 'Choose one; 14" wheels are an upgrade' : 'Choose one';
+    if (g.type === 'optional') return 'Optional, choose one (tap again to remove)';
     if (g.type === 'multi') return 'Optional, add any';
-    if (g.type === 'qty') return 'None, one or two';
-    if (g.type === 'side') return 'Mounts on the left, right or both sides';
+    if (g.type === 'qty') return 'Optional, one or two (tap again to remove)';
+    if (g.type === 'side') return `Optional, ${g.sides.includes('both') ? 'left, right or both' : 'left or right'}`;
     if (g.type === 'flag') return 'Optional';
     return '';
 }
@@ -3917,17 +4184,23 @@ function renderTempoGroup(g, o, nested) {
     let body = '';
     if (g.type === 'single' || g.type === 'optional' || g.type === 'multi') {
         const cards = [];
-        if (g.type === 'optional') {
-            cards.push(optionCard({ key: `${g.id}:none`, label: 'None', photo: null, active: !o[g.id], onclick: `pickTempoOption('${g.id}', -1)`, kind: 'radio' }));
-        }
         g.options.forEach((opt, k) => {
-            if (g.upgradeFrom && k === g.upgradeFrom) cards.push('<p class="opt-grid-label">Upgrades</p>');
+            if (g.upgradeFrom && k === g.upgradeFrom) {
+                cards.push(`
+                    <div class="opt-grid-label opt-upgrade-head">
+                        <span>14" upgrade</span>
+                        ${optionSegments([false, true].map(on => ({ key: `wheelUpgrade:${on}`, label: on ? 'On' : 'Off', active: !!o.wheelUpgrade === on, onclick: `setWheelUpgrade(${on})` })))}
+                    </div>`);
+            }
             const multi = g.type === 'multi';
             const active = multi ? (o[g.id] || []).includes(opt) : o[g.id] === opt;
+            const locked = g.upgradeFrom && k >= g.upgradeFrom && !o.wheelUpgrade;
             cards.push(optionCard({
                 key: `${g.id}:${k}`, label: opt, photo: optionPhoto(opt), active,
                 onclick: multi ? `toggleTempoOption('${g.id}', ${k})` : `pickTempoOption('${g.id}', ${k})`,
-                kind: multi ? 'check' : 'radio'
+                kind: multi ? 'check' : 'radio',
+                note: locked ? 'Upgrade' : '',
+                extra: locked ? 'data-locked="true"' : ''
             }));
         });
         // Seat colors read better as swatches than as photo cards
@@ -3941,13 +4214,13 @@ function renderTempoGroup(g, o, nested) {
         }
     } else if (g.type === 'qty' || g.type === 'side') {
         const segs = g.type === 'qty'
-            ? [0, 1, 2].map(n => ({ key: `${g.id}:${n}`, label: n ? String(n) : 'None', active: o[g.id] === n, onclick: `setTempoQty('${g.id}', ${n})` }))
-            : TEMPO_SIDES.map(s => ({ key: `${g.id}:${s.value || 'none'}`, label: s.label, active: (o[g.id] || '') === s.value, onclick: `setTempoSide('${g.id}', '${s.value}')`, disabled: tempoSideTaken(g, s.value, o) }));
+            ? [1, 2].map(n => ({ key: `${g.id}:${n}`, label: String(n), active: o[g.id] === n, onclick: `setTempoQty('${g.id}', ${n})` }))
+            : TEMPO_SIDES.filter(s => g.sides.includes(s.value)).map(s => ({ key: `${g.id}:${s.value}`, label: s.label, active: (o[g.id] || '') === s.value, onclick: `setTempoSide('${g.id}', '${s.value}')`, disabled: tempoSideTaken(g, s.value, o) }));
         const used = g.type === 'side' ? tempoSidesOf(o[g.shares]) : [];
         const chosen = g.type === 'qty' ? o[g.id] > 0 : !!o[g.id];
         body = `
             <div class="opt-item ${chosen ? 'opt-card-active' : ''}">
-                ${optionMedia(optionPhoto(g.id), g.title)}
+                ${optionMedia(optionPhoto(g.id))}
                 <span class="opt-item-body">
                     ${optionSegments(segs)}
                     ${used.length ? `<span class="opt-card-note">${used.length > 1 ? 'Both sides are' : `The ${used[0]} side is`} taken by the ${g.sharesTitle}.</span>` : ''}
@@ -3981,7 +4254,7 @@ function renderTempoIncluded(groups) {
                 const [name, detail] = splitOptionName(g.value);
                 return `
                     <div class="opt-included-item">
-                        ${optionMedia(optionPhoto(g.value) || optionPhoto(g.id), name)}
+                        ${optionMedia(optionPhoto(g.value) || optionPhoto(g.id))}
                         <span class="opt-card-body">
                             <span class="opt-card-detail">${g.title}</span>
                             <span class="opt-card-name">${name}</span>
@@ -4010,7 +4283,11 @@ function renderTempoOptions(product) {
                     <h3 class="opt-section-title">${section}</h3>
                     ${section === 'Included'
                         ? renderTempoIncluded(inSection)
-                        : inSection.map(g => {
+                        : inSection.map((g, k) => {
+                            // Accessories that share the cart's mounts (ball washer and cooler) sit side by side
+                            if (g.shares && inSection[k - 1] && inSection[k - 1].id === g.shares) return '';
+                            const partner = g.shares && inSection[k + 1] && inSection[k + 1].id === g.shares ? inSection[k + 1] : null;
+                            if (partner) return `<div class="opt-pair">${renderTempoGroup(g, o, false)}${renderTempoGroup(partner, o, false)}</div>`;
                             const children = subs.filter(s => s.parent === g.id);
                             return renderTempoGroup(g, o, false)
                                 + (children.length ? `<div class="opt-subpanel">${children.map(s => renderTempoGroup(s, o, true)).join('')}</div>` : '');
@@ -4135,9 +4412,38 @@ function renderBuildSection(product, buildSet) {
     `;
 }
 
-// "Scratch 2", "Pro 2+2": a golfer build named with its model's seat layout
+// "Scratch 2", "Signature 4+2": a build named with its model's seat layout
 function buildViewName(product, level) {
-    return `${level.name} ${product.name.replace(/^Golfer /, '')}`;
+    return `${level.name} ${product.layout}`;
+}
+
+// The page's words for the chosen build: header name, tagline and button, the overview paragraph and the
+// battery. The first build is the model's own view, so it keeps the model's name and description.
+function updateDetailBuildText(product) {
+    const buildSet = getProductBuildSet(product);
+    const levels = buildSet ? buildSet.builds : [];
+    const i = levels.findIndex(b => b.id === detailBuild.level);
+    if (i < 0) return;
+    const level = levels[i];
+    const base = i === 0;
+    const name = base ? product.name : buildViewName(product, level);
+    const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    set('detail-title', name);
+    set('detail-tagline', base ? product.tagline : (level.blurb || level.tagline));
+    set('detail-build-cta', `Build your ${name}`);
+    set('detail-description-name', `${name}.`);
+    // A build's overview: the model's layout sentence, then what the build adds
+    const layout = (product.description.match(/^[^.]*\./) || [product.description])[0];
+    set('detail-description', base || !level.about ? product.description : `${layout} ${level.about}`);
+    if (isTempoVersion(product)) set('detail-battery', base ? product.battery : TEMPO_MATRIX.battery[i]);
+    // The header photo follows the build when the model has one for it
+    const photo = product.galleryLevels ? product.galleryLevels.indexOf(level.id) : -1;
+    if (photo >= 0) {
+        const thumb = document.querySelectorAll('.gallery-thumb')[photo];
+        if (thumb) showDetailImage(thumb, product.gallery[photo]);
+        const img = document.getElementById('detail-main-img');
+        if (img) img.alt = `${name} build`;
+    }
 }
 
 // Header thumbnail for a build: its photo, name and description, and the builder below starts on that build
@@ -4147,15 +4453,6 @@ function showDetailBuildView(button, index) {
     const level = buildSet && buildSet.builds.find(b => b.id === product.galleryLevels[index]);
     if (!level) return;
     showDetailImage(button, product.gallery[index]);
-    const img = document.getElementById('detail-main-img');
-    if (img) img.alt = `${buildViewName(product, level)} build`;
-    const title = document.getElementById('detail-title');
-    if (title) title.textContent = buildViewName(product, level);
-    const tagline = document.getElementById('detail-tagline');
-    // The Golfer build is the model's default view, so it keeps the model's own description
-    if (tagline) tagline.textContent = index === 0 ? product.tagline : (level.blurb || level.tagline);
-    const cta = document.getElementById('detail-build-cta');
-    if (cta) cta.textContent = `Build your ${buildViewName(product, level)}`;
     if (detailBuild.level !== level.id) selectBuildLevel(level.id);
 }
 
@@ -4349,14 +4646,14 @@ function renderProductDetailsPage() {
             ` : ''}
 
             <div class="rise home-section grid lg:grid-cols-12 gap-10 lg:gap-12">
-                <p class="lg:col-span-8 type-lg text-mute"><span class="text-ink">${product.name}.</span> ${product.description}</p>
+                <p class="lg:col-span-8 type-lg text-mute"><span id="detail-description-name" class="text-ink">${product.name}.</span> <span id="detail-description">${product.description}</span></p>
                 ${isVehicle ? `
                     <dl class="lg:col-span-4 space-y-6 lg:pt-3">
-                        ${[{ label: 'Powertrain', value: product.powertrain }, { label: 'Battery', value: product.battery }]
+                        ${[{ label: 'Powertrain', value: product.powertrain }, { label: 'Battery', value: product.battery, id: 'detail-battery' }]
                             .filter(h => isMeaningful(h.value)).map(h => `
                             <div class="border-t border-line pt-4">
                                 <dt class="text-sm text-mute">${h.label}</dt>
-                                <dd class="text-lg text-ink mt-1">${h.value}</dd>
+                                <dd ${h.id ? `id="${h.id}" ` : ''}class="text-lg text-ink mt-1">${h.value}</dd>
                             </div>
                         `).join('')}
                     </dl>
@@ -4569,7 +4866,7 @@ function renderSegmentPage() {
                 <div class="grid lg:grid-cols-12 gap-6 lg:gap-12 items-end mb-10">
                     <h2 class="type-lg text-ink lg:col-span-7">Compare ${buildSet.builds.map(b => b.name).join(', ')}.</h2>
                     <p class="measure lg:col-span-5">${segment.id === 'golfer'
-                        ? 'Golfer, Scratch and Pro apply across Golfer 2, Golfer 2+2 and Tempo 4. Canopy, flip seat and enclosure choices depend on the model.'
+                        ? 'Golfer, Scratch and Pro apply across Golfer 2, Golfer 2+2 and Golfer 4. Canopy, flip seat and enclosure choices depend on the model.'
                         : 'Essential, Signature and Elite apply across every lifestyle model. Canopy, flip seat and enclosure choices depend on the model.'}</p>
                 </div>
                 ${renderBuildCompareTable(buildSet)}
