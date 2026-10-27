@@ -2013,7 +2013,7 @@ const HOME_BANNERS = [
     { image: 'image/Hero/hero5.jpg', alt: 'More than just golf carts. We keep you rolling. Message us to learn how we can help!', cta: 'Book a service', route: 'service', slug: null },
     { image: 'image/Hero/hero6.jpg', alt: 'A fleet of white golf carts lined up at a resort entrance', cta: 'Request a fleet proposal', route: 'solutions', slug: null }
 ];
-const HOME_BANNER_MS = 5000;
+const HOME_BANNER_MS = 3000;
 let homeBanners = null;
 
 function renderHomeBanners() {
