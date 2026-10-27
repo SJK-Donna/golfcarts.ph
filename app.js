@@ -140,8 +140,18 @@ const PRODUCTS_DATA = [
         battery: 'Trojan FLA 8V lead-acid (Essential, Signature) or Battlite lithium (Elite)',
         chargingTime: '4.0 Hours',
         powertrain: '4.0 kW AC Motor',
-        image: 'image/Products/Base +.png',
-        gallery: ['image/Products/Base +.png', 'image/Products/Premium+ black.png'],
+        image: 'image/Products/builds/lifestyle-2-essential.jpg',
+        gallery: ['image/Products/builds/lifestyle-2-essential.jpg', 'image/Products/builds/lifestyle-2-signature.jpg', 'image/Products/builds/lifestyle-2-elite.jpg'],
+        // The header's thumbnails are the Essential, Signature and Elite builds: picking one shows its photo, name and description
+        galleryLevels: ['essential', 'signature', 'elite'],
+        // The colors in each build's photo (paints the build doesn't offer are left out, so it starts on its first color)
+        buildLooks: {
+            essential: { body: 'White', seat: 'Beige', canopy: '2 Pass Canopy Beige' },
+            signature: { body: 'Cashmere', seat: 'Beige', canopy: '2 Pass Canopy Beige' },
+            elite: { seat: 'Classic Premium Seat Camello', canopy: '2 Pass Canopy Beige' }
+        },
+        // One photo per build level, shown on the build cards
+        buildPhotos: { essential: 'image/Products/builds/lifestyle-2-essential.jpg', signature: 'image/Products/builds/lifestyle-2-signature.jpg', elite: 'image/Products/builds/lifestyle-2-elite.jpg' },
         features: ['Two Forward-Facing Seats', 'Windshield and Mirror Package', 'Defined Lighting Kit', 'Weatherproof Molded Vinyl Seats'],
         specs: { 'Motor Type': '4.0 kW AC Brushless', 'Controller': 'Curtis Controller', 'Chassis': 'Aluminum Box Frame', 'Brakes': 'Dual Rear Drum Brakes' }
     },
@@ -189,8 +199,18 @@ const PRODUCTS_DATA = [
         battery: 'Trojan FLA 8V lead-acid (Essential, Signature) or Battlite lithium (Elite)',
         chargingTime: '3.0 Hours',
         powertrain: '5.0 kW AC High-Output Motor',
-        image: 'image/Products/Club Car 4.png',
-        gallery: ['image/Products/Club Car 4.png'],
+        image: 'image/Products/builds/lifestyle-4-essential.jpg',
+        gallery: ['image/Products/builds/lifestyle-4-essential.jpg', 'image/Products/builds/lifestyle-4-signature.jpg', 'image/Products/builds/lifestyle-4-elite.jpg'],
+        // The header's thumbnails are the Essential, Signature and Elite builds: picking one shows its photo, name and description
+        galleryLevels: ['essential', 'signature', 'elite'],
+        // The colors in each build's photo (paints the build doesn't offer are left out, so it starts on its first color)
+        buildLooks: {
+            essential: { body: 'White', seat: 'Beige', canopy: '88" Canopy Black' },
+            signature: { body: 'Cashmere', seat: 'Beige', canopy: '88" Canopy Black' },
+            elite: { seat: 'Classic Premium Seat Black and Gray', canopy: '88" Canopy Black' }
+        },
+        // One photo per build level, shown on the build cards
+        buildPhotos: { essential: 'image/Products/builds/lifestyle-4-essential.jpg', signature: 'image/Products/builds/lifestyle-4-signature.jpg', elite: 'image/Products/builds/lifestyle-4-elite.jpg' },
         features: ['Four Seats in Two Forward-Facing Rows', 'Compatible Seat Belts and Grab Handles', 'Defined Lighting and Mirror Package', 'Extended Roof Canopy'],
         specs: { 'Motor Type': '5.0 kW High Output AC Motor', 'Controller': 'Curtis 350A Controller', 'Chassis': 'Aluminum Spaceframe', 'Brakes': '4-Wheel Hydraulic Brake System' }
     },
@@ -1125,9 +1145,9 @@ const VEHICLE_MODELS = {
     'g-tempo-2':     { name: 'Golfer 2', label: '2 Seater',            image: 'image/Products/builds/golfer-2-golfer.jpg',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
     'g-tempo-2-2':   { name: 'Golfer 2+2', label: '2+2 Seater',          image: 'image/Products/builds/golfer-2-2-golfer.jpg',       slug: 'golfer-tempo-2-2' },
     'g-tempo-4':     { name: 'Golfer 4', label: '4 Seater',             image: 'image/Products/builds/golfer-4-golfer.jpg',             slug: 'golfer-tempo-4' },
-    'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/Base +.png',                 slug: 'lifestyle-tempo-2' },
+    'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/builds/lifestyle-2-essential.jpg',                 slug: 'lifestyle-tempo-2' },
     'l-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2' },
-    'l-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'lifestyle-tempo-4' },
+    'l-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/builds/lifestyle-4-essential.jpg',             slug: 'lifestyle-tempo-4' },
     'l-tempo-4-2':   { name: 'Tempo 4+2', label: '4+2 Seater',           image: 'image/Products/4 plus2 Lifted.png',         slug: 'lifestyle-tempo-4-2' },
     'villager-6':    { name: 'Villager 6',          image: 'image/Products/Villager 6.png',             slug: 'villager-6' },
     'villager-8':    { name: 'Villager 8',          image: 'image/Products/Villager 8.png',             slug: 'villager-8' },
@@ -2019,7 +2039,6 @@ function homeSpecLine(p) {
 // The homepage header banners (image/Hero/hero1-6.png, shown from their web-size copies hero1-6.jpg)
 const HOME_BANNERS = [
     { image: 'image/Hero/hero1.jpg', alt: 'Fairway? Covered. Quiet, smooth, and ready to roll. Upgrade your ride with us!', cta: 'Explore The Golfer', route: 'segment', slug: 'golfer' },
-    { image: 'image/Hero/hero2.jpg', alt: 'Golf Carts Halloween: a red golf cart dressed up with cobwebs and a skull', cta: 'Shop golf carts', route: 'products', slug: null },
     { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' },
     { image: 'image/Hero/hero4.jpg', alt: 'Two Tempo golf carts, red and silver, on a golf course', cta: 'Build your Tempo', route: 'product-details', slug: 'golfer-tempo-2' },
     { image: 'image/Hero/hero5.jpg', alt: 'More than just golf carts. We keep you rolling. Message us to learn how we can help!', cta: 'Book a service', route: 'service', slug: null },
@@ -2610,20 +2629,24 @@ const HOME_EVENT = {
 
 // Halloween effects over the event header: bats flapping across, and a cobweb in the corner with a spider
 // dropping and climbing on its thread. Decoration only: hidden from screen readers, never in the way of a click.
-const SPOOKY_BAT = '<svg viewBox="0 0 64 28" width="100%" height="100%"><path class="bat-wings" fill="#14081f" d="M32 10c-2-4-4-5-4-5l1 4c-3-1-7-3-12-3 1 3 0 5-3 6-3-2-7-2-14-1 5 2 8 6 9 10 2-2 5-3 8-2 2 0 3 2 5 3 3-2 6-3 10-2 4-1 7 0 10 2 2-1 3-3 5-3 3-1 6 0 8 2 1-4 4-8 9-10-7-1-11-1-14 1-3-1-4-3-3-6-5 0-9 2-12 3l1-4s-2 1-4 5z"/></svg>';
+// A bat seen from below: a body and two wings, each wing beating up and down from its shoulder
+const SPOOKY_BAT = '<svg viewBox="-32 -16 64 32" width="100%" height="100%" overflow="visible"><g fill="#14081f">'
+    + '<path class="bat-wing bat-wing-left" d="M-3 -2C-8 -9 -18 -11 -30 -6c3 2 4 5 3 8-3-1-6 0-7 2 4 0 6 2 6 5-3-1-6 0-8 2 6 1 12 0 18-4 4 3 8 2 11-2 4 2 7-1 8-5z"/>'
+    + '<path class="bat-wing bat-wing-right" d="M3 -2C8 -9 18 -11 30 -6c-3 2-4 5-3 8 3-1 6 0 7 2-4 0-6 2-6 5 3-1 6 0 8 2-6 1-12 0-18-4-4 3-8 2-11-2-4 2-7-1-8-5z"/>'
+    + '<ellipse cx="0" cy="1" rx="3.6" ry="7"/><circle cx="0" cy="-6" r="3.4"/><path d="M-3 -8l-1.2-4 2.6 2.6zM3 -8l1.2-4-2.6 2.6z"/></g></svg>';
 const SPOOKY_WEB = '<svg viewBox="0 0 100 100" width="100%" height="100%" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="0.8"><path d="M100 0L0 100M100 0L30 100M100 0L60 100M100 0L0 70M100 0L0 40M100 0L0 10"/><path d="M88 0q-2 10 12 12M74 0q-4 22 26 26M58 0q-6 36 42 42M40 0q-8 52 60 60M22 0q-10 70 78 78"/></svg>';
 const SPOOKY_SPIDER = '<svg viewBox="0 0 40 40" width="100%" height="100%"><g stroke="#0b0b0b" stroke-width="2" stroke-linecap="round" fill="none"><path d="M14 18l-8-6-4 4M14 21l-10 0-3 5M15 24l-7 6-1 6M26 18l8-6 4 4M26 21l10 0 3 5M25 24l7 6 1 6"/></g><ellipse cx="20" cy="22" rx="7" ry="8" fill="#0b0b0b"/><circle cx="20" cy="13" r="5" fill="#0b0b0b"/><circle cx="18" cy="12" r="1.2" fill="#ff3b3b"/><circle cx="22" cy="12" r="1.2" fill="#ff3b3b"/></svg>';
 
 function renderSpookyEffects() {
     const bats = [
-        { top: 18, size: 46, dur: 11, delay: 0 },
-        { top: 34, size: 30, dur: 14, delay: -5 },
-        { top: 10, size: 24, dur: 17, delay: -9 },
-        { top: 48, size: 36, dur: 13, delay: -2.5 }
+        { top: 18, size: 46, dur: 9, delay: 0, beat: 0.16, path: 1 },
+        { top: 36, size: 30, dur: 12, delay: -5, beat: 0.12, path: 2 },
+        { top: 10, size: 24, dur: 14, delay: -9, beat: 0.11, path: 3 },
+        { top: 50, size: 36, dur: 10.5, delay: -2.5, beat: 0.14, path: 2 }
     ];
     return `
         <div class="spooky-fx" aria-hidden="true">
-            ${bats.map(b => `<span class="spooky-bat" style="--top:${b.top}%; --size:${b.size}px; --dur:${b.dur}s; --delay:${b.delay}s">${SPOOKY_BAT}</span>`).join('')}
+            ${bats.map(b => `<span class="spooky-bat" style="--top:${b.top}%; --size:${b.size}px; --dur:${b.dur}s; --delay:${b.delay}s; --beat:${b.beat}s"><span class="bat-path bat-path-${b.path}">${SPOOKY_BAT}</span></span>`).join('')}
             <span class="spooky-web">${SPOOKY_WEB}</span>
             <span class="spooky-spider"><span class="spooky-thread"></span><span class="spooky-spider-body">${SPOOKY_SPIDER}</span></span>
         </div>`;

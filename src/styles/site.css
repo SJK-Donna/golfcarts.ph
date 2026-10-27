@@ -1528,33 +1528,90 @@
         overflow: hidden;
         pointer-events: none;
     }
-    /* Bats fly right to left across the banner, bobbing as they go, wings flapping */
+    /* Bats cross the banner right to left. Like real bats they don't glide in a straight line: each zigzags up
+       and down and banks into its turns (bat-path), while its wings beat fast from the shoulders, the body
+       lifting a little on each downstroke */
     .spooky-bat {
         position: absolute;
         top: var(--top);
-        left: 100%;
+        left: 0;
         width: var(--size);
-        height: calc(var(--size) * 0.45);
+        aspect-ratio: 2;
         animation: spooky-fly var(--dur) linear var(--delay) infinite;
     }
+    .bat-path {
+        display: block;
+        width: 100%;
+        height: 100%;
+        animation: var(--path-name) var(--dur) ease-in-out var(--delay) infinite;
+    }
+    .bat-path-1 { --path-name: bat-path-1; }
+    .bat-path-2 { --path-name: bat-path-2; }
+    .bat-path-3 { --path-name: bat-path-3; }
     .spooky-bat svg {
-        animation: spooky-bob 1.4s ease-in-out infinite;
+        display: block;
+        width: 100%;
+        height: 100%;
+        animation: bat-lift var(--beat) ease-in-out infinite alternate;
     }
-    .spooky-bat .bat-wings {
-        transform-origin: 50% 40%;
-        animation: spooky-flap 0.28s ease-in-out infinite alternate;
+    .bat-wing {
+        transform-box: view-box;
+        animation: bat-beat var(--beat) ease-in-out infinite alternate;
     }
+    .bat-wing-left { transform-origin: -3px -1px; }
+    .bat-wing-right { transform-origin: 3px -1px; animation-name: bat-beat-right; }
     @keyframes spooky-fly {
-        from { transform: translateX(0); }
-        to { transform: translateX(calc(-100vw - 200px)); }
+        from { transform: translateX(calc(100cqw + 60px)); }
+        to { transform: translateX(-120px); }
     }
-    @keyframes spooky-bob {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
+    .spooky-fx {
+        container-type: inline-size;
     }
-    @keyframes spooky-flap {
-        from { transform: scaleY(1); }
-        to { transform: scaleY(0.45); }
+    /* Wings: up (raised, foreshortened) to down (swept below the body) */
+    @keyframes bat-beat {
+        from { transform: rotate(28deg) scaleY(0.7); }
+        to { transform: rotate(-38deg) scaleY(1); }
+    }
+    @keyframes bat-beat-right {
+        from { transform: rotate(-28deg) scaleY(0.7); }
+        to { transform: rotate(38deg) scaleY(1); }
+    }
+    @keyframes bat-lift {
+        from { transform: translateY(2px); }
+        to { transform: translateY(-2px); }
+    }
+    /* Three erratic flight lines: rises, dips and sudden darts, banking as the bat turns */
+    @keyframes bat-path-1 {
+        0% { transform: translate(0, 0) rotate(0deg); }
+        12% { transform: translate(0, -18px) rotate(-10deg); }
+        22% { transform: translate(0, 6px) rotate(8deg); }
+        35% { transform: translate(0, -4px) rotate(-4deg); }
+        48% { transform: translate(0, 22px) rotate(12deg); }
+        60% { transform: translate(0, 4px) rotate(-6deg); }
+        74% { transform: translate(0, -20px) rotate(-12deg); }
+        88% { transform: translate(0, 10px) rotate(6deg); }
+        100% { transform: translate(0, 0) rotate(0deg); }
+    }
+    @keyframes bat-path-2 {
+        0% { transform: translate(0, 0) rotate(0deg); }
+        15% { transform: translate(0, 16px) rotate(10deg); }
+        28% { transform: translate(0, -10px) rotate(-8deg); }
+        40% { transform: translate(0, -26px) rotate(-14deg); }
+        55% { transform: translate(0, 2px) rotate(6deg); }
+        70% { transform: translate(0, 18px) rotate(10deg); }
+        84% { transform: translate(0, -8px) rotate(-6deg); }
+        100% { transform: translate(0, 0) rotate(0deg); }
+    }
+    @keyframes bat-path-3 {
+        0% { transform: translate(0, 0) rotate(0deg); }
+        10% { transform: translate(0, -8px) rotate(-6deg); }
+        20% { transform: translate(0, 12px) rotate(9deg); }
+        30% { transform: translate(0, -14px) rotate(-10deg); }
+        45% { transform: translate(0, 8px) rotate(5deg); }
+        58% { transform: translate(0, -22px) rotate(-12deg); }
+        72% { transform: translate(0, 14px) rotate(11deg); }
+        86% { transform: translate(0, -6px) rotate(-4deg); }
+        100% { transform: translate(0, 0) rotate(0deg); }
     }
     /* A cobweb in the top-right corner, its spider dropping on a thread and climbing back */
     .spooky-web {
@@ -1598,13 +1655,14 @@
     @media (prefers-reduced-motion: reduce) {
         .spooky-bat,
         .spooky-bat svg,
-        .spooky-bat .bat-wings,
+        .bat-path,
+        .bat-wing,
         .spooky-spider,
         .spooky-spider-body {
             animation: none;
         }
         .spooky-bat {
-            left: calc(100% - var(--size) * 2 - var(--top) * 4);
+            transform: translateX(calc(100cqw - var(--size) * 2 - var(--top) * 6));
         }
     }
 
