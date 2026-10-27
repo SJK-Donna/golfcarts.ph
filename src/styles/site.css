@@ -1339,7 +1339,7 @@
         background: #B30F12;
         transition: transform 0.8s var(--ease);
     }
-    .promo-cover img {
+    .promo-cover > img {
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -1508,6 +1508,93 @@
         }
         .lineup-promo .lineup-seats {
             font-size: 0.75rem;
+        }
+    }
+
+    /* ---- Halloween effects over the event header (renderSpookyEffects in app.js) ---- */
+    .spooky-fx {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+    /* Bats fly right to left across the banner, bobbing as they go, wings flapping */
+    .spooky-bat {
+        position: absolute;
+        top: var(--top);
+        left: 100%;
+        width: var(--size);
+        height: calc(var(--size) * 0.45);
+        animation: spooky-fly var(--dur) linear var(--delay) infinite;
+    }
+    .spooky-bat svg {
+        animation: spooky-bob 1.4s ease-in-out infinite;
+    }
+    .spooky-bat .bat-wings {
+        transform-origin: 50% 40%;
+        animation: spooky-flap 0.28s ease-in-out infinite alternate;
+    }
+    @keyframes spooky-fly {
+        from { transform: translateX(0); }
+        to { transform: translateX(calc(-100vw - 200px)); }
+    }
+    @keyframes spooky-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    @keyframes spooky-flap {
+        from { transform: scaleY(1); }
+        to { transform: scaleY(0.45); }
+    }
+    /* A cobweb in the top-right corner, its spider dropping on a thread and climbing back */
+    .spooky-web {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: clamp(4rem, 12vw, 9rem);
+        aspect-ratio: 1;
+    }
+    .spooky-spider {
+        position: absolute;
+        top: 0;
+        right: clamp(2.5rem, 7vw, 5.5rem);
+        width: clamp(1.25rem, 2.4vw, 2rem);
+        animation: spooky-drop 6s ease-in-out infinite;
+    }
+    .spooky-thread {
+        position: absolute;
+        bottom: 80%;
+        left: 50%;
+        width: 1px;
+        height: 400px;
+        background: rgba(255, 255, 255, 0.7);
+    }
+    .spooky-spider-body {
+        display: block;
+        aspect-ratio: 1;
+        animation: spooky-wiggle 1.2s ease-in-out infinite;
+    }
+    @keyframes spooky-drop {
+        0%, 100% { transform: translateY(-40%); }
+        45%, 60% { transform: translateY(calc(var(--drop, 6rem))); }
+    }
+    @keyframes spooky-wiggle {
+        0%, 100% { transform: rotate(-8deg); }
+        50% { transform: rotate(8deg); }
+    }
+    @media (min-width: 1024px) {
+        .spooky-spider { --drop: 9rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .spooky-bat,
+        .spooky-bat svg,
+        .spooky-bat .bat-wings,
+        .spooky-spider,
+        .spooky-spider-body {
+            animation: none;
+        }
+        .spooky-bat {
+            left: calc(100% - var(--size) * 2 - var(--top) * 4);
         }
     }
 

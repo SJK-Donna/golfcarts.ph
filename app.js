@@ -101,8 +101,19 @@ const PRODUCTS_DATA = [
         battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
         chargingTime: '3.5 Hours',
         powertrain: '5.0 kW AC Motor',
-        image: 'image/Products/Club Car 4.png',
-        gallery: ['image/Products/Club Car 4.png'],
+        image: 'image/Products/builds/golfer-4-golfer.jpg',
+        gallery: ['image/Products/builds/golfer-4-golfer.jpg', 'image/Products/builds/golfer-4-scratch.jpg', 'image/Products/builds/golfer-4-pro.jpg'],
+        // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
+        galleryLevels: ['golf', 'scratch', 'pro'],
+        // The colors in each build's photo (the Golfer photo's black and the Pro photo's orange aren't offered at those
+        // levels, so those builds start on their first body color)
+        buildLooks: {
+            golf: { seat: 'White', canopy: '88" Canopy Black' },
+            scratch: { body: 'Sangria', seat: 'Tsunami Silver Red & Black', canopy: '88" Canopy Black' },
+            pro: { seat: 'Classic Premium Seat Camello', canopy: '88" Canopy Black' }
+        },
+        // One photo per build level, shown on the build cards
+        buildPhotos: { golf: 'image/Products/builds/golfer-4-golfer.jpg', scratch: 'image/Products/builds/golfer-4-scratch.jpg', pro: 'image/Products/builds/golfer-4-pro.jpg' },
         features: ['Four Seats in Two Forward-Facing Rows', 'Golf Bag Provision with Rear Bag Cover', 'Extended Roof Canopy', 'Corrosion-Resistant Aluminum Frame'],
         specs: { 'Motor Type': '5.0 kW AC Motor', 'Controller': 'Curtis 350A Controller', 'Chassis': 'Aluminum Spaceframe', 'Brakes': '4-Wheel Hydraulic Brake System' }
     },
@@ -814,7 +825,7 @@ const BUILD_SETS = {
 // TEMPO VERSIONS: what each Tempo build includes and which options it offers, from the "Versions"
 // document (Google Doc "Versions", read 2026-10-15) and the sales team's answers:
 //   - the Golf build has no headlights; the lift kit starts at Scratch / Signature and is optional;
-//   - sand bottle, ball washer and cooler: none, 1 or 2 each; the GC floor mat comes with every build;
+//   - sand bottle, ball washer and cooler: none, 1 or 2 each; the GC floor mat comes with Pro / Elite only;
 //   - Tempo 4+2 follows the same matrix (4-seater canopy and enclosure, +2 rear flip seat).
 // Each row lists the choices per build level: [Golf / Essential, Scratch / Signature, Pro / Elite];
 // an empty list means not offered. The builder before this (every colour, seat and package for every
@@ -824,7 +835,7 @@ const TEMPO_LINES = {
     golfer: {
         title: 'Golfer, Scratch or Pro.',
         levels: [
-            { id: 'golf', name: 'Golfer', fullName: 'Tempo Golf', tagline: 'Golf essentials', blurb: 'The golf essentials: a bag cover, a floor mat and a dependable lead-acid battery.' },
+            { id: 'golf', name: 'Golfer', fullName: 'Tempo Golf', tagline: 'Golf essentials', blurb: 'The golf essentials: a bag cover and a dependable lead-acid battery.' },
             { id: 'scratch', name: 'Scratch', fullName: 'Tempo Scratch Golf', tagline: 'Golf accessories and comfort', blurb: 'Golf accessories, LED lighting and more colors.',
                 about: 'Adds LED lighting, golf accessories and more colors and seats.' },
             { id: 'pro', name: 'Pro', fullName: 'Tempo Pro', tagline: 'The premium personal cart', blurb: 'Lithium power and premium finishes.',
@@ -865,6 +876,7 @@ const TEMPO_MATRIX = {
         '4': [['88" Canopy Black'], ['88" Canopy Black'], ['88" Canopy Black']]
     },
     battery: ['Trojan FLA 8V lead-acid', 'Trojan FLA 8V lead-acid', 'Battlite lithium'],
+    floorMat: [false, false, true], // the GC floor mat comes with Pro / Elite only
     wheels: [[WHEEL_STEEL], [WHEEL_STEEL, WHEEL_TRITON, WHEEL_HELA], [WHEEL_ALLOY, WHEEL_TRITON, WHEEL_HELA]],
     wheelUpgrades: [
         [],
@@ -966,7 +978,7 @@ function tempoLevelIncludes(line, i) {
     ];
     if (line === 'golfer') items.push(i === 0 ? 'GC bag cover, black' : 'Bag covers, sand bottles, ball washers, cooler');
     else if (m.lifestyleCooler[i]) items.push('Cooler');
-    items.push('GC floor mat');
+    if (TEMPO_MATRIX.floorMat[i]) items.push('GC floor mat');
     return items;
 }
 
@@ -1026,7 +1038,7 @@ function getTempoOptionGroups(product, i) {
     const add = g => groups.push(g);
 
     add({ id: 'battery', section: 'Included', title: 'Battery', type: 'fixed', value: m.battery[i] });
-    add({ id: 'floorMat', section: 'Included', title: 'Floor mat', type: 'fixed', value: 'GC floor mat' });
+    if (m.floorMat[i]) add({ id: 'floorMat', section: 'Included', title: 'Floor mat', type: 'fixed', value: 'GC floor mat' });
     // Lighting: where lights are optional ("No headlights" in the sheet), the kits are an optional pick; a build
     // without lights has no lighting row
     const lights = m.lighting[line][i];
@@ -1112,7 +1124,7 @@ function defaultTempoOptions(product, i) {
 const VEHICLE_MODELS = {
     'g-tempo-2':     { name: 'Golfer 2', label: '2 Seater',            image: 'image/Products/builds/golfer-2-golfer.jpg',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
     'g-tempo-2-2':   { name: 'Golfer 2+2', label: '2+2 Seater',          image: 'image/Products/builds/golfer-2-2-golfer.jpg',       slug: 'golfer-tempo-2-2' },
-    'g-tempo-4':     { name: 'Golfer 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'golfer-tempo-4' },
+    'g-tempo-4':     { name: 'Golfer 4', label: '4 Seater',             image: 'image/Products/builds/golfer-4-golfer.jpg',             slug: 'golfer-tempo-4' },
     'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/Base +.png',                 slug: 'lifestyle-tempo-2' },
     'l-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2' },
     'l-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/Club Car 4.png',             slug: 'lifestyle-tempo-4' },
@@ -1814,7 +1826,7 @@ function getBuildDetails() {
     if (isTempoVersion(product)) rows.push(...getTempoOptionRows(product));
     // Build options decided on the model page; the quote's accessory list doesn't offer them again
     const covered = isTempoVersion(product)
-        ? ['floorMat', ...getTempoOptionGroups(product, detailLevelIndex(product)).map(g => g.id)]
+        ? getTempoOptionGroups(product, detailLevelIndex(product)).map(g => g.id)
         : [];
     return { slug: product.slug, rows, covered, lifted: !!(detailBuild.options && detailBuild.options.lift) };
 }
@@ -2205,6 +2217,7 @@ function renderHomePromo() {
                 ${renderPromoEffects()}
                 <div class="promo-cover">
                     <img src="image/Promo/red-series-cover.jpg" alt="Red Series" loading="lazy" decoding="async">
+                    ${renderPromoEffects()}
                     <button type="button" class="promo-arrow promo-open" onclick="togglePromoCover(true)">
                         See the Red Series
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -2595,6 +2608,27 @@ const HOME_EVENT = {
     ]
 };
 
+// Halloween effects over the event header: bats flapping across, and a cobweb in the corner with a spider
+// dropping and climbing on its thread. Decoration only: hidden from screen readers, never in the way of a click.
+const SPOOKY_BAT = '<svg viewBox="0 0 64 28" width="100%" height="100%"><path class="bat-wings" fill="#14081f" d="M32 10c-2-4-4-5-4-5l1 4c-3-1-7-3-12-3 1 3 0 5-3 6-3-2-7-2-14-1 5 2 8 6 9 10 2-2 5-3 8-2 2 0 3 2 5 3 3-2 6-3 10-2 4-1 7 0 10 2 2-1 3-3 5-3 3-1 6 0 8 2 1-4 4-8 9-10-7-1-11-1-14 1-3-1-4-3-3-6-5 0-9 2-12 3l1-4s-2 1-4 5z"/></svg>';
+const SPOOKY_WEB = '<svg viewBox="0 0 100 100" width="100%" height="100%" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="0.8"><path d="M100 0L0 100M100 0L30 100M100 0L60 100M100 0L0 70M100 0L0 40M100 0L0 10"/><path d="M88 0q-2 10 12 12M74 0q-4 22 26 26M58 0q-6 36 42 42M40 0q-8 52 60 60M22 0q-10 70 78 78"/></svg>';
+const SPOOKY_SPIDER = '<svg viewBox="0 0 40 40" width="100%" height="100%"><g stroke="#0b0b0b" stroke-width="2" stroke-linecap="round" fill="none"><path d="M14 18l-8-6-4 4M14 21l-10 0-3 5M15 24l-7 6-1 6M26 18l8-6 4 4M26 21l10 0 3 5M25 24l7 6 1 6"/></g><ellipse cx="20" cy="22" rx="7" ry="8" fill="#0b0b0b"/><circle cx="20" cy="13" r="5" fill="#0b0b0b"/><circle cx="18" cy="12" r="1.2" fill="#ff3b3b"/><circle cx="22" cy="12" r="1.2" fill="#ff3b3b"/></svg>';
+
+function renderSpookyEffects() {
+    const bats = [
+        { top: 18, size: 46, dur: 11, delay: 0 },
+        { top: 34, size: 30, dur: 14, delay: -5 },
+        { top: 10, size: 24, dur: 17, delay: -9 },
+        { top: 48, size: 36, dur: 13, delay: -2.5 }
+    ];
+    return `
+        <div class="spooky-fx" aria-hidden="true">
+            ${bats.map(b => `<span class="spooky-bat" style="--top:${b.top}%; --size:${b.size}px; --dur:${b.dur}s; --delay:${b.delay}s">${SPOOKY_BAT}</span>`).join('')}
+            <span class="spooky-web">${SPOOKY_WEB}</span>
+            <span class="spooky-spider"><span class="spooky-thread"></span><span class="spooky-spider-body">${SPOOKY_SPIDER}</span></span>
+        </div>`;
+}
+
 function renderHomeEvents() {
     const e = HOME_EVENT;
     // Each column shows every photo twice in a row, so its scroll loops seamlessly; the second column starts
@@ -2611,7 +2645,10 @@ function renderHomeEvents() {
     return `
         <section class="rise home-section" aria-labelledby="home-events-title">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
-                <img src="${e.header}" alt="${e.title}" loading="lazy" decoding="async" class="w-full h-auto block">
+                <div class="relative">
+                    <img src="${e.header}" alt="${e.title}" loading="lazy" decoding="async" class="w-full h-auto block">
+                    ${renderSpookyEffects()}
+                </div>
                 <!-- The event's story on the left, its photos on the right (stacked on phones) -->
                 <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 mt-8">
                     <div class="space-y-4">
@@ -3289,7 +3326,7 @@ const ACCESSORY_CATALOG = [
     { group: 'Driver Accessories', items: [
         { id: 'drv-wheel', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel', sku: 'SJK-1355', fits: ['tempo', 'onward'] },
         { id: 'drv-wheel-scorecard', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel with Scorecard', sku: 'SJK-1354', fits: ['golf'] },
-        { id: 'drv-floormat', includedOn: ['tempo'], name: 'GC Floor Mat', sku: 'SJK-1375', fits: ['tempo', 'onward', 'villager'] }
+        { id: 'drv-floormat', builder: 'floorMat', name: 'GC Floor Mat', sku: 'SJK-1375', fits: ['tempo', 'onward', 'villager'] }
     ] },
     { group: 'Exterior', items: [
         { id: 'ext-fender-3', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 3"', sku: 'SJK-1542', fits: ['tempo'] },
@@ -3588,7 +3625,7 @@ function updateDetailPreview() {
         console.warn('Color preview unavailable; open the site from a web address to enable it.', err);
         const body = getProductBodyColors(product).find(c => c.name === detailBuild.body);
         const img = document.getElementById('detail-color-img');
-        if (img) img.src = (body && body.image) || product.image;
+        if (img) img.src = (body && body.image) || (product.buildPhotos && product.buildPhotos[detailBuild.level]) || product.image;
     });
 }
 
@@ -3668,7 +3705,7 @@ function selectDetailColor(index, fromVisitor) {
     // updateDetailPreview(); if that can't run (e.g. the page was opened from a local file), this photo stays.
     if (!hasLiveColorPreview(detailPreviewKey(product)) || !livePreviewAvailable) {
         const img = document.getElementById('detail-color-img');
-        if (img) img.src = color.image || product.image;
+        if (img) img.src = color.image || (product.buildPhotos && product.buildPhotos[detailBuild.level]) || product.image;
         const note = document.getElementById('detail-color-photo-note');
         if (note) {
             note.textContent = 'Photo shows a standard finish';
@@ -4084,6 +4121,7 @@ const OPTION_PHOTOS = {
     'GC Apex Tempo LED Headlights & Tail Lights': 'light-gc-apex',
     'Club Car Tempo Deluxe Light Kit': 'light-cc-deluxe',
     // Wheels and tires
+    '8" steel rims with cover': 'wheel-8-steel',
     '12" Triton Machined Black, 215/35-12 tires': 'wheel-12-triton-215',
     '12" Hela Bright Chrome, 215/35-12 tires': 'wheel-12-hela-215',
     '10" 5-spoke alloy wheels, gunmetal': 'wheel-10-5spoke-gunmetal',
