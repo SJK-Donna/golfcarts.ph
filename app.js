@@ -1200,7 +1200,8 @@ const NAV_SEGMENTS = [
         version: 'lifestyle',
         links: [{ label: 'Compare builds', anchor: 'compare' }, { label: 'Explore lifted packages', anchor: 'lifted' }],
         subcategories: [
-            { id: 'models', label: 'Models', groups: [{ label: 'Models', items: ['l-tempo-2', 'l-tempo-2-2', 'l-tempo-4', 'l-tempo-4-2'] }] }
+            // menuHeading: false: the dropdown lists the models without a 'Models' heading above them
+            { id: 'models', label: 'Models', menuHeading: false, groups: [{ label: 'Models', items: ['l-tempo-2', 'l-tempo-2-2', 'l-tempo-4', 'l-tempo-4-2'] }] }
         ]
     },
     {
@@ -1706,7 +1707,7 @@ function renderSegmentDropdown(seg) {
             <div class="segment-dropdown-inner grid gap-8" style="grid-template-columns: repeat(${seg.subcategories.length}, minmax(180px, 1fr));">
                 ${seg.subcategories.map(sub => `
                     <div class="space-y-3">
-                        <button type="button" onclick="openSegment('${seg.id}', '${seg.id}-${sub.id}')" class="block text-left text-[0.8125rem] font-medium text-mute hover:text-ink">${sub.label}</button>
+                        ${sub.menuHeading === false ? '' : `<button type="button" onclick="openSegment('${seg.id}', '${seg.id}-${sub.id}')" class="block text-left text-[0.8125rem] font-medium text-mute hover:text-ink">${sub.label}</button>`}
                         ${sub.groups.map(group => `
                             <div class="space-y-0.5">
                                 ${group.label !== sub.label ? `<p class="text-xs font-semibold text-ink">${group.label}</p>` : ''}
