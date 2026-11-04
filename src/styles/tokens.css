@@ -33,9 +33,16 @@
     /* Details that change with the theme */
     --field-border: #8A8B83; /* 3.2:1 on paper; form controls need 3:1 */
     --swatch-ring: rgba(21, 23, 20, 0.2);
-    --map-dot: #A3A59C;
-    --map-grid: rgba(21, 23, 20, 0.06);
-    --map-coast: rgba(79, 110, 34, 0.55);
+
+    /* Admin (back office): a cool workspace behind white panels, a stone sidebar, and status colours. Each status
+       pair is text on its fill, 7:1 or better. */
+    --adm-canvas: #EDEFE9;
+    --adm-panel: #FFFFFF;
+    --adm-side: #E4E6DE;
+    --adm-hover: #F3F4EF;
+    --adm-wait: #F6E7B8;   --adm-on-wait: #4A3B00;
+    --adm-bad: #F4D3CF;    --adm-on-bad: #6B1A12;
+    --adm-good: #DDEBC8;   --adm-on-good: #2F4513;
 
     color-scheme: light;
 }
@@ -56,9 +63,14 @@
 
     --field-border: #6E7068;
     --swatch-ring: rgba(246, 246, 242, 0.25);
-    --map-dot: #3F423B;
-    --map-grid: rgba(246, 246, 242, 0.05);
-    --map-coast: rgba(116, 158, 53, 0.5);
+
+    --adm-canvas: #0F110E;
+    --adm-panel: #171915;
+    --adm-side: #1B1D19;
+    --adm-hover: #20231E;
+    --adm-wait: #4A3B00;   --adm-on-wait: #F6E7B8;
+    --adm-bad: #5A1A13;    --adm-on-bad: #F4D3CF;
+    --adm-good: #2F4513;   --adm-on-good: #DDEBC8;
 
     color-scheme: dark;
 }

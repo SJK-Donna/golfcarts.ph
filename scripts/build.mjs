@@ -50,7 +50,7 @@ function escapeAttr(value) {
 // ---- 1. Clean and copy ----
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
-for (const f of ['app.js', 'recolor.js', '.nojekyll', '.htaccess', 'favicon.ico', 'image', 'video']) copy(f);
+for (const f of ['app.js', 'recolor.js', 'account.js', '.nojekyll', '.htaccess', 'favicon.ico', 'image', 'video']) copy(f);
 
 const fontFiles = {
     '@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2': 'newsreader-latin-opsz-normal.woff2',
@@ -59,6 +59,14 @@ const fontFiles = {
 };
 fs.mkdirSync(out('fonts'));
 for (const [from, to] of Object.entries(fontFiles)) fs.copyFileSync(rel(`node_modules/${from}`), out(`fonts/${to}`));
+
+// Leaflet for the branch map (loaded by app.js only on pages with the map); its pins are drawn by the site,
+// so its marker images aren't needed
+fs.mkdirSync(out('vendor/leaflet'), { recursive: true });
+for (const f of ['leaflet.js', 'leaflet.css']) fs.copyFileSync(rel(`node_modules/leaflet/dist/${f}`), out(`vendor/leaflet/${f}`));
+// Supabase client for Be a Golfer and the admin (account.js); the browser build and its one lazy chunk
+fs.mkdirSync(out('vendor/supabase'), { recursive: true });
+for (const f of ['supabase.js', '591.supabase.js']) fs.copyFileSync(rel(`node_modules/@supabase/supabase-js/dist/umd/${f}`), out(`vendor/supabase/${f}`));
 
 // ---- 2. CSS ----
 execFileSync(process.execPath, [rel('node_modules/tailwindcss/lib/cli.js'), '-c', rel('tailwind.config.js'),
@@ -69,6 +77,7 @@ execFileSync(process.execPath, [rel('node_modules/tailwindcss/lib/cli.js'), '-c'
 fs.mkdirSync(rel('css'), { recursive: true });
 fs.copyFileSync(out('css/site.css'), rel('css/site.css'));
 fs.cpSync(out('fonts'), rel('fonts'), { recursive: true });
+fs.cpSync(out('vendor'), rel('vendor'), { recursive: true });
 
 // ---- 3. Images ----
 // Each PNG / JPG gets a WebP copy beside it ("x.png" -> "x.png.webp"), resized to at most 1920px wide.
@@ -127,6 +136,7 @@ if (!template.includes(`<base href="${base}">`)) throw new Error('index.html mus
 const appSource = useWebp(fs.readFileSync(rel('app.js'), 'utf8'));
 fs.writeFileSync(out('app.js'), appSource);
 const recolorSource = fs.readFileSync(rel('recolor.js'), 'utf8');
+const accountSource = fs.readFileSync(rel('account.js'), 'utf8');
 
 // Street addresses for structured data (display addresses live in BRANCHES in app.js)
 const BRANCH_ADDRESSES = {
@@ -180,6 +190,7 @@ async function renderRoute(routePath) {
     window.scrollTo = () => {};
     run(dom, recolorSource);
     run(dom, appSource);
+    run(dom, accountSource);
     // app.js renders on DOMContentLoaded; wait for it
     await new Promise(resolve => (window.document.readyState === 'complete' ? resolve() : window.addEventListener('load', resolve)));
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -229,6 +240,8 @@ async function writePage(page, slug, file, { noindex = false } = {}) {
 }
 
 for (const [page, slug] of routes) await writePage(page, slug, null);
+// The Golfer account and admin pages: real URLs, kept out of search and the sitemap
+for (const page of ['golfer', 'admin']) await writePage(page, null, null, { noindex: true });
 await writePage('not-found', null, '404.html', { noindex: true });
 
 fs.writeFileSync(out('sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>
