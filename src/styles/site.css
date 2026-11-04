@@ -173,7 +173,7 @@
     }
     /* Narrower laptops: a little less space between menu items so the header stays on one line */
     @media (max-width: 1439px) {
-        .header-nav-link { padding-left: 0.375rem; padding-right: 0.375rem; }
+        .header-nav-link { padding-left: 0.3rem; padding-right: 0.3rem; }
     }
     .nav-chevron {
         transition: transform 0.25s var(--ease);
@@ -268,6 +268,10 @@
     }
     @media (min-width: 1024px) {
         .site-header { padding: 0 3rem; }
+    }
+    /* Laptop widths where the full menu just fits: less space around it so the header stays on one line */
+    @media (min-width: 1360px) and (max-width: 1599px) {
+        .site-header { gap: 1rem; }
     }
     /* Full menu on the narrowest laptops: less side padding so the Be a Golfer icon fits */
     @media (min-width: 1360px) and (max-width: 1439px) {

@@ -1183,9 +1183,24 @@ const VEHICLE_MODELS = {
 // Menu hierarchy: pillar -> subcategory -> group -> model keys. Drives the header dropdowns, the mobile
 // drawer, the Cart page tab sub-menus and the pillar landing pages. `links` add extra menu entries that
 // jump to a section of the pillar page; `enquiry` adds a business enquiry prompt to a subcategory.
+// `parent` puts a pillar under another one in the header (The Golfer and Lifestyle sit under Private Golf
+// Carts); a subcategory's `page` links its section to that pillar's own page.
 const NAV_SEGMENTS = [
     {
+        id: 'private',
+        label: 'Private Golf Carts',
+        category: null,
+        tagline: 'Golf carts for the course, the village and home.',
+        description: 'Golfer carts for regular golf, and Lifestyle carts for family transport and life around a private property.',
+        image: 'image/Hero/fam-hero.jpeg',
+        subcategories: [
+            { id: 'golfer', label: 'The Golfer', page: 'golfer', groups: [{ label: 'The Golfer', items: ['g-tempo-2', 'g-tempo-2-2', 'g-tempo-4'] }] },
+            { id: 'lifestyle', label: 'Lifestyle & Private Use', page: 'lifestyle', groups: [{ label: 'Lifestyle & Private Use', items: ['l-tempo-2', 'l-tempo-2-2', 'l-tempo-4', 'l-tempo-4-2'] }] }
+        ]
+    },
+    {
         id: 'golfer',
+        parent: 'private',
         label: 'The Golfer',
         category: 'The Golfer',
         tagline: 'Built around the way you play.',
@@ -1199,6 +1214,7 @@ const NAV_SEGMENTS = [
     },
     {
         id: 'lifestyle',
+        parent: 'private',
         label: 'Lifestyle & Private Use',
         category: 'Lifestyle & Private Use',
         tagline: 'Mobility for homes, villages, estates and farms.',
@@ -1213,7 +1229,7 @@ const NAV_SEGMENTS = [
     },
     {
         id: 'resort',
-        label: 'Resort & Hospitality',
+        label: 'Resort and Hospitality',
         category: 'Resort & Hospitality',
         tagline: 'Guest transport and daily property operations.',
         description: 'Match the vehicle to passenger flow, luggage and daily operating conditions, then add utility and fit-to-task builds for the jobs behind the scenes.',
@@ -1241,10 +1257,10 @@ const NAV_SEGMENTS = [
     },
     {
         id: 'remanufactured',
-        label: 'Remanufactured',
+        label: 'Rebuilt and Pre Owned',
         category: null,
         tagline: 'A clear value offering.',
-        description: 'Remanufactured golf and lifestyle builds, with utility where available. Each unit is quoted with its seating layout, rebuild scope, battery type and condition, included equipment, warranty terms and available upgrades.',
+        description: 'Rebuilt golf and lifestyle carts, with utility where available. Each unit is quoted with its seating layout, rebuild scope, battery type and condition, included equipment, warranty terms and available upgrades.',
         image: 'image/Products/reman 4.png',
         subcategories: [
             {
@@ -1257,15 +1273,16 @@ const NAV_SEGMENTS = [
     }
 ];
 
-// Header navigation order from the blueprint: three buying pillars, then value, fleet and aftersales routes
+// Header navigation order from the website review (30 Oct 2026): private carts first, then fleet, custom
+// builds, resort, rebuilt carts, aftersales and stories. Parts and Accessories sits under Service and Support.
 const MAIN_NAV = [
-    { segment: 'golfer' },
-    { segment: 'lifestyle' },
+    { segment: 'private' },
+    { label: 'Fleet Solutions', href: 'fleet/', page: 'solutions' },
+    { label: 'Custom Carts', href: 'models/golfer-tempo-2/', action: 'buildYourCart()' },
     { segment: 'resort' },
     { segment: 'remanufactured' },
-    { label: 'Fleet Solutions', href: 'fleet/', page: 'solutions' },
-    { label: 'Parts & Accessories', href: 'carts/?category=Accessories', action: "setCategoryAndNavigate('Accessories')", category: 'Accessories' },
-    { label: 'Service & Support', href: 'service/', page: 'service' }
+    { label: 'Service and Support', href: 'service/', page: 'service' },
+    { label: 'Stories and Guides', href: 'blog/', page: 'blogs' }
 ];
 
 // Primary action for individual buyers: start on the hero product's build selector
@@ -1289,8 +1306,9 @@ const HOME_LINEUP = [
     { name: 'Tempo', seats: '2 to 6 seats', image: 'image/lineup/tempo.png', slug: 'golfer-tempo-2', left: 81.67, width: 17.21, height: 61 }
 ];
 
-// Shop by use. Golfer leads with the largest photo; Remanufactured is a text-led strip (see renderHomeUses)
+// Shop by use, in the review's order. Private Golf Carts leads with the largest photo; Rebuilt is a text-led strip (see renderHomeUses)
 const HOME_USES = {
+    private: { image: 'image/Banners/golf.jpg', alt: 'Green Tempo 2+2 with beige seats on a fairway', width: 1800, height: 1239 },
     golfer: { image: 'image/Banners/golf.jpg', alt: 'Green Tempo 2+2 with beige seats on a fairway', width: 1800, height: 1239 },
     lifestyle: { image: 'image/Banners/personal.jpg', alt: 'Two golfers greeting each other beside a white Tempo 2', width: 990, height: 960 },
     resort: { image: 'image/Banners/resort.jpg', alt: 'Cream guest shuttle parked at a resort entrance', width: 1800, height: 1399 }
@@ -1520,7 +1538,7 @@ function getPageMeta(page, slug = null) {
         products: { title: `All carts | ${site}`, description: 'Every Golfcarts.ph cart: golf, lifestyle, resort and utility models, with colors, seats and accessories.' },
         solutions: { title: `Fleet solutions | ${site}`, description: 'Fleet proposals for golf courses, resorts, estates and industrial sites: guest transport, utility and fit-to-task carts.' },
         service: { title: `Service and support | ${site}`, description: 'Book a service, order parts and get maintenance and charging advice from the Golfcarts.ph team.' },
-        blogs: { title: `Blog | ${site}`, description: 'Buying guides, maintenance tips and stories about low-speed electric vehicles.' },
+        blogs: { title: `Stories and Guides | ${site}`, description: 'Company stories, buying guides and maintenance tips for low-speed electric vehicles.' },
         about: { title: `About | ${site}`, description: 'Golfcarts.ph, run by SJK Guahan Inc., sells, customizes and services low-speed electric vehicles for private roads.' },
         contact: { title: `Contact | ${site}`, description: 'Visit or call our branches in Manila, Cebu, Laguna and Clark, or send us a message.' },
         golfer: { title: `Be a Golfer | ${site}`, description: 'An optional Golfer account: save your cart builds, see your quotes and get member news.' },
@@ -1636,9 +1654,11 @@ function toggleMobileMenu(open) {
 function updateNavState() {
     const pillarProduct = currentPage === 'product-details' && PRODUCTS_DATA.find(p => p.slug === currentSlug);
     const listCategory = currentPage === 'products' && productFilterCategory !== 'All' ? productFilterCategory : null;
-    const pillarSeg = currentPage === 'segment' ? currentSlug
-        : pillarProduct ? (NAV_SEGMENTS.find(s => s.category === pillarProduct.category) || {}).id
-        : listCategory ? (NAV_SEGMENTS.find(s => s.category === listCategory) || {}).id || null : null;
+    const pillar = currentPage === 'segment' ? NAV_SEGMENTS.find(s => s.id === currentSlug)
+        : pillarProduct ? NAV_SEGMENTS.find(s => s.category === pillarProduct.category)
+        : listCategory ? NAV_SEGMENTS.find(s => s.category === listCategory) : null;
+    // A pillar listed under another one (The Golfer under Private Golf Carts) marks its parent
+    const pillarSeg = pillar ? pillar.parent || pillar.id : null;
     const activePage = currentPage === 'blog-details' ? 'blogs' : (pillarSeg || listCategory) ? null : currentPage === 'product-details' ? 'products' : currentPage;
     document.querySelectorAll('.nav-link').forEach(link => {
         const active = (activePage && link.dataset.page === activePage) || (pillarSeg && link.dataset.segment === pillarSeg)
@@ -1778,7 +1798,11 @@ function renderSegmentMenus() {
     renderMainNav();
     const mobile = document.getElementById('mobile-segment-menus');
     if (mobile) {
-        mobile.innerHTML = NAV_SEGMENTS.map(seg => `
+        // Same items and order as the header
+        mobile.innerHTML = MAIN_NAV.map(item => {
+            const seg = item.segment && NAV_SEGMENTS.find(s => s.id === item.segment);
+            if (!seg) return `<a href="${item.href}" ${item.page ? `data-route="${item.page}"` : `onclick="event.preventDefault(); toggleMobileMenu(); ${item.action}"`} class="mobile-nav-link">${item.label}</a>`;
+            return `
             <details class="mobile-segment">
                 <summary><span>${seg.label}</span><span class="disclosure-sign" aria-hidden="true"></span></summary>
                 <div class="mobile-segment-models">
@@ -1788,8 +1812,8 @@ function renderSegmentMenus() {
                         ${sub.groups.flatMap(group => group.items).map(key => modelMenuItem(seg, sub, key, '')).join('')}
                     `).join('')}
                 </div>
-            </details>
-        `).join('');
+            </details>`;
+        }).join('');
     }
 }
 
@@ -2087,12 +2111,14 @@ function homeSpecLine(p) {
 // Promotional banners (the original homepage slider). The text is part of each image, so `alt`
 // repeats it for screen readers; each banner has its own action under the slider.
 // The homepage header banners (image/Hero/hero1-6.png, shown from their web-size copies hero1-6.jpg)
+// Order from the website review: private, fleet, custom, (resort, rebuilt: artwork still to come), service.
+// The Red Series promo stays last until its place is decided.
 const HOME_BANNERS = [
-    { image: 'image/Hero/hero1.jpg', alt: 'Fairway? Covered. Quiet, smooth, and ready to roll. Upgrade your ride with us!', cta: 'Explore The Golfer', route: 'segment', slug: 'golfer' },
-    { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' },
-    { image: 'image/Hero/hero4.jpg', alt: 'Two Tempo golf carts, red and silver, on a golf course', cta: 'Build your Tempo', route: 'product-details', slug: 'golfer-tempo-2' },
-    { image: 'image/Hero/hero5.jpg', alt: 'More than just golf carts. We keep you rolling. Message us to learn how we can help!', cta: 'Book a service', route: 'service', slug: null },
-    { image: 'image/Hero/hero6.jpg', alt: 'A fleet of white golf carts lined up at a resort entrance', cta: 'Request a fleet proposal', route: 'solutions', slug: null }
+    { image: 'image/Hero/hero1.jpg', alt: 'Fairway? Covered. Quiet, smooth, and ready to roll. Upgrade your ride with us!', cta: 'Explore Private Carts', route: 'segment', slug: 'private' },
+    { image: 'image/Hero/hero6.jpg', alt: 'A fleet of white golf carts lined up at a resort entrance', cta: 'Plan Your Fleet', route: 'solutions', slug: null },
+    { image: 'image/Hero/hero4.jpg', alt: 'Two Tempo golf carts, red and silver, on a golf course', cta: 'Build Your Cart', route: 'product-details', slug: 'golfer-tempo-2' },
+    { image: 'image/Hero/hero5.jpg', alt: 'More than just golf carts. We keep you rolling. Message us to learn how we can help!', cta: 'Book a Service', route: 'service', slug: null },
+    { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' }
 ];
 const HOME_BANNER_MS = 3000;
 let homeBanners = null;
@@ -2340,7 +2366,7 @@ function renderHomeUseTile(id, sizeClass, imageClass) {
         </a>`;
 }
 
-// Editorial grid: a large Golfer photo, two offset tiles of different sizes, and a text-led Remanufactured strip
+// Editorial grid: a large Private Golf Carts photo, two offset tiles (Fleet, Resort), and a text-led Rebuilt strip
 function renderHomeUses() {
     const reman = NAV_SEGMENTS.find(s => s.id === 'remanufactured');
     return `
@@ -2348,17 +2374,25 @@ function renderHomeUses() {
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
                 <h2 id="home-uses-title" class="type-xl text-ink mb-12 lg:mb-16 max-w-[14ch]">Shop by how you'll use it.</h2>
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-14">
-                    ${renderHomeUseTile('golfer', 'lg:col-span-7', 'aspect-[4/3] lg:aspect-[7/6]')}
+                    ${renderHomeUseTile('private', 'lg:col-span-7', 'aspect-[4/3] lg:aspect-[7/6]')}
                     <div class="lg:col-span-5 grid gap-y-14 lg:pt-40">
-                        ${renderHomeUseTile('lifestyle', '', 'aspect-square lg:aspect-[5/4]')}
+                        <a href="${routeHref('solutions')}" data-route="solutions" class="group block">
+                            <div class="media-zoom edge-light aspect-square lg:aspect-[5/4]">
+                                <img src="image/Hero/fleet_hero.jpg" alt="Three golf carts lined up side by side" width="799" height="527" loading="lazy" decoding="async" class="w-full h-full object-cover">
+                            </div>
+                            <div class="pt-5 space-y-2">
+                                <h3 class="type-lg text-ink">Fleet Solutions</h3>
+                                <p class="measure">Fleets for golf courses, resorts and sites.</p>
+                            </div>
+                        </a>
                     </div>
                     <div class="lg:col-span-5 lg:col-start-2">
                         ${renderHomeUseTile('resort', '', 'aspect-[4/3]')}
                     </div>
                     <a href="${routeHref('segment', 'remanufactured')}" data-route="segment" data-slug="remanufactured" class="group lg:col-span-5 lg:col-start-8 self-end border-t border-ink pt-6 space-y-3">
-                        <!-- A rebuilt cart above the heading: "Remanufactured" is one long word, so there's no room beside it -->
+                        <!-- A rebuilt cart above the heading -->
                         <div class="media-zoom edge-light aspect-[16/10]">
-                            <img src="image/Products/reman-street.jpg" alt="A black remanufactured Club Car 2+2 parked on a residential street" width="1600" height="1000" loading="lazy" decoding="async" class="w-full h-full object-cover">
+                            <img src="image/Products/reman-street.jpg" alt="A black rebuilt Club Car 2+2 parked on a residential street" width="1600" height="1000" loading="lazy" decoding="async" class="w-full h-full object-cover">
                         </div>
                         <h3 class="type-lg text-ink">${reman.label}</h3>
                         <p class="measure">Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.</p>
@@ -4027,7 +4061,7 @@ function initDetailTabs() {
         entries.forEach(entry => {
             if (!entry.isIntersecting) return;
             document.querySelectorAll('.detail-tab').forEach(tab => {
-                tab.classList.toggle('detail-tab-active', tab.dataset.target === entry.target.id);
+                tab.classList.toggle('detail-tab-active', (tab.dataset.covers || tab.dataset.target).split(' ').includes(entry.target.id));
             });
         });
     }, { rootMargin: '-45% 0px -50% 0px' });
@@ -4913,13 +4947,13 @@ function renderProductDetailsPage() {
         { label: 'Charging time', value: product.chargingTime }
     ]).filter(s => isVehicle && isMeaningful(s.value)).map(s => ({ ...s, ...splitStatValue(s.value) }));
 
+    // Section bar from the website review: Overview, Build Yours, Specifications (Gallery to follow).
+    // `covers` lists the sections that keep a tab marked while they're on screen.
+    const buildStart = buildSet ? 'build' : isVehicle ? 'colors' : null;
     const tabs = [
         { id: 'overview', label: 'Overview' },
-        ...(buildSet ? [{ id: 'build', label: 'Build' }] : []),
-        ...(isVehicle ? [{ id: 'colors', label: 'Colors' }] : []),
-        ...(tempo ? [{ id: 'options', label: 'Equipment' }] : []),
-        { id: 'features', label: 'Highlights' },
-        { id: 'specifications', label: 'Specifications' }
+        ...(buildStart ? [{ id: buildStart, label: 'Build Yours', covers: ['build', 'colors', 'options'] }] : []),
+        { id: 'specifications', label: 'Specifications', covers: ['features', 'specifications'] }
     ];
 
     setTimeout(initDetailTabs, 50);
@@ -4930,9 +4964,9 @@ function renderProductDetailsPage() {
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 flex items-center justify-between gap-6">
                 <span class="hidden md:block font-display text-xl text-ink whitespace-nowrap">${product.name}</span>
                 <div class="flex items-center -ml-3 md:ml-0 overflow-x-auto scrollbar-none">
-                    ${tabs.map((t, i) => `<button type="button" onclick="scrollToDetailSection('${t.id}')" data-target="${t.id}" class="detail-tab ${i === 0 ? 'detail-tab-active' : ''}">${t.label}</button>`).join('')}
+                    ${tabs.map((t, i) => `<button type="button" onclick="scrollToDetailSection('${t.id}')" data-target="${t.id}" ${t.covers ? `data-covers="${t.covers.join(' ')}"` : ''} class="detail-tab ${i === 0 ? 'detail-tab-active' : ''}">${t.label}</button>`).join('')}
                 </div>
-                <button type="button" onclick="openQuoteModal('${safeName}')" class="hidden sm:inline-flex btn btn-primary min-h-[2.5rem] px-5 text-sm flex-shrink-0">Get a quote</button>
+                <button type="button" onclick="openQuoteModal('${safeName}')" class="inline-flex btn btn-primary min-h-[2.5rem] px-4 sm:px-5 text-sm flex-shrink-0">Get a quote</button>
             </div>
         </nav>
 
@@ -4985,23 +5019,15 @@ function renderProductDetailsPage() {
                 </dl>
             ` : ''}
 
+            ${isVehicle ? '' : `
+            <!-- Carts open with the short statement and facts above (website review); parts keep their description -->
             <div class="rise home-section grid lg:grid-cols-12 gap-10 lg:gap-12">
                 <p class="lg:col-span-8 type-lg text-mute"><span id="detail-description-name" class="text-ink">${product.name}.</span> <span id="detail-description">${product.description}</span></p>
-                ${isVehicle ? `
-                    <dl class="lg:col-span-4 space-y-6 lg:pt-3">
-                        ${[{ label: 'Powertrain', value: product.powertrain }, { label: 'Battery', value: product.battery, id: 'detail-battery' }]
-                            .filter(h => isMeaningful(h.value)).map(h => `
-                            <div class="border-t border-line pt-4">
-                                <dt class="text-sm text-mute">${h.label}</dt>
-                                <dd ${h.id ? `id="${h.id}" ` : ''}class="text-lg text-ink mt-1">${h.value}</dd>
-                            </div>
-                        `).join('')}
-                    </dl>
-                ` : (product.gallery[1] ? `
+                ${product.gallery[1] ? `
                     <div class="lg:col-span-4 bg-stone aspect-square flex items-center justify-center p-8">
                         <img src="${product.gallery[1]}" alt="${product.name}, another view" loading="lazy" class="max-h-full object-contain mix-blend-multiply">
-                    </div>` : '')}
-            </div>
+                    </div>` : ''}
+            </div>`}
         </div>
 
         ${buildSet ? `<div class="border-t border-line">${renderBuildSection(product, buildSet)}</div>` : ''}
@@ -5193,12 +5219,22 @@ function renderSegmentPage() {
                 <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-line pb-6 mb-10">
                     <h2 class="type-lg text-ink">${sub.label}</h2>
                     ${sub.intro ? `<p class="measure md:text-right md:max-w-md">${sub.intro}</p>` : ''}
+                    ${sub.page ? `<a href="${routeHref('segment', sub.page)}" data-route="segment" data-slug="${sub.page}" class="link text-sm self-start md:self-auto">Compare builds</a>` : ''}
                 </div>
-                ${sub.groups.map(group => `
+                ${sub.groups.map(group => {
+                    // Carts without a photo yet are listed by name instead of showing an empty card
+                    const shown = group.items.filter(key => VEHICLE_MODELS[key].image);
+                    const onRequest = group.items.filter(key => !VEHICLE_MODELS[key].image);
+                    return `
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">
-                        ${group.items.map(key => renderSegmentModelCard(segment.id, sub.id, key)).join('')}
+                        ${shown.map(key => renderSegmentModelCard(segment.id, sub.id, key)).join('')}
                     </div>
-                `).join('')}
+                    ${onRequest.length ? `
+                        <div class="mt-10 border-t border-line pt-5 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                            <p><span class="font-semibold text-ink">Also available on request:</span> ${onRequest.map(key => `<span id="${modelAnchorId(segment.id, sub.id, key)}" class="scroll-mt-40">${VEHICLE_MODELS[key].name}</span>`).join(' · ')}</p>
+                            <button type="button" onclick="openQuoteModal('', 'Asking about: ${onRequest.map(key => VEHICLE_MODELS[key].name.replace(/'/g, "\\'")).join(', ')}')" class="link text-sm">Ask about these</button>
+                        </div>` : ''}`;
+                }).join('')}
                 ${sub.enquiry ? `<div class="mt-14">${renderEnquiryPrompt(sub.enquiry)}</div>` : ''}
             </section>
         `).join('')}
@@ -5341,6 +5377,8 @@ function renderServicePage() {
                         <button type="button" onclick="scrollToDetailSection('service-request')" class="btn btn-primary">Book a service</button>
                         <button type="button" onclick="goToHomeSection('home-branches')" class="btn btn-outline">Find a branch</button>
                     </div>
+                    <!-- Parts and Accessories lives under Service and Support (website review) -->
+                    <a href="carts/?category=Accessories" onclick="event.preventDefault(); setCategoryAndNavigate('Accessories')" class="link inline-block">Shop parts and accessories</a>
                 </div>
             </div>
         </section>
@@ -5395,7 +5433,8 @@ function renderBlogsPage() {
     const posts = [...BLOGS_DATA].sort((a, b) => new Date(b.date) - new Date(a.date));
     return `
         <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-16 lg:pt-24">
-            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end">
+            <p class="text-sm text-mute">Stories and Guides</p>
+            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mt-4">
                 <h1 class="type-xl text-ink lg:col-span-7">Notes from the fairway.</h1>
                 <p class="measure lg:col-span-5">Buying guides, maintenance tips and stories about low-speed electric vehicles.</p>
             </div>
@@ -5427,7 +5466,7 @@ function renderBlogDetailsPage() {
 
     return `
         <article class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-12 lg:pt-20">
-            <a href="${routeHref('blogs')}" data-route="blogs" class="text-sm text-ink-2 hover:text-ink">Blog</a>
+            <a href="${routeHref('blogs')}" data-route="blogs" class="text-sm text-ink-2 hover:text-ink">Stories and Guides</a>
             <header class="mt-8 max-w-4xl">
                 <p class="text-sm text-mute">${post.category} · <time datetime="${post.date}">${formatBlogDate(post.date)}</time></p>
                 <h1 class="type-xl text-ink mt-4">${post.title}</h1>
