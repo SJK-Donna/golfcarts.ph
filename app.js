@@ -27,11 +27,9 @@ const PRODUCTS_DATA = [
         description: 'Two forward-facing seats, built around the way you play. Our bestseller, made to be customized with golf accessories, comfort upgrades and premium finishes.',
         priceLabel: 'Inquire for Price',
         seating: '2 Seats (Forward Facing)',
-        range: '85 km per charge',
-        speed: '30 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
-        chargingTime: '3.5 Hours',
-        powertrain: '5.0 kW AC Motor',
+        speed: '24.1 km/h max',
+        battery: 'Six (6) 8-volt, single-point watering',
+        powertrain: '3.3 HP',
         image: 'image/Products/builds/golfer-2-golfer.jpg',
         gallery: ['image/Products/builds/golfer-2-golfer.jpg', 'image/Products/builds/golfer-2-scratch-right.jpg', 'image/Products/builds/golfer-2-pro.jpg'],
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
@@ -45,7 +43,8 @@ const PRODUCTS_DATA = [
         // One photo per build level, shown on the build cards (from the sales team's Drive folder of build photos)
         buildPhotos: { golf: 'image/Products/builds/golfer-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-scratch-right.jpg', pro: 'image/Products/builds/golfer-2-pro.jpg' },
         features: ['Two Forward-Facing Seats', 'Golf Bag Provision with Rear Bag Cover', 'Shatter-Resistant Foldable Windshield', 'Corrosion-Resistant Aluminum Frame'],
-        specs: { 'Motor Type': '5.0 kW AC Motor', 'Controller': 'Enpower 350A Controller', 'Chassis': 'Aircraft Grade Aluminum Chassis', 'Brakes': '4-Wheel Hydraulic Brake System' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'tempo-base'
     },
     {
         id: 'golfer-tempo-2-2',
@@ -61,11 +60,9 @@ const PRODUCTS_DATA = [
         description: 'Two forward-facing seats plus two rear-facing seats, for village-based golfers who also drive the family around.',
         priceLabel: 'Inquire for Price',
         seating: '4 Seats (2 Forward + 2 Rear)',
-        range: '80 km per charge',
-        speed: '30 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
-        chargingTime: '3.5 Hours',
-        powertrain: '5.0 kW AC Electric Motor',
+        speed: '24.1 km/h max',
+        battery: 'Six (6) 8-volt, single-point watering',
+        powertrain: '3.3 HP',
         image: 'image/Products/builds/golfer-2-2-golfer.jpg',
         gallery: ['image/Products/builds/golfer-2-2-golfer.jpg', 'image/Products/builds/golfer-2-2-scratch.jpg', 'image/Products/builds/golfer-2-2-pro-right.jpg'],
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
@@ -80,7 +77,8 @@ const PRODUCTS_DATA = [
         buildPhotos: { golf: 'image/Products/builds/golfer-2-2-golfer.jpg', scratch: 'image/Products/builds/golfer-2-2-scratch.jpg', pro: 'image/Products/builds/golfer-2-2-pro-right.jpg' },
         colorPhotos: { 'White': 'image/Products/Tempo 2+2 - Golf.png', 'Sangria': 'image/Products/Tempo 2+2 - Golf - Red.png' },
         features: ['Two Forward + Two Rear-Facing Seats', 'Compatible Rear Golf Bag Attachment', 'High-Impact Foldable Windshield', 'Corrosion-Resistant Aluminum Spaceframe'],
-        specs: { 'Motor Type': '5.0 kW AC Direct Drive Motor', 'Controller': 'Curtis 350A Programmable AC Controller', 'Chassis': 'Rust-Proof Lightweight Aluminum', 'Brakes': 'Rear Mechanical Drum & Auto Park Brake' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'tempo-2-2'
     },
     {
         id: 'golfer-tempo-4',
@@ -96,11 +94,9 @@ const PRODUCTS_DATA = [
         description: 'Four seats in two forward-facing rows, for golf with extra passenger comfort and an all-forward seating layout.',
         priceLabel: 'Inquire for Price',
         seating: '4 Seats (Two Forward Rows)',
-        range: '85 km per charge',
-        speed: '30 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Golfer, Scratch) or Battlite lithium (Pro)',
-        chargingTime: '3.5 Hours',
-        powertrain: '5.0 kW AC Motor',
+        speed: '24.1 km/h max',
+        battery: 'Six (6) 8-volt, single-point watering',
+        powertrain: '3.3 HP',
         image: 'image/Products/builds/golfer-4-golfer.jpg',
         gallery: ['image/Products/builds/golfer-4-golfer.jpg', 'image/Products/builds/golfer-4-scratch.jpg', 'image/Products/builds/golfer-4-pro.jpg'],
         // The header's thumbnails are the Golfer, Scratch and Pro builds: picking one shows its photo, name and description
@@ -115,7 +111,8 @@ const PRODUCTS_DATA = [
         // One photo per build level, shown on the build cards
         buildPhotos: { golf: 'image/Products/builds/golfer-4-golfer.jpg', scratch: 'image/Products/builds/golfer-4-scratch.jpg', pro: 'image/Products/builds/golfer-4-pro.jpg' },
         features: ['Four Seats in Two Forward-Facing Rows', 'Golf Bag Provision with Rear Bag Cover', 'Extended Roof Canopy', 'Corrosion-Resistant Aluminum Frame'],
-        specs: { 'Motor Type': '5.0 kW AC Motor', 'Controller': 'Curtis 350A Controller', 'Chassis': 'Aluminum Spaceframe', 'Brakes': '4-Wheel Hydraulic Brake System' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'club-car-4'
     },
 
     // ==========================================
@@ -135,11 +132,9 @@ const PRODUCTS_DATA = [
         description: 'Two seats for getting around homes, villages, estates and farms, with practical, comfort and premium builds to choose from.',
         priceLabel: 'Inquire for Price',
         seating: '2 Seats (Forward Facing)',
-        range: '80 km per charge',
-        speed: '28 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Essential, Signature) or Battlite lithium (Elite)',
-        chargingTime: '4.0 Hours',
-        powertrain: '4.0 kW AC Motor',
+        speed: '24.1 km/h max',
+        battery: 'Six (6) 8-volt, single-point watering',
+        powertrain: '3.3 HP',
         image: 'image/Products/builds/lifestyle-2-essential.jpg',
         gallery: ['image/Products/builds/lifestyle-2-essential.jpg', 'image/Products/builds/lifestyle-2-signature.jpg', 'image/Products/builds/lifestyle-2-elite.jpg'],
         // The header's thumbnails are the Essential, Signature and Elite builds: picking one shows its photo, name and description
@@ -153,7 +148,8 @@ const PRODUCTS_DATA = [
         // One photo per build level, shown on the build cards
         buildPhotos: { essential: 'image/Products/builds/lifestyle-2-essential.jpg', signature: 'image/Products/builds/lifestyle-2-signature.jpg', elite: 'image/Products/builds/lifestyle-2-elite.jpg' },
         features: ['Two Forward-Facing Seats', 'Windshield and Mirror Package', 'Defined Lighting Kit', 'Weatherproof Molded Vinyl Seats'],
-        specs: { 'Motor Type': '4.0 kW AC Brushless', 'Controller': 'Curtis Controller', 'Chassis': 'Aluminum Box Frame', 'Brakes': 'Dual Rear Drum Brakes' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'tempo-base'
     },
     {
         id: 'lifestyle-tempo-2-2',
@@ -169,16 +165,15 @@ const PRODUCTS_DATA = [
         description: 'Two forward-facing seats plus two rear-facing seats, with an optional rear flip seat that turns passenger space into cargo space.',
         priceLabel: 'Inquire for Price',
         seating: '4 Seats (2 Forward + 2 Rear)',
-        range: '88 km per charge',
-        speed: '32 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Essential, Signature) or Battlite lithium (Elite)',
-        chargingTime: '3.5 Hours',
-        powertrain: '5.0 kW AC Motor',
+        speed: '24.1 km/h max',
+        battery: 'Six (6) 8-volt, single-point watering',
+        powertrain: '3.3 HP',
         image: 'image/Products/Tempo 2+2 - Family.png',
         gallery: ['image/Products/Tempo 2+2 - Family.png', 'image/Products/Tempo 2+2 - Family - Sangria Red.png', 'image/Products/Tempo 2+2 - Explorer.png', 'image/Products/Tempo 2+2 - Lifted.png'],
         colorPhotos: { 'Green': 'image/Products/Tempo 2+2 - Family.png', 'Sangria': 'image/Products/Tempo 2+2 - Family - Sangria Red.png' },
         features: ['Two Forward + Two Rear-Facing Seats', 'Optional Rear Flip Seat for Cargo', 'Compatible Seat Belts and Grab Handles', 'Defined Lighting and Mirror Package'],
-        specs: { 'Motor Type': '5.0 kW AC Motor', 'Controller': 'Enpower 350A Controller', 'Chassis': 'Aluminum Frame Chassis', 'Brakes': '4-Wheel Hydraulic Disc Brakes' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'tempo-2-2'
     },
     {
         id: 'lifestyle-tempo-4',
@@ -194,11 +189,9 @@ const PRODUCTS_DATA = [
         description: 'Four seats in two forward-facing rows, for families and guests moving around a village, estate or farm.',
         priceLabel: 'Inquire for Price',
         seating: '4 Seats (Two Forward Rows)',
-        range: '95 km per charge',
-        speed: '32 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Essential, Signature) or Battlite lithium (Elite)',
-        chargingTime: '3.0 Hours',
-        powertrain: '5.0 kW AC High-Output Motor',
+        speed: '24.1 km/h max',
+        battery: 'Six (6) 8-volt, single-point watering',
+        powertrain: '3.3 HP',
         image: 'image/Products/builds/lifestyle-4-essential.jpg',
         gallery: ['image/Products/builds/lifestyle-4-essential.jpg', 'image/Products/builds/lifestyle-4-signature.jpg', 'image/Products/builds/lifestyle-4-elite.jpg'],
         // The header's thumbnails are the Essential, Signature and Elite builds: picking one shows its photo, name and description
@@ -212,7 +205,8 @@ const PRODUCTS_DATA = [
         // One photo per build level, shown on the build cards
         buildPhotos: { essential: 'image/Products/builds/lifestyle-4-essential.jpg', signature: 'image/Products/builds/lifestyle-4-signature.jpg', elite: 'image/Products/builds/lifestyle-4-elite.jpg' },
         features: ['Four Seats in Two Forward-Facing Rows', 'Compatible Seat Belts and Grab Handles', 'Defined Lighting and Mirror Package', 'Extended Roof Canopy'],
-        specs: { 'Motor Type': '5.0 kW High Output AC Motor', 'Controller': 'Curtis 350A Controller', 'Chassis': 'Aluminum Spaceframe', 'Brakes': '4-Wheel Hydraulic Brake System' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'club-car-4'
     },
     {
         id: 'lifestyle-tempo-4-2',
@@ -228,15 +222,14 @@ const PRODUCTS_DATA = [
         description: 'Four forward-facing seats plus a rear row, with an optional rear flip-seat arrangement for extra passengers or cargo.',
         priceLabel: 'Inquire for Price',
         seating: '6 Seats (4 Forward + 2 Rear)',
-        range: '85 km per charge',
-        speed: '32 km/h max',
-        battery: 'Trojan FLA 8V lead-acid (Essential, Signature) or Battlite lithium (Elite)',
-        chargingTime: '4.0 Hours',
-        powertrain: '6.3 kW Heavy Torque Motor',
+        speed: '24.1 km/h max',
+        battery: 'Six (6) 8-volt, single-point watering',
+        powertrain: '3.3 HP',
         image: 'image/Products/4 plus2 Lifted.png',
         gallery: ['image/Products/4 plus2 Lifted.png'],
         features: ['Four Forward + Two Rear-Facing Seats', 'Optional Rear Flip-Seat Arrangement', 'Compatible Seat Belts and Grab Handles', 'Lifted Package Available'],
-        specs: { 'Motor Type': '6.3 kW AC Heavy Duty', 'Controller': 'Curtis 400A Controller', 'Chassis': 'Heavy Duty Tubular Frame', 'Brakes': '4-Wheel Hydraulic Disc Brakes' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'club-car-4-2'
     },
 
     // ==========================================
@@ -303,15 +296,14 @@ const PRODUCTS_DATA = [
         description: 'Forward-facing passenger seating with rear cargo space for luggage transfers and property logistics.',
         priceLabel: 'Inquire for Price',
         seating: '4 Seats + Cargo Box',
-        range: '80 km per charge',
-        speed: '30 km/h max',
-        battery: '72V Industrial Lithium',
-        chargingTime: '4.0 Hours',
-        powertrain: '6.3 kW AC Motor',
+        speed: '27.3 km/h max',
+        battery: 'Eight (8) 6-volt Flooded Lead Acid',
+        powertrain: '3.7 HP',
         image: 'image/Products/Transporter 4.png',
         gallery: ['image/Products/Transporter 4.png'],
         features: ['Forward-Facing Passenger Seating', 'Rear Cargo Space for Luggage', 'Heavy Duty Tow Hitch Receiver Included', 'Waterproof Heavy Rubberized Cabin Floor'],
-        specs: { 'Motor Type': '6.3 kW AC Heavy Torque Brushless', 'Controller': 'Curtis High-Output Industrial Controller', 'Chassis': 'Hot-Dip Galvanized Reinforced Steel Frame', 'Brakes': '4-Wheel Hydraulic Disc Brakes' }
+        // Club Car spec sheet, shown in full under Specifications (SPEC_SHEETS)
+        specSheet: 'transporter-4'
     },
     {
         id: 'minibus-14',
@@ -1352,10 +1344,78 @@ function goToHomeSection(sectionId) {
     }
 }
 
-function handleHomeQuoteSubmit(e) {
+// Quote requests go to the Google Sheet's Apps Script (google-apps-script/quote-sheet.gs), which saves
+// the row and emails the customer and the owner a PDF quotation
+const QUOTE_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyY9GcWxNqOXkZHKWHINYvulNyfzr6BpUVmJIv0b-RcOSdDDu7LMBpARMWMPDw7kNftow/exec';
+
+// An image redrawn at most `width` px wide as a data URL for the PDF quotation ('' when it can't be read)
+function quoteImageData(src, width, type) {
+    return new Promise(resolve => {
+        if (!src) return resolve('');
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.min(width, img.naturalWidth);
+                canvas.height = Math.round(img.naturalHeight * canvas.width / img.naturalWidth);
+                const ctx = canvas.getContext('2d');
+                // JPEG has no transparency: a white backdrop instead of black
+                if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL(type, 0.85));
+            } catch (err) {
+                resolve('');
+            }
+        };
+        img.onerror = () => resolve('');
+        img.src = src;
+    });
+}
+
+// The cart photo for the quotation: on its model page, the photo showing (in the chosen color), else the model's photo
+function quotePhotoSrc(slug) {
+    const product = PRODUCTS_DATA.find(p => p.slug === slug);
+    if (!product) return '';
+    const shown = currentPage === 'product-details' && currentSlug === slug && document.getElementById('detail-color-img');
+    return (shown && shown.src) || product.image;
+}
+
+// Sends one quote request, with the logo and the cart photo for the PDF; resolves false when it couldn't be sent
+async function sendQuoteRequest(form, fields, slug) {
+    const button = form.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    try {
+        if (QUOTE_SHEET_URL) {
+            const [logo, photo] = await Promise.all([
+                quoteImageData('image/GCPH_logo.png', 480, 'image/png'),
+                quoteImageData(quotePhotoSrc(slug), 1000, 'image/jpeg')
+            ]);
+            await fetch(QUOTE_SHEET_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ ...fields, logo, photo }) });
+        }
+        return true;
+    } catch (err) {
+        showToast('Your request could not be sent. Please call (02) 7745-5089 or email info@golfcarts.ph.');
+        return false;
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+async function handleHomeQuoteSubmit(e) {
     e.preventDefault();
-    e.target.reset();
-    showToast("Request sent. We'll reply with your quote.");
+    const form = e.target;
+    const data = new FormData(form);
+    const model = form.querySelector('#hq-model');
+    const modelName = model ? model.options[model.selectedIndex].textContent : '';
+    const reference = 'QT-' + Math.floor(100000 + Math.random() * 900000);
+    const sent = await sendQuoteRequest(form, {
+        reference, source: 'Home form', name: data.get('name'), email: data.get('email'), phone: data.get('phone'),
+        model: modelName, quantity: data.get('quantity'), branch: data.get('branch'), notes: data.get('notes'),
+        rows: JSON.stringify([['Model', modelName]])
+    }, model && model.value);
+    if (!sent) return;
+    form.reset();
+    showToast(`Request sent. Your reference is ${reference}. Check your email for the quotation.`);
 }
 
 // Customer quotes on the About page
@@ -1790,12 +1850,10 @@ function openQuoteModal(productName = '', notes = '') {
             if (match) select.value = match.slug;
             else if ([...select.options].some(o => o.value === productName)) select.value = productName;
         }
-        // Each quote starts with a fresh accessory selection for the chosen model
-        quoteAccessories = new Set();
+        // Accessories picked on a model page go with that model's quote only
+        if (!select || select.value !== quoteAccessoriesSlug) quoteAccessories = new Set();
         // Opened from a model page: carry everything chosen there (build, packages, colors) into the request
         quoteBuild = currentPage === 'product-details' ? getBuildDetails() : null;
-        renderAccessoryChips();
-        renderAccessoryPicker();
         renderQuoteSummary();
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
@@ -1815,19 +1873,28 @@ function closeQuoteModal() {
     if (quoteModalReturnFocus && quoteModalReturnFocus.focus) quoteModalReturnFocus.focus();
 }
 
-function handleModalQuoteSubmit(e) {
+async function handleModalQuoteSubmit(e) {
     e.preventDefault();
     const refCode = 'QT-' + Math.floor(100000 + Math.random() * 900000);
     // Everything the visitor chose goes into the request alongside their own notes
     const details = document.getElementById('quote-details');
     if (details) details.value = `Reference: ${refCode}\n${getQuoteSummaryText()}`;
+    const data = new FormData(e.target);
+    const select = document.getElementById('modal-product-select');
+    const sent = await sendQuoteRequest(e.target, {
+        reference: refCode, source: 'Quote pop-up', name: data.get('name'), email: data.get('email'), phone: data.get('phone'),
+        model: select && select.selectedIndex >= 0 ? select.options[select.selectedIndex].textContent : '',
+        notes: data.get('notes'), rows: JSON.stringify(getQuoteSummaryRows())
+    }, select && select.value);
+    if (!sent) return;
     closeQuoteModal();
     const count = quoteAccessories.size;
     const accessoryNote = count ? ` with ${count} accessor${count === 1 ? 'y' : 'ies'}` : '';
-    showToast(`Request sent${accessoryNote}. Your reference is ${refCode}.`);
+    showToast(`Request sent${accessoryNote}. Your reference is ${refCode}. Check your email for the quotation.`);
     e.target.reset();
     quoteAccessories = new Set();
     quoteBuild = null;
+    refreshDetailAccessories();
 }
 
 // --- QUOTE SUMMARY: what the visitor chose, shown in the quote form and sent with the request ---
@@ -1839,8 +1906,9 @@ function getBuildDetails() {
     if (!product) return null;
     const buildSet = getProductBuildSet(product);
     const level = buildSet && (buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0]);
-    const rows = [['Model', `${product.name} (${categoryLabel(product.category)})`]];
-    if (level) rows.push(['Build', `${buildTitle(product, level)}${level.fullName && level.fullName !== level.name ? ` (${level.fullName})` : ''}`]);
+    // A Tempo is named by its seats ("2+2 Seater Club Car"), so the build is just its level ("Scratch")
+    const rows = [['Model', isTempoVersion(product) ? `${product.layout} Seater Club Car` : `${product.name} (${categoryLabel(product.category)})`]];
+    if (level) rows.push(['Build', level.name]);
     if (detailBodyColors(product).length) rows.push(['Body color', detailBuild.body || 'Standard']);
     if (getDetailSeatGroups(product).length) rows.push(['Seat', detailBuild.seat || 'Standard']);
     if (getDetailCanopyOptions(product).length) rows.push(['Canopy', detailBuild.canopy || 'Standard']);
@@ -3277,15 +3345,15 @@ function getDetailCanopyOptions(product) {
 // (e.g. "Villager 6 Rain Enclosure"); Precedent-only items are omitted. `product` links a catalog photo.
 const ACCESSORY_CATALOG = [
     { group: 'Windshield', items: [
-        { id: 'ws-clear', slot: 'windshield', includedOn: ['tempo'], name: 'Clear Hinged Windshield', sku: 'SJK-0066', fits: ['tempo'] },
-        { id: 'ws-tinted', slot: 'windshield', name: 'Tinted Hinged Windshield', sku: 'SJK-1854', fits: ['tempo'] },
+        { id: 'ws-clear', slot: 'windshield', includedOn: ['tempo'], name: 'Clear Hinged Windshield', sku: 'SJK-0066', fits: ['tempo'], image: 'image/Options/windshield-clear.jpg' },
+        { id: 'ws-tinted', slot: 'windshield', name: 'Tinted Hinged Windshield', sku: 'SJK-1854', fits: ['tempo'], image: 'image/Accessories/Tinted Windshield png.png' },
         { id: 'ws-premium-clear', slot: 'windshield', name: 'Premium Clear Hinged Windshield', sku: 'SJK-1042', fits: ['onward'] },
         { id: 'ws-premium-tinted', slot: 'windshield', name: 'Premium Tinted Hinged Windshield', sku: 'SJK-1043', fits: ['onward'] }
     ] },
     { group: 'Lighting', items: [
         { id: 'lt-cc-tempo', slot: 'lighting', builder: 'lighting', name: 'CC Tempo Lights (Head Lights)', sku: 'SJK-0249', fits: ['tempo'], product: 'acc-deluxe-lights' },
-        { id: 'lt-gc-tempo', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Light Kit', sku: 'SJK-1921', fits: ['tempo'] },
-        { id: 'lt-gc-tempo-full', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit', sku: 'SJK-1573', fits: ['tempo'] },
+        { id: 'lt-gc-tempo', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Light Kit', sku: 'SJK-1921', fits: ['tempo'], image: 'image/Options/light-gc-tempo.jpg' },
+        { id: 'lt-gc-tempo-full', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit', sku: 'SJK-1573', fits: ['tempo'], image: 'image/Options/light-gc-tempo-full.jpg' },
         { id: 'lt-gc-tempo-rgb', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit RGB', sku: 'SJK-1548', fits: ['tempo'] }
     ] },
     { group: 'Golf Accessories', items: [
@@ -3293,7 +3361,7 @@ const ACCESSORY_CATALOG = [
         { id: 'golf-washer', builder: 'ballWasher', name: 'Ball Washer', sku: 'SJK-0248', fits: ['golf'], product: 'acc-ball-cleaner' },
         { id: 'golf-cooler', slot: 'cooler', builder: 'cooler', name: 'Caddie Cooler', sku: 'SJK-0257', fits: ['golf'], product: 'acc-cooler' },
         { id: 'golf-cooler-premium', slot: 'cooler', builder: 'cooler', name: 'Premium Caddie Cooler', sku: 'SJK-1363', fits: ['golf'] },
-        { id: 'golf-caddie', slot: 'caddie', name: 'Caddie Carrier', sku: 'SJK-1374', fits: ['golf'] },
+        { id: 'golf-caddie', slot: 'caddie', name: 'Caddie Carrier', sku: 'SJK-1374', fits: ['golf'], image: 'image/Options/caddy-stand.jpg' },
         { id: 'golf-bag-mag-black', slot: 'bagCover', builder: 'bagCover', name: 'Premium Magnetic Bag Cover (Black)', sku: 'SJK-0344', fits: ['golf'], product: 'acc-bag-cover' },
         { id: 'golf-bag-mag-beige', slot: 'bagCover', builder: 'bagCover', name: 'Premium Magnetic Bag Cover (Beige)', sku: 'SJK-0347', fits: ['golf'], product: 'acc-bag-cover' },
         { id: 'golf-bag-black', slot: 'bagCover', builder: 'bagCover', name: 'Bag Cover (Black)', sku: 'SJK-0136', fits: ['golf'], product: 'acc-bag-cover' },
@@ -3301,10 +3369,10 @@ const ACCESSORY_CATALOG = [
         { id: 'golf-bag-white', slot: 'bagCover', builder: 'bagCover', name: 'Bag Cover (White)', sku: 'SJK-1040', fits: ['golf'], product: 'acc-bag-cover' }
     ] },
     { group: 'Mirrors', items: [
-        { id: 'mir-side', slot: 'sideMirrors', builder: 'mirrors', name: 'Side Mirrors', sku: 'SJK-1146', fits: ['tempo', 'onward', 'villager', 'utility'] },
+        { id: 'mir-side', slot: 'sideMirrors', builder: 'mirrors', name: 'Side Mirrors', sku: 'SJK-1146', fits: ['tempo', 'onward', 'villager', 'utility'], image: 'image/Options/mirror-side.jpg' },
         { id: 'mir-side-blinker', slot: 'sideMirrors', builder: 'mirrors', name: 'Side Mirrors with Blinkers', sku: 'SJK-1545', fits: ['tempo', 'onward', 'villager', 'utility'], product: 'acc-side-mirror' },
         { id: 'mir-5-panel', slot: 'rearMirror', builder: 'mirrors', name: '5 Panel Rear Mirror', sku: 'SJK-0154', fits: ['tempo', 'onward', 'villager'], product: 'acc-5-panel-mirror' },
-        { id: 'mir-convex', slot: 'rearMirror', builder: 'mirrors', name: 'Convex Rear Mirror', sku: 'SJK-1461', fits: ['tempo', 'onward', 'villager', 'utility'] }
+        { id: 'mir-convex', slot: 'rearMirror', builder: 'mirrors', name: 'Convex Rear Mirror', sku: 'SJK-1461', fits: ['tempo', 'onward', 'villager', 'utility'], image: 'image/Options/mirror-convex-short.jpg' }
     ] },
     { group: 'Storage', items: [
         { id: 'sto-overhead', builder: 'storage', name: 'Overhead Storage Console', sku: 'SJK-0880', fits: ['tempo', 'onward'] },
@@ -3342,29 +3410,31 @@ const ACCESSORY_CATALOG = [
     ] },
     { group: 'Electronics', items: [
         { id: 'el-cc-soundbar', slot: 'audio', builder: 'electronics', name: 'Club Car Premium Sound Bar', sku: 'SJK-0787', fits: ['tempo', 'onward', 'villager'], product: 'acc-premium-speaker' },
-        { id: 'el-gc-soundbar', slot: 'audio', builder: 'electronics', name: 'GC Sound Bar 27" RGB', sku: 'SJK-1564', fits: ['tempo', 'onward', 'villager'] },
-        { id: 'el-wireless', builder: 'charging', name: 'Wireless Charging', sku: 'SJK-1510', fits: ['tempo', 'onward'] },
+        { id: 'el-gc-soundbar', slot: 'audio', builder: 'electronics', name: 'GC Sound Bar 27" RGB', sku: 'SJK-1564', fits: ['tempo', 'onward', 'villager'], image: 'image/Options/audio-gc-soundbar-27.jpg' },
+        { id: 'el-wireless', builder: 'charging', name: 'Wireless Charging', sku: 'SJK-1510', fits: ['tempo', 'onward'], image: 'image/Options/charge-wireless.jpg' },
         { id: 'el-usb-premium', slot: 'usb', builder: 'charging', name: 'Premium USB-C Charging Port', sku: 'SJK-1178', fits: ['tempo', 'onward', 'villager', 'utility'] },
-        { id: 'el-usb-gc', slot: 'usb', builder: 'charging', name: 'GC USB-C Charging Port QC3.0 with Volt Meter', fits: ['tempo', 'onward', 'villager', 'utility'] }
+        { id: 'el-usb-gc', slot: 'usb', builder: 'charging', name: 'GC USB-C Charging Port QC3.0 with Volt Meter', fits: ['tempo', 'onward', 'villager', 'utility'], image: 'image/Options/charge-usb-c-voltmeter.jpg' }
     ] },
     { group: 'Driver Accessories', items: [
-        { id: 'drv-wheel', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel', sku: 'SJK-1355', fits: ['tempo', 'onward'] },
-        { id: 'drv-wheel-scorecard', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel with Scorecard', sku: 'SJK-1354', fits: ['golf'] },
-        { id: 'drv-floormat', builder: 'floorMat', name: 'GC Floor Mat', sku: 'SJK-1375', fits: ['tempo', 'onward', 'villager'] }
+        { id: 'drv-wheel', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel', sku: 'SJK-1355', fits: ['tempo', 'onward'], image: 'image/Options/steering-premium.jpg' },
+        { id: 'drv-wheel-scorecard', slot: 'steering', builder: 'steering', name: 'Premium Steering Wheel with Scorecard', sku: 'SJK-1354', fits: ['golf'], image: 'image/Options/steering-scorecard.jpg' },
+        { id: 'drv-floormat', builder: 'floorMat', name: 'GC Floor Mat', sku: 'SJK-1375', fits: ['tempo', 'onward', 'villager'], image: 'image/Options/floor-mat-gc.jpg' }
     ] },
     { group: 'Exterior', items: [
-        { id: 'ext-fender-3', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 3"', sku: 'SJK-1542', fits: ['tempo'] },
+        { id: 'ext-fender-3', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 3"', sku: 'SJK-1542', fits: ['tempo'], image: 'image/Options/fender-tempo-3.jpg' },
         { id: 'ext-fender-15', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 1.5"', fits: ['tempo'] },
         { id: 'ext-fender-onward', slot: 'fenders', name: 'Onward Fenders', sku: 'SJK-1885', fits: ['onward'] },
         { id: 'ext-brush-guard', builder: 'lift', name: 'Brush Guard', sku: 'SJK-0119', fits: ['tempo', 'onward', 'utility'], product: 'acc-brush-guard' }
     ] },
     { group: 'Lifted Accessories', items: [
         { id: 'lift-4', slot: 'lift', builder: 'lift', name: '4" Lift Kit', sku: 'SJK-0330', fits: ['tempo'] },
-        { id: 'lift-nerf', builder: 'lift', needsLift: true, name: 'Nerf Bar', sku: 'SJK-0377', fits: ['lifted'] }
+        { id: 'lift-nerf', builder: 'lift', needsLift: true, name: 'Nerf Bar', sku: 'SJK-0377', fits: ['lifted'], image: 'image/Options/nerf-bar.jpg' }
     ] }
 ];
 
 let quoteAccessories = new Set();
+// The model page the accessories were picked on
+let quoteAccessoriesSlug = null;
 
 function findAccessory(id) {
     for (const group of ACCESSORY_CATALOG) {
@@ -3380,13 +3450,12 @@ function quoteBuildFor(productName) {
     return quoteBuild && product && quoteBuild.slug === product.slug ? quoteBuild : null;
 }
 
-// Accessory groups a cart can still take, looked up by the product name shown in the quote form: those that
+// Accessory groups a cart can still take, looked up by product name (and the build chosen for it): those that
 // fit the model, minus what it already comes with, what its build already decides, and lift parts for a cart
 // that isn't lifted (by its build, or by a lift kit picked here)
-function getCompatibleAccessoryGroups(productName) {
+function getCompatibleAccessoryGroups(productName, build = quoteBuildFor(productName)) {
     const product = findProductRef(productName);
     const tags = (product && product.accessoryTags) || [];
-    const build = quoteBuildFor(productName);
     const covered = build ? build.covered : [];
     const lifted = tags.includes('lifted') || (build && build.lifted) || [...quoteAccessories].some(id => (findAccessory(id) || {}).slot === 'lift');
     return ACCESSORY_CATALOG
@@ -3398,25 +3467,33 @@ function getCompatibleAccessoryGroups(productName) {
         .filter(g => g.items.length);
 }
 
+// The model page's accessories: what fits the model and isn't already decided in its Equipment and upgrades
+function detailAccessoryGroups() {
+    const product = currentDetailProduct();
+    return product ? getCompatibleAccessoryGroups(product.slug, getBuildDetails()) : [];
+}
+
+// The accessory list under "More accessories" (Tempo) or "Add accessories" (other models) on the model page
 function renderAccessoryPicker() {
-    const picker = document.getElementById('modal-accessory-picker');
-    const select = document.getElementById('modal-product-select');
-    if (!picker || !select) return;
-    const groups = getCompatibleAccessoryGroups(select.value);
+    const picker = document.getElementById('detail-accessories');
+    if (!picker) return;
+    const groups = detailAccessoryGroups();
     // A group whose items are all one kind takes one; a group with a few kinds (side and rear mirrors) one of each
     const onlyOne = g => g.items.length > 1 && g.items.every(i => i.slot && i.slot === g.items[0].slot);
     const oneEach = g => !onlyOne(g) && g.items.some(i => i.slot && g.items.filter(j => j.slot === i.slot).length > 1);
+    const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.accId : null;
 
     picker.innerHTML = (groups.length ? groups.map(g => `
-        <fieldset class="space-y-2">
-            <legend class="text-sm text-ink-2 mb-2">${g.group}${onlyOne(g) ? ' <span class="text-mute">(choose one)</span>' : oneEach(g) ? ' <span class="text-mute">(one of each kind)</span>' : ''}</legend>
+        <fieldset>
+            <legend class="text-sm text-ink-2 mb-3">${g.group}${onlyOne(g) ? ' <span class="text-mute">(choose one)</span>' : oneEach(g) ? ' <span class="text-mute">(one of each kind)</span>' : ''}</legend>
+            <div class="grid gap-2 ${picker.dataset.cols === '2' ? 'sm:grid-cols-2' : ''}">
             ${g.items.map(item => {
-                const photo = item.product && (PRODUCTS_DATA.find(p => p.slug === item.product) || {}).image;
+                const photo = item.image || (item.product && (PRODUCTS_DATA.find(p => p.slug === item.product) || {}).image);
                 return `
-                    <label class="flex items-center gap-3 p-2.5 bg-paper border border-line hover:border-ink-2 cursor-pointer">
-                        <input type="checkbox" ${quoteAccessories.has(item.id) ? 'checked' : ''} onchange="toggleQuoteAccessory('${item.id}')" class="w-4 h-4 accent-[#151714] flex-shrink-0">
-                        <span class="w-10 h-10 bg-stone flex items-center justify-center overflow-hidden flex-shrink-0">
-                            ${photo ? `<img src="${photo}" alt="" loading="lazy" class="max-w-full max-h-full object-contain">` : ''}
+                    <label class="flex items-center gap-3 p-2.5 bg-paper border ${quoteAccessories.has(item.id) ? 'border-ink' : 'border-line'} hover:border-ink-2 cursor-pointer">
+                        <input type="checkbox" data-acc-id="${item.id}" ${quoteAccessories.has(item.id) ? 'checked' : ''} onchange="toggleQuoteAccessory('${item.id}')" class="w-4 h-4 accent-[#151714] flex-shrink-0">
+                        <span class="w-14 h-14 bg-stone flex items-center justify-center overflow-hidden flex-shrink-0">
+                            ${photo ? `<img src="${photo}" alt="" loading="lazy" class="max-w-full max-h-full object-contain mix-blend-multiply">` : ''}
                         </span>
                         <span class="flex-1 min-w-0 text-sm">
                             <span class="block text-ink">${item.name}</span>
@@ -3424,25 +3501,25 @@ function renderAccessoryPicker() {
                         </span>
                     </label>`;
             }).join('')}
+            </div>
         </fieldset>
-    `).join('') + '<p class="text-sm text-ink-2">We confirm fitment before quoting.</p>'
-        : '<p class="text-sm text-ink-2">No more accessories to add for this build. Tell us anything else you need in the notes.</p>');
+    `).join('') + '<p class="text-sm text-ink-2">Accessories are paid add-ons. We price them in your quote and confirm fitment.</p>'
+        : '<p class="text-sm text-ink-2">No more accessories to add for this build. Tell us anything else you need in the quote notes.</p>');
+    if (focused) {
+        const again = picker.querySelector(`[data-acc-id="${focused}"]`);
+        if (again) again.focus();
+    }
 }
 
-function renderAccessoryChips() {
-    const chips = document.getElementById('modal-accessory-chips');
-    const toggle = document.getElementById('accessory-toggle');
-    if (chips) {
-        chips.innerHTML = [...quoteAccessories].map(id => {
-            const item = findAccessory(id);
-            return item ? `
-                <span class="inline-flex items-center gap-1 pl-3 pr-1 py-1 bg-paper border border-ink text-sm text-ink rounded-[2px]">
-                    ${item.name}
-                    <button type="button" onclick="toggleQuoteAccessory('${id}')" aria-label="Remove ${item.name}" class="w-6 h-6 leading-none hover:bg-stone">&times;</button>
-                </span>` : '';
-        }).join('');
-    }
-    if (toggle) toggle.textContent = quoteAccessories.size ? `${quoteAccessories.size} selected` : '';
+// After a build or accessory change: drops picks that no longer fit (the build now decides them, or the lift
+// kit they need was removed) and redraws the button's count and the open list
+function refreshDetailAccessories() {
+    const fitting = new Set(detailAccessoryGroups().flatMap(g => g.items.map(i => i.id)));
+    quoteAccessories = new Set([...quoteAccessories].filter(id => fitting.has(id)));
+    const count = document.getElementById('detail-accessory-count');
+    if (count) count.textContent = `(${quoteAccessories.size ? `${quoteAccessories.size} of ${fitting.size} selected` : fitting.size})`;
+    const picker = document.getElementById('detail-accessories');
+    if (picker && !picker.hidden) renderAccessoryPicker();
 }
 
 function toggleQuoteAccessory(id) {
@@ -3452,44 +3529,23 @@ function toggleQuoteAccessory(id) {
         if (item && item.slot) quoteAccessories.forEach(other => { if ((findAccessory(other) || {}).slot === item.slot) quoteAccessories.delete(other); });
         quoteAccessories.add(id);
     }
-    // Drops picks that no longer fit (fenders and the nerf bar once the lift kit is removed)
-    const select = document.getElementById('modal-product-select');
-    const fitting = new Set(getCompatibleAccessoryGroups(select ? select.value : '').flatMap(g => g.items.map(i => i.id)));
-    quoteAccessories = new Set([...quoteAccessories].filter(x => fitting.has(x)));
-    renderAccessoryChips();
-    renderQuoteSummary();
-    const picker = document.getElementById('modal-accessory-picker');
-    if (picker && !picker.classList.contains('hidden')) renderAccessoryPicker();
+    refreshDetailAccessories();
 }
 
-function toggleAccessoryPicker(forceOpen = null) {
-    const picker = document.getElementById('modal-accessory-picker');
+// Opens or closes the model page's accessory list
+function toggleDetailAccessories(button) {
+    const picker = document.getElementById('detail-accessories');
     if (!picker) return;
-    const open = forceOpen === null ? picker.classList.contains('hidden') : forceOpen;
-    picker.classList.toggle('hidden', !open);
-    if (open) renderAccessoryPicker();
+    picker.hidden = !picker.hidden;
+    button.setAttribute('aria-expanded', String(!picker.hidden));
+    if (!picker.hidden) renderAccessoryPicker();
 }
 
-// Drops selections that don't fit the newly selected model
+// Another model chosen in the quote form: the accessories picked for this page's model don't go with it
 function onQuoteModelChange() {
     const select = document.getElementById('modal-product-select');
-    const fitting = new Set(getCompatibleAccessoryGroups(select ? select.value : '').flatMap(g => g.items.map(i => i.id)));
-    quoteAccessories = new Set([...quoteAccessories].filter(id => fitting.has(id)));
-    renderAccessoryChips();
+    if (!select || select.value !== quoteAccessoriesSlug) quoteAccessories = new Set();
     renderQuoteSummary();
-    const picker = document.getElementById('modal-accessory-picker');
-    if (picker && !picker.classList.contains('hidden')) renderAccessoryPicker();
-}
-
-function openQuoteWithAccessories(productName, notes = '') {
-    openQuoteModal(productName, notes);
-    toggleAccessoryPicker(true);
-}
-
-// Vehicle page: opens the quote with the accessory list, carrying over the selected colors
-function addAccessoriesFromDetail() {
-    const product = PRODUCTS_DATA.find(p => p.slug === currentSlug);
-    if (product) openQuoteWithAccessories(product.slug);
 }
 
 // Swatch colors for every seat option, measured from the seat photos in image/Seats (the vinyl's main
@@ -3615,7 +3671,10 @@ let livePreviewAvailable = location.protocol !== 'file:';
 // Pro); on other models, the model's studio photo (the same engine as the homepage preview)
 function detailPreviewKey(product) {
     const key = `${product.slug}:${detailBuild.level}`;
-    return hasLiveColorPreview(key) ? key : product.slug;
+    if (!hasLiveColorPreview(key)) return product.slug;
+    // A one-color seat on a build photographed with a striped seat shows on its plain-seat photo, when it has one
+    const plain = COLOR_PREVIEW[key].plainSeatPhoto;
+    return plain && detailBuild.seat && !getSeatPattern(detailBuild.seat) ? plain : key;
 }
 
 function updateDetailPreview() {
@@ -3624,8 +3683,9 @@ function updateDetailPreview() {
     const key = detailPreviewKey(product);
     if (!hasLiveColorPreview(key)) return;
     const body = getProductBodyColors(product).find(c => c.name === detailBuild.body);
-    // On a build photo, parts still in the photo's own colors stay exactly as photographed
-    const look = (key !== product.slug && product.buildLooks && product.buildLooks[detailBuild.level]) || {};
+    // On a build photo, parts still in the photo's own colors stay exactly as photographed (a stand-in photo
+    // brings its own colors)
+    const look = (key !== product.slug && (COLOR_PREVIEW[key].look || (product.buildLooks && product.buildLooks[detailBuild.level]))) || {};
     const keep = part => key !== product.slug && (!detailBuild[part] || detailBuild[part] === look[part]);
     const token = ++detailPreviewToken;
     renderCartPreview(key, {
@@ -3694,11 +3754,61 @@ function isMeaningful(value) {
 }
 
 // Groups the flat product fields into BYD-style specification tables
+// Club Car spec sheets from the sales team, copied as written (a model's specSheet names its sheet; the Golfer
+// and Lifestyle versions of a cart share one)
+const SPEC_POWER_TEMPO = [['Engine', 'Battery Powered'], ['Horsepower', '3.3 HP'], ['Battery', 'Six (6) 8-volt, single-point watering'], ['Charger', '48 VDC, 13.5-amp DC high frequency'], ['Speed Range', 'Varies; 15 mph max. (24.1 kph)']];
+const SPEC_BRAKES_TEMPO = [['Brakes', 'Self-Adjusting Rear Wheel Mechanical drum'], ['Park Brake', 'Foot Operated, Multi Lock']];
+const SPEC_SHEETS = {
+    'tempo-base': [
+        { title: 'Power', rows: SPEC_POWER_TEMPO },
+        { title: 'Steering', rows: [['Steering', 'Self-adjusting rack and pinion'], ['Suspension', 'Independent Leaf Spring with Hydraulics'], ['Turn Radius', '2,641 mm'], ['Clearance', '114.3 mm']] },
+        { title: 'Brakes', rows: SPEC_BRAKES_TEMPO },
+        { title: 'Body and Tires', rows: [['Body Finish', 'Molded-in-Color'], ['Tires', 'Kenda Hole N-1 18x8.5-8']] },
+        { title: 'Dimensions & Weights', rows: [['Overall Length', '2320 mm'], ['Overall Height', '1740 mm'], ['Overall Width', '1290.3 mm'], ['Wheelbase', '1740 mm'], ['Curb Weight', '410 kg']] }
+    ],
+    'tempo-2-2': [
+        { title: 'Power', rows: SPEC_POWER_TEMPO },
+        { title: 'Steering', rows: [['Steering', 'Self-adjusting rack and pinion'], ['Suspension', 'Independent Leaf Spring with Hydraulics'], ['Turn Radius', '2,641 mm'], ['Clearance', '114.3 mm']] },
+        { title: 'Brakes', rows: SPEC_BRAKES_TEMPO },
+        { title: 'Body and Tires', rows: [['Body Finish', 'Molded-in-Color'], ['Tires', 'Kenda Hole N-1 18x8.5-8']] },
+        { title: 'Dimensions & Weights', rows: [['Overall Length', '2568 mm'], ['Overall Height', '1265 mm'], ['Overall Width', '1290.3 mm'], ['Wheelbase', '1709.4 mm'], ['Curb Weight', '410 kg']] }
+    ],
+    'club-car-4': [
+        { title: 'Power', rows: SPEC_POWER_TEMPO },
+        { title: 'Steering', rows: [['Steering', 'Self-adjusting rack and pinion'], ['Suspension', 'Independent Leaf Spring with Hydraulics'], ['Turn Radius', '5303.5 mm'], ['Clearance', '114.3 mm']] },
+        { title: 'Brakes', rows: SPEC_BRAKES_TEMPO },
+        { title: 'Body and Tires', rows: [['Body Finish', 'Molded-in-Color'], ['Tires', 'Kenda Pro Tour 205/50-10']] },
+        { title: 'Dimensions & Weights', rows: [['Overall Length', '3658 mm'], ['Overall Height', '1753 mm'], ['Overall Width', '1270 mm'], ['Wheelbase', '2565.4 mm'], ['Curb Weight', '485.3 kg']] }
+    ],
+    'club-car-4-2': [
+        { title: 'Power', rows: SPEC_POWER_TEMPO },
+        { title: 'Steering', rows: [['Steering', 'Self-adjusting rack and pinion'], ['Suspension', 'Independent Leaf Spring with Hydraulics'], ['Turn Radius', '5303.5 mm'], ['Clearance', '114.3 mm']] },
+        { title: 'Brakes', rows: SPEC_BRAKES_TEMPO },
+        { title: 'Body and Tires', rows: [['Body Finish', 'Molded-in-Color'], ['Tires', 'Kenda Hole N-1 18x8.5-8']] },
+        { title: 'Dimensions & Weights', rows: [['Overall Length', '3658 mm'], ['Overall Height', '1753 mm'], ['Overall Width', '1270 mm'], ['Wheelbase', '2565.4 mm'], ['Curb Weight', '533.4 kg']] }
+    ],
+    // The sheet leaves Tires blank
+    'transporter-4': [
+        { title: 'Power', rows: [['Engine', '48 VDC'], ['Horsepower', '3.7 HP'], ['Battery', 'Eight (8) 6-volt Flooded Lead Acid'], ['Charger', 'DELTAQ Quip (1kw high frequency)'], ['Speed Range', 'Varies; 17 mph max. (27.3 kph)']] },
+        { title: 'Steering', rows: [['Steering', 'Self-adjusting rack and pinion'], ['Suspension', 'Independent Leaf Spring with Hydraulics'], ['Turn Radius', '5303.5 mm'], ['Clearance', '142mm']] },
+        { title: 'Brakes', rows: [['Brakes', '4 Wheel Mechanical drum'], ['Park Brake', 'Foot Operated, Multi Lock']] },
+        { title: 'Body and Tires', rows: [['Body Finish', 'Armorflex']] },
+        { title: 'Dimensions & Weights', rows: [['Overall Length', '3561 mm'], ['Overall Height', '1196 mm'], ['Overall Width', '1270 mm'], ['Wheelbase', '2517.14 mm'], ['Curb Weight', '680 kg']] }
+    ]
+};
+
+// One value from a model's spec sheet ('Horsepower', 'Curb Weight'), or undefined
+function specSheetValue(product, label) {
+    const row = (SPEC_SHEETS[product.specSheet] || []).flatMap(g => g.rows).find(([k]) => k === label);
+    return row && row[1];
+}
+
 function getDetailSpecGroups(product) {
     // Accessories reuse vehicle field names for unrelated data, so only their own spec table applies
     if (product.category === 'Accessories') {
         return [{ title: 'Specifications', rows: Object.entries(product.specs || {}) }];
     }
+    if (SPEC_SHEETS[product.specSheet]) return [...SPEC_SHEETS[product.specSheet], { title: 'Capacity', rows: [['Seating', product.seating]] }];
     const groups = [
         { title: 'Performance', rows: [['Range', product.range], ['Top Speed', product.speed], ['Powertrain', product.powertrain]] },
         { title: 'Battery & Charging', rows: [['Battery', product.battery], ['Charging Time', product.chargingTime]] },
@@ -3829,6 +3939,7 @@ function updateBuildSummaryLine() {
     const line = document.getElementById('build-summary-line');
     if (line) line.textContent = getBuildSummaryText();
     updateBuildPanel();
+    refreshDetailAccessories();
 }
 
 // The "Your build" side panel beside Equipment and upgrades (Tempo builds): the build, its colors and every
@@ -4144,6 +4255,9 @@ const OPTION_PHOTOS = {
     // Lighting
     'GC Apex Tempo LED Headlights & Tail Lights': 'light-gc-apex',
     'Club Car Tempo Deluxe Light Kit': 'light-cc-deluxe',
+    'GC Tempo LED Headlights': 'light-gc-tempo',
+    'GC Tempo LED Headlights & Tail Lights': 'light-gc-tempo-full',
+    floorMat: 'floor-mat-gc',
     // Wheels and tires
     '8" steel rims with cover': 'wheel-8-steel',
     '12" Triton Machined Black, 215/35-12 tires': 'wheel-12-triton-215',
@@ -4640,15 +4754,26 @@ function renderProductDetailsPage() {
     setTimeout(updateBuildSummaryLine, 0);
     const specGroups = getDetailSpecGroups(product);
     const related = PRODUCTS_DATA.filter(p => p.category === product.category && p.slug !== product.slug).slice(0, 3);
-    const accessoryCount = getCompatibleAccessoryGroups(product.slug).reduce((n, g) => n + g.items.length, 0);
+    // Accessories picked on another model's page don't carry over
+    if (quoteAccessoriesSlug !== product.slug) {
+        quoteAccessories = new Set();
+        quoteAccessoriesSlug = product.slug;
+    }
+    const accessoryCount = getCompatibleAccessoryGroups(product.slug, getBuildDetails()).reduce((n, g) => n + g.items.length, 0);
 
     // The four figures buyers compare first
-    const stats = [
+    // (from the spec sheet when the model has one)
+    const stats = (product.specSheet ? [
+        { label: 'Seating', value: product.seating },
+        { label: 'Top speed', value: product.speed },
+        { label: 'Horsepower', value: specSheetValue(product, 'Horsepower') },
+        { label: 'Curb weight', value: specSheetValue(product, 'Curb Weight') }
+    ] : [
         { label: 'Seating', value: product.seating },
         { label: 'Range', value: product.range },
         { label: 'Top speed', value: product.speed },
         { label: 'Charging time', value: product.chargingTime }
-    ].filter(s => isVehicle && isMeaningful(s.value)).map(s => ({ ...s, ...splitStatValue(s.value) }));
+    ]).filter(s => isVehicle && isMeaningful(s.value)).map(s => ({ ...s, ...splitStatValue(s.value) }));
 
     const tabs = [
         { id: 'overview', label: 'Overview' },
@@ -4767,8 +4892,9 @@ function renderProductDetailsPage() {
                         <div class="flex flex-wrap gap-3">
                             ${tempo ? `<button type="button" onclick="scrollToDetailSection('options')" class="btn btn-primary">Choose equipment</button>` : ''}
                             <button type="button" id="detail-color-quote" onclick="requestQuoteInColor()" class="btn ${tempo ? 'btn-outline' : 'btn-primary'}">${bodyColors.length || canopyOptions.length ? 'Get a quote for this build' : 'Get a quote'}</button>
-                            ${accessoryCount && !tempo ? `<button type="button" onclick="addAccessoriesFromDetail()" class="btn btn-outline">Add accessories <span class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
+                            ${accessoryCount && !tempo ? `<button type="button" onclick="toggleDetailAccessories(this)" aria-expanded="false" aria-controls="detail-accessories" class="btn btn-outline">Add accessories <span id="detail-accessory-count" class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
                         </div>
+                        ${accessoryCount && !tempo ? '<div id="detail-accessories" class="space-y-8" hidden></div>' : ''}
                     </div>
                 </div>
             </div>
@@ -4791,8 +4917,9 @@ function renderProductDetailsPage() {
                     <div id="detail-options">${renderTempoOptions(product)}</div>
                     <div class="mt-12 flex flex-wrap gap-3">
                         <button type="button" onclick="requestQuoteInColor()" class="btn btn-primary">Get a quote for this build</button>
-                        ${accessoryCount ? `<button type="button" onclick="addAccessoriesFromDetail()" class="btn btn-outline">More accessories <span class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
+                        ${accessoryCount ? `<button type="button" onclick="toggleDetailAccessories(this)" aria-expanded="false" aria-controls="detail-accessories" class="btn btn-outline">More accessories <span id="detail-accessory-count" class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
                     </div>
+                    ${accessoryCount ? '<div id="detail-accessories" data-cols="2" class="mt-8 space-y-8" hidden></div>' : ''}
                 </div>
             </div>
         </section>

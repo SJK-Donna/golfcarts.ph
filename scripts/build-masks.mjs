@@ -125,13 +125,42 @@ const MASKS = {
             [[390, 168], [450, 150], [600, 120], [780, 105], [790, 128], [720, 150], [600, 170], [400, 178]]
         ] }
     },
+    // The Lifestyle 2 Essential photo also stands in for Golfer 2 Scratch with a one-color seat (recolor.js): the
+    // same cart from the same side, with a plain seat to repaint
+    'lifestyle-2-essential': {
+        // White paint on a white backdrop: the outlines follow the cart's edge (solid). The headlights' silver lenses
+        // and the badge are cut out along the outer edge of their black frames, so the paint runs right up to them.
+        // The cowl stops at its dark top edge (y 345-350): the light band above it is the windshield's lower edge.
+        body: { refs: ['#e4e4e2', '#f1f1ef', '#e1dedb', '#d9d7d3', '#cecbc6', '#a7a29e'], kL: 2.5, tol: 9, minL: 55, solid: true,
+            exclude: [
+                [[474, 408], [483, 405], [505, 407], [527, 415], [539, 423], [543, 433], [546, 447], [543, 452], [535, 453], [515, 449], [490, 445], [479, 439], [475, 429], [472, 417]],
+                [[567, 428], [606, 426], [608, 444], [569, 446]],
+                [[620, 415], [628, 400], [636, 397], [640, 402], [641, 432], [634, 440], [625, 446], [620, 440]]
+            ],
+            polys: [
+            // Front cowl, from under the windshield down to the black bumper, round its right corner
+            [[395, 352], [430, 342], [560, 340], [605, 352], [638, 376], [648, 420], [648, 442], [612, 460], [560, 468], [480, 458], [420, 444], [392, 424]],
+            // Side panel and rear corner, under the seat, up to the cushion's bottom edge: the panel's lit top lip and
+            // the wedge of it showing left of the cushion, below the hip restraint bar, are paint too
+            [[82, 386], [96, 366], [150, 362], [192, 396], [240, 403], [384, 403], [398, 416], [398, 470], [382, 494], [172, 492], [150, 466], [128, 448], [96, 444], [82, 432]]
+        ] },
+        // Down to the cushion's bottom edge (y 409), so the panel below it stays body
+        seat: { refs: ['#b69b81', '#c0aa92', '#bfa78b', '#b3977f', '#bca488', '#c3ab91'], kL: 3, tol: 14, polys: [
+            [[150, 300], [162, 268], [180, 260], [262, 260], [272, 266], [284, 260], [356, 260], [370, 278], [374, 350], [396, 368], [400, 400], [384, 409], [250, 409], [238, 398], [200, 372], [158, 360]]
+        ] },
+        // The roof, down to its rim; the mirror hanging under it is dark, so it stays out by color
+        canopy: { refs: ['#8b785d', '#decab5', '#917a59', '#cdb99e', '#d6c5aa', '#8e7758'], kL: 2.5, tol: 10, polys: [
+            [[122, 132], [160, 100], [250, 80], [350, 70], [450, 76], [540, 94], [574, 114], [562, 126], [480, 130], [430, 136], [300, 152], [200, 158], [128, 150]]
+        ] }
+    },
     'golfer-2-2-golfer': {
         // Black paint can't be told from the black trim, so the body is the map found on the Scratch 2+2 photo:
         // the same cart, shot from the same camera position, in green paint
         // fill: this build has no headlights; its headlight openings are covered with body-colored blanks (as on the
         // white Golfer 2 photo), so they are painted with the body instead of staying black
         body: { from: 'golfer-2-2-scratch', fill: [
-            [[497, 383], [568, 385], [594, 418], [574, 433], [505, 417]],
+            // The left headlight's blank, over all of the Scratch photo's headlight cut-out
+            [[497, 383], [569, 385], [595, 416], [588, 431], [572, 433], [505, 418], [497, 400]],
             // The cowl beside the windshield post, up to the post's edge (it sits a few px left of the Scratch photo's)
             [[435.5, 345], [455, 345], [455, 414.5], [424.5, 412.5], [426.5, 398], [428.5, 385], [430, 372], [431.5, 360]],
             [[678, 378], [708, 367], [713, 402], [697, 424], [682, 414]]
@@ -177,7 +206,9 @@ const MASKS = {
             // just below the traced panels (growth crept onto them, leaving the panels' lower edges ragged)
             exclude: [[[250, 457.5], [335, 470.5], [390, 468], [400, 468], [400, 495], [245, 495]],
                 [[430, 416], [460, 417.5], [503.3, 429], [553.3, 439], [593.3, 449], [606.7, 451.5], [633.3, 451], [680, 439.5], [693.3, 429.5],
-                    [713.3, 421], [722, 412.5], [740, 415], [740, 470], [430, 470]], [[406, 402.5], [418, 400], [418, 416], [400, 416], [400, 412.5]], [[500, 386], [566, 388], [590, 418], [572, 430], [508, 414]], [[680, 380], [706, 370], [710, 402], [695, 421], [684, 412]], [[611, 402], [662, 402], [662, 426], [611, 426]]],
+                    [713.3, 421], [722, 412.5], [740, 415], [740, 470], [430, 470]], [[406, 402.5], [418, 400], [418, 416], [400, 416], [400, 412.5]],
+                // Left headlight out to its dark bezel's outer edge (inside it, a light paint ate the bezel's top and right)
+                [[498.5, 385], [568, 386.5], [593, 415.5], [586.5, 429], [572, 431], [507.5, 417], [499.5, 400]], [[680, 380], [706, 370], [710, 402], [695, 421], [684, 412]], [[611, 402], [662, 402], [662, 426], [611, 426]]],
             polys: [
             // Front cowl, rear side panel along the wheel arch, seat line and footwell, and the tail corner
             [[430, 334], [452, 322], [520, 317], [600, 320], [655, 330], [700, 358], [722, 370], [724, 408], [716, 420], [640, 444], [560, 448], [490, 440], [452, 428], [430, 420]],

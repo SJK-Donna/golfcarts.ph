@@ -90,6 +90,14 @@ const SEAT_TONES = [...STRIPED_SEATS, 'golfer-2-pro', 'golfer-2-2-pro-right'];
 // The Scratch 2+2 photo is the Golfer 2+2 cart shot from the same camera, so a one-color seat is the Golfer photo's
 // real standard seat, repainted (`plainSeatFrom`), instead of the Tsunami seat with its stripes smoothed away
 COLOR_PREVIEW['golfer-tempo-2-2:scratch'].plainSeatFrom = 'golfer-tempo-2-2:golf';
+// The Golfer 2 photos are shot from different angles, so the Scratch photo has no plain seat to borrow. A one-color
+// seat shows instead on the Lifestyle 2 Essential photo (`plainSeatPhoto`): the same cart from the same side, with a
+// plain seat. `look` is that photo's own colors (Essential's in app.js), which are left as photographed.
+COLOR_PREVIEW['golfer-tempo-2:scratch-plain'] = {
+    base: 'image/Products/builds/lifestyle-2-essential.jpg', mask: 'image/Products/builds/masks/lifestyle-2-essential.png', shade: true,
+    look: { body: 'White', seat: 'Beige', canopy: '2 Pass Canopy Beige' }
+};
+COLOR_PREVIEW['golfer-tempo-2:scratch'].plainSeatPhoto = 'golfer-tempo-2:scratch-plain';
 
 const recolorCache = {};
 
@@ -552,70 +560,6 @@ function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.8
 // brightness shades the color, so folds and shadows carry over but the stripes' light and dark don't.
 // Judging tones pixel by pixel from lightness instead turned whole black panels red, and shifting HSL
 // lightness turned white and grey seats flat and washed out.
-// A striped seat's light with the stripes taken out, for painting it one color. The stripes differ in sheen, so
-// the seat's broad form comes from each pixel's brightness over its tones' typical brightness, averaged within
-// 14 px and softened. On top go the photo's shadows (creases, the gaps between headrests, backrest and cushion),
-// judged against nearby pixels of the same stripe so the stripes themselves cancel out, and faded out over the
-// 3 px next to a stripe edge, since the traced edges sit a pixel or two off the real ones and outlined them.
-function toneFreeLight(base, region) {
-    if (region.toneFree) return region.toneFree;
-    const { w, h } = base;
-    const px = base.imageData.data;
-    const W1 = w + 1;
-    // Summed-area tables: the tone-free ratio over the seat, and brightness and count per tone
-    const tables = () => [new Float64Array(W1 * (h + 1)), new Float64Array(W1 * (h + 1))];
-    const all = tables(), per = [tables(), tables(), tables()];
-    const ratio = new Float32Array(w * h), Y = new Float32Array(w * h), tone = new Int8Array(w * h).fill(-1);
-    region.idx.forEach((i, k) => {
-        const t = region.tones[k];
-        const ref = t.reduce((sum, wt, n) => sum + wt * region.toneY[n], 0);
-        Y[i] = linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
-        ratio[i] = Math.max(0.1, Math.min(4, Y[i] / ref));
-        tone[i] = t[0] >= t[1] && t[0] >= t[2] ? 0 : t[1] >= t[2] ? 1 : 2;
-    });
-    const fill = ([S, N], value, on) => {
-        for (let y = 0; y < h; y++) {
-            let rs = 0, rn = 0;
-            for (let x = 0; x < w; x++) {
-                const i = y * w + x;
-                if (on(i)) { rs += value[i]; rn++; }
-                S[(y + 1) * W1 + x + 1] = S[y * W1 + x + 1] + rs;
-                N[(y + 1) * W1 + x + 1] = N[y * W1 + x + 1] + rn;
-            }
-        }
-    };
-    fill(all, ratio, i => tone[i] >= 0);
-    per.forEach((tbl, t) => fill(tbl, Y, i => tone[i] === t));
-    const mean = ([S, N], x, y, r) => {
-        const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1), y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
-        const box = A => A[y1 * W1 + x1] - A[y0 * W1 + x1] - A[y1 * W1 + x0] + A[y0 * W1 + x0];
-        return box(S) / Math.max(1, box(N));
-    };
-    // Distance in px (up to 3) to a pixel of another tone
-    const edgeDist = (i, x, y) => {
-        for (let d = 1; d <= 3; d++) {
-            for (let dy = -d; dy <= d; dy++) for (let dx = -d; dx <= d; dx++) {
-                if (Math.max(Math.abs(dx), Math.abs(dy)) !== d || x + dx < 0 || x + dx >= w || y + dy < 0 || y + dy >= h) continue;
-                const j = (y + dy) * w + x + dx;
-                if (tone[j] >= 0 && tone[j] !== tone[i]) return d - 1;
-            }
-        }
-        return 3;
-    };
-    const light = new Float32Array(w * h);
-    region.idx.forEach(i => {
-        const x = i % w, y = Math.floor(i / w);
-        const broad = Math.max(0.6, Math.min(1.15, mean(all, x, y, 14))) ** 0.6;
-        const shadow = Math.max(0.55, Math.min(1.04, Y[i] / Math.max(1e-4, mean(per[tone[i]], x, y, 8))));
-        light[i] = broad * shadow ** (edgeDist(i, x, y) / 3);
-    });
-    // Smoothed within 2 px, so the result reads as soft vinyl rather than patches
-    const smooth = tables();
-    fill(smooth, light, i => tone[i] >= 0);
-    region.toneFree = region.idx.map(i => mean(smooth, i % w, Math.floor(i / w), 2));
-    return region.toneFree;
-}
-
 function paintToneSeat(out, base, region, target, bands) {
     const px = base.imageData.data;
     if (!region.toneY) {
@@ -642,11 +586,14 @@ function paintToneSeat(out, base, region, target, bands) {
         const Y = linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
         let rgb = [0, 0, 0];
         if (!patterned) {
-            // One color: the standard seats are matte vinyl (see image/Seats/standard-*.jpg), whose light varies only a
-            // few percent across the seat, with no shine. So the seat's light with the stripes taken out (see
-            // toneFreeLight) keeps its shadows, softened, and only a trace of anything brighter
-            const r = toneFreeLight(base, region)[k];
-            const shade = r < 1 ? r ** 0.6 : 1 + (Math.min(r, 1.3) - 1) * 0.12;
+            // One color: each pixel's light against its own tones' typical light, so the stripes cancel out but the
+            // seat's shape stays (headrests, bolsters, seams, the gap above the cushion). Averaging the light over the
+            // seat instead smoothed those away and left a foggy blob. Shadows carry over almost fully; anything
+            // brighter only faintly, since the standard seats are matte vinyl (image/Seats/standard-*.jpg) and a pixel
+            // traced to the wrong stripe at a stripe's edge would otherwise light up as a line
+            const ref = region.tones[k].reduce((sum, wt, n) => sum + wt * region.toneY[n], 0);
+            const r = Math.max(0.2, Math.min(1.6, Y / ref));
+            const shade = r < 1 ? r ** 0.8 : 1 + (r - 1) * 0.1;
             rgb = colors[1].rgb.map(v => v * shade);
         } else region.tones[k].forEach((w, t) => {
             if (!w) return;

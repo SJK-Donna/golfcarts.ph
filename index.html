@@ -98,7 +98,7 @@
 
     <!-- Quote dialog: request details on the left, compatible accessories on the right -->
     <div id="quote-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-0 sm:p-6" onclick="if (event.target === this) closeQuoteModal()">
-        <div role="dialog" aria-modal="true" aria-labelledby="quote-modal-title" class="relative w-full max-w-5xl mx-auto sm:my-8 bg-paper border border-line min-h-full sm:min-h-0">
+        <div role="dialog" aria-modal="true" aria-labelledby="quote-modal-title" class="relative w-full max-w-2xl mx-auto sm:my-8 bg-paper border border-line min-h-full sm:min-h-0">
             <div class="flex items-center justify-between gap-4 px-5 sm:px-8 py-5 border-b border-line">
                 <h2 id="quote-modal-title" class="type-md text-ink">Get a quote</h2>
                 <button type="button" onclick="closeQuoteModal()" aria-label="Close" class="inline-flex items-center justify-center w-10 h-10 -mr-2 text-ink hover:bg-stone rounded-[2px]">
@@ -106,7 +106,7 @@
                 </button>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2">
+            <div>
                 <form id="modal-quote-form" onsubmit="handleModalQuoteSubmit(event)" class="p-5 sm:p-8 space-y-5">
                     <!-- Model, build, packages, colors and accessories chosen so far (renderQuoteSummary in app.js) -->
                     <div id="quote-summary" aria-live="polite"></div>
@@ -138,17 +138,6 @@
                     </div>
                     <button type="submit" class="btn btn-primary w-full">Send request</button>
                 </form>
-
-                <!-- Accessories that fit the selected model (built by renderAccessoryPicker in app.js) -->
-                <div class="flex flex-col p-5 sm:p-8 bg-stone lg:max-h-[640px]">
-                    <div class="flex items-baseline justify-between gap-3">
-                        <h3 class="text-lg font-semibold text-ink">Add accessories</h3>
-                        <span id="accessory-toggle" class="text-sm text-ink-2" aria-live="polite"></span>
-                    </div>
-                    <p class="text-sm text-ink-2 mt-2">Accessories are paid add-ons. We price them in your quote.</p>
-                    <div id="modal-accessory-chips" class="flex flex-wrap gap-2 mt-4 empty:hidden"></div>
-                    <div id="modal-accessory-picker" class="mt-4 flex-1 min-h-0 max-h-80 lg:max-h-none overflow-y-auto space-y-6"></div>
-                </div>
             </div>
         </div>
     </div>
