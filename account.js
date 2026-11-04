@@ -167,65 +167,118 @@ function closeGolferModal() {
     if (golferModalReturnFocus && golferModalReturnFocus.focus) golferModalReturnFocus.focus();
 }
 
+// The dialog: on wide screens a brand panel (the cart and what an account is for) beside the form; on phones the
+// form alone. Sign up and Log in share a switch at the top; forgot / reset / sent are single steps of their own
+const GOLFER_PERKS = ['Save the carts you build', 'See every quote you request', 'Quote forms filled in for you', 'Member news and offers, if you want them'];
+
+function passwordField(id, label, autocomplete, extra = '') {
+    return `<div class="field">
+        <div class="auth-label-row"><label for="${id}">${label}</label>${extra}</div>
+        <div class="auth-password">
+            <input id="${id}" name="password" required type="password" minlength="${autocomplete === 'new-password' ? 8 : 1}" autocomplete="${autocomplete}"${autocomplete === 'new-password' ? ` aria-describedby="${id}-hint"` : ''}>
+            <button type="button" onclick="toggleGolferPassword(this)" aria-pressed="false" aria-label="Show password">Show</button>
+        </div>
+        ${autocomplete === 'new-password' ? `<p id="${id}-hint" class="auth-hint">At least 8 characters.</p>` : ''}
+    </div>`;
+}
+
+function toggleGolferPassword(button) {
+    const input = button.previousElementSibling;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    button.textContent = show ? 'Hide' : 'Show';
+    button.setAttribute('aria-pressed', String(show));
+    button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+}
+
 function renderGolferModal() {
     const box = document.getElementById('golfer-dialog');
     const mode = golferModalMode, signup = mode === 'signup';
-    const titles = { signup: 'Be a Golfer', login: 'Welcome back', forgot: 'Reset your password', reset: 'Choose a new password', sent: 'Check your email' };
-    const tabs = signup || mode === 'login' ? `
-        <div class="golfer-tabs" role="tablist" aria-label="Sign up or log in">
-            <button type="button" role="tab" aria-selected="${signup}" onclick="openGolferModal('signup', golferModalReason, golferAfterAuth)">Sign up</button>
-            <button type="button" role="tab" aria-selected="${!signup}" onclick="openGolferModal('login', golferModalReason, golferAfterAuth)">Log in</button>
-        </div>` : '';
-    const forms = {
-        signup: `
-            ${golferModalReason ? `<p class="text-sm text-ink">${escapeHtml(golferModalReason)}</p>` : ''}
-            <ul class="golfer-perks text-sm">
-                <li>Save your cart builds</li>
-                <li>See every quote you've requested</li>
-                <li>Quote forms filled in for you</li>
-                <li>Member news and offers, if you want them</li>
-            </ul>
-            <div class="field"><label for="gf-name">Full name</label><input id="gf-name" name="name" required type="text" autocomplete="name"></div>
-            <div class="field"><label for="gf-email">Email</label><input id="gf-email" name="email" required type="email" autocomplete="email"></div>
-            <div class="field"><label for="gf-phone">Mobile number</label><input id="gf-phone" name="phone" required type="tel" autocomplete="tel" placeholder="+63 900 000 0000"></div>
-            <div class="field"><label for="gf-password">Password (8 characters or more)</label><input id="gf-password" name="password" required type="password" minlength="8" autocomplete="new-password"></div>
-            <label class="golfer-check"><input type="checkbox" name="news" checked> <span>Send me member news and offers</span></label>
-            <p id="golfer-error" class="golfer-error" role="alert"></p>
-            <button type="submit" class="btn btn-primary w-full">Create my account</button>
-            <p class="text-xs text-mute">No account needed to build a cart or get a quote. We'll email you a link to confirm your address.</p>`,
-        login: `
-            ${golferModalReason ? `<p class="text-sm text-ink">${escapeHtml(golferModalReason)}</p>` : ''}
-            <div class="field"><label for="gf-email">Email</label><input id="gf-email" name="email" required type="email" autocomplete="email"></div>
-            <div class="field"><label for="gf-password">Password</label><input id="gf-password" name="password" required type="password" autocomplete="current-password"></div>
-            <p id="golfer-error" class="golfer-error" role="alert"></p>
-            <button type="submit" class="btn btn-primary w-full">Log in</button>
-            <button type="button" onclick="openGolferModal('forgot')" class="link text-sm">Forgot your password?</button>`,
-        forgot: `
-            <p class="text-sm">We'll email you a link to choose a new password.</p>
-            <div class="field"><label for="gf-email">Email</label><input id="gf-email" name="email" required type="email" autocomplete="email"></div>
-            <p id="golfer-error" class="golfer-error" role="alert"></p>
-            <button type="submit" class="btn btn-primary w-full">Send the link</button>
-            <button type="button" onclick="openGolferModal('login')" class="link text-sm">Back to log in</button>`,
-        reset: `
-            <div class="field"><label for="gf-password">New password (8 characters or more)</label><input id="gf-password" name="password" required type="password" minlength="8" autocomplete="new-password"></div>
-            <p id="golfer-error" class="golfer-error" role="alert"></p>
-            <button type="submit" class="btn btn-primary w-full">Save new password</button>`,
-        sent: `
-            <p class="text-ink">${escapeHtml(golferSentMessage)}</p>
-            <button type="button" onclick="openGolferModal('login')" class="btn btn-outline w-full">Go to log in</button>`
+    const reason = golferModalReason ? `<p class="auth-reason">${escapeHtml(golferModalReason)}</p>` : '';
+    const steps = {
+        signup: {
+            title: 'Create your Golfer account',
+            sub: 'Free and optional: you can build a cart and get a quote without one.',
+            form: `${reason}
+                <div class="auth-row">
+                    <div class="field"><label for="gf-name">Full name</label><input id="gf-name" name="name" required type="text" autocomplete="name"></div>
+                    <div class="field"><label for="gf-phone">Mobile number</label><input id="gf-phone" name="phone" required type="tel" autocomplete="tel" placeholder="+63 900 000 0000"></div>
+                </div>
+                <div class="field"><label for="gf-email">Email</label><input id="gf-email" name="email" required type="email" autocomplete="email"></div>
+                ${passwordField('gf-password', 'Password', 'new-password')}
+                <label class="golfer-check"><input type="checkbox" name="news" checked> <span>Send me member news and offers</span></label>
+                <p id="golfer-error" class="golfer-error" role="alert"></p>
+                <button type="submit" class="btn btn-primary w-full">Create account</button>
+                <p class="auth-hint text-center -mt-1">We'll email you a link to confirm your address.</p>
+                <p class="auth-foot">Already a member? <button type="button" onclick="openGolferModal('login', golferModalReason, golferAfterAuth)" class="link">Log in</button></p>`
+        },
+        login: {
+            title: 'Log in',
+            sub: 'Golfers and Golfcarts.ph staff sign in here.',
+            form: `${reason}
+                <div class="field"><label for="gf-email">Email</label><input id="gf-email" name="email" required type="email" autocomplete="email"></div>
+                ${passwordField('gf-password', 'Password', 'current-password', '<button type="button" onclick="openGolferModal(\'forgot\')" class="link auth-forgot">Forgot password?</button>')}
+                <p id="golfer-error" class="golfer-error" role="alert"></p>
+                <button type="submit" class="btn btn-primary w-full">Log in</button>
+                <p class="auth-foot">New here? <button type="button" onclick="openGolferModal('signup', golferModalReason, golferAfterAuth)" class="link">Create an account</button></p>`
+        },
+        forgot: {
+            title: 'Reset your password',
+            sub: 'Enter your account\'s email and we\'ll send you a link to choose a new password.',
+            form: `<div class="field"><label for="gf-email">Email</label><input id="gf-email" name="email" required type="email" autocomplete="email"></div>
+                <p id="golfer-error" class="golfer-error" role="alert"></p>
+                <button type="submit" class="btn btn-primary w-full">Email me a reset link</button>
+                <p class="auth-foot"><button type="button" onclick="openGolferModal('login')" class="link">Back to log in</button></p>`
+        },
+        reset: {
+            title: 'Choose a new password',
+            sub: 'You\'ll stay logged in on this device.',
+            form: `${passwordField('gf-password', 'New password', 'new-password')}
+                <p id="golfer-error" class="golfer-error" role="alert"></p>
+                <button type="submit" class="btn btn-primary w-full">Save new password</button>`
+        },
+        sent: {
+            title: 'Check your email',
+            sub: '',
+            form: `<div class="auth-sent">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/></svg>
+                    <p>${escapeHtml(golferSentMessage)}</p>
+                </div>
+                <p class="text-sm text-mute">Nothing after a few minutes? Check your spam folder.</p>
+                <button type="button" onclick="openGolferModal('login')" class="btn btn-outline w-full">Back to log in</button>`
+        }
     };
+    const step = steps[mode];
     const handlers = { signup: 'handleGolferSignup', login: 'handleGolferLogin', forgot: 'handleGolferForgot', reset: 'handleGolferReset' };
+    const switcher = signup || mode === 'login' ? `
+        <div class="auth-switch" role="tablist" aria-label="Sign up or log in">
+            <button type="button" role="tab" aria-selected="${signup}" onclick="openGolferModal('signup', golferModalReason, golferAfterAuth)">Sign up</button>
+            <button type="button" role="tab" aria-selected="${mode === 'login'}" onclick="openGolferModal('login', golferModalReason, golferAfterAuth)">Log in</button>
+        </div>` : '<span></span>';
     box.innerHTML = `
-        <div class="flex items-center justify-between gap-4 px-5 sm:px-8 py-5 border-b border-line">
-            <h2 id="golfer-modal-title" class="type-md text-ink">${titles[mode]}</h2>
-            <button type="button" onclick="closeGolferModal()" aria-label="Close" class="inline-flex items-center justify-center w-10 h-10 -mr-2 text-ink hover:bg-stone rounded-[2px]">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-            </button>
-        </div>
-        ${tabs}
-        ${handlers[mode] ? `<form data-no-prefill onsubmit="${handlers[mode]}(event)" class="p-5 sm:p-8 space-y-5" novalidate>${forms[mode]}</form>`
-            : `<div class="p-5 sm:p-8 space-y-5">${forms[mode]}</div>`}`;
-    const first = box.querySelector('input');
+        <div class="auth">
+            <aside class="auth-side" aria-hidden="true">
+                <img src="image/GCPH_logo.png" alt="" width="140" height="31" class="auth-logo">
+                <img src="image/Products/builds/golfer-2-pro.jpg" alt="" class="auth-cart" loading="lazy">
+                <div>
+                    <p class="auth-side-title">One account for every cart you build.</p>
+                    <ul class="golfer-perks auth-perks">${GOLFER_PERKS.map(p => `<li>${p}</li>`).join('')}</ul>
+                </div>
+            </aside>
+            <div class="auth-main">
+                <div class="auth-top">
+                    ${switcher}
+                    <button type="button" onclick="closeGolferModal()" aria-label="Close" class="auth-close">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    </button>
+                </div>
+                <h2 id="golfer-modal-title" class="auth-title">${step.title}</h2>
+                ${step.sub ? `<p class="auth-sub">${step.sub}</p>` : ''}
+                ${handlers[mode] ? `<form data-no-prefill onsubmit="${handlers[mode]}(event)" class="auth-form" novalidate>${step.form}</form>`
+                    : `<div class="auth-form">${step.form}</div>`}
+            </div>
+        </div>`;
+    const first = box.querySelector('.auth-main input');
     if (first) setTimeout(() => first.focus(), 0);
 }
 

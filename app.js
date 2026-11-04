@@ -4697,8 +4697,8 @@ function renderBuildSection(product, buildSet) {
                     return `
                     <div data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} flex flex-col">
                     <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" class="text-left p-6 lg:p-8 ${pkg ? 'pb-5 lg:pb-5' : ''} flex flex-col gap-5 flex-1">
-                        ${product.buildPhotos && product.buildPhotos[b.id] ? `
-                            <span class="build-card-photo"><img src="${product.buildPhotos[b.id]}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
+                        ${(product.buildPhotos && product.buildPhotos[b.id]) || product.image ? `
+                            <span class="build-card-photo"><img src="${(product.buildPhotos && product.buildPhotos[b.id]) || product.image}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
                         <span class="flex items-start justify-between gap-4">
                             <span>
                                 <span class="block type-md text-ink">${b.name}</span>
@@ -4999,7 +4999,7 @@ function renderProductDetailsPage() {
                     </dl>
                 ` : (product.gallery[1] ? `
                     <div class="lg:col-span-4 bg-stone aspect-square flex items-center justify-center p-8">
-                        <img src="${product.gallery[1]}" alt="${product.name}, another view" loading="lazy" class="max-h-full object-contain">
+                        <img src="${product.gallery[1]}" alt="${product.name}, another view" loading="lazy" class="max-h-full object-contain mix-blend-multiply">
                     </div>` : '')}
             </div>
         </div>
@@ -5137,7 +5137,7 @@ function renderSegmentModelCard(segmentId, subId, modelKey) {
         <div id="${modelAnchorId(segmentId, subId, modelKey)}" class="flex flex-col scroll-mt-40">
             <div class="${product ? 'media-zoom edge-light' : ''} relative overflow-hidden bg-stone aspect-[4/3] flex items-center justify-center p-6">
                 ${model.image
-                    ? `<img src="${model.image}" alt="${model.name}" loading="lazy" decoding="async" class="max-h-full w-auto object-contain">`
+                    ? `<img src="${model.image}" alt="${model.name}" loading="lazy" decoding="async" class="max-h-full w-auto object-contain mix-blend-multiply">`
                     : '<span class="text-sm text-ink-2">Photo to follow</span>'}
             </div>
             <div class="pt-5 flex flex-col gap-2 flex-1">
@@ -5184,7 +5184,7 @@ function renderSegmentPage() {
                 </div>
             </div>
             <div class="mt-12 ${photo ? 'aspect-[16/9] md:aspect-[21/9] overflow-hidden' : 'bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8'}">
-                <img src="${photo ? photo.image : segment.image}" alt="${photo ? photo.alt : segment.label}" fetchpriority="high" class="${photo ? 'w-full h-full object-cover' : 'max-h-full w-auto object-contain'}">
+                <img src="${photo ? photo.image : segment.image}" alt="${photo ? photo.alt : segment.label}" fetchpriority="high" class="${photo ? 'w-full h-full object-cover' : 'max-h-full w-auto object-contain mix-blend-multiply'}">
             </div>
         </section>
 
@@ -5227,7 +5227,7 @@ function renderSegmentPage() {
                         <a href="${routeHref('product-details', 'lifestyle-tempo-2-2')}" data-route="product-details" data-slug="lifestyle-tempo-2-2" class="btn btn-primary">Build a lifted Tempo 2+2</a>
                     </div>
                     <div class="lg:col-span-7">
-                        <img src="image/Products/Tempo 2+2 - Lifted.png" alt="Tempo 2+2 with the lifted package" loading="lazy" class="w-full aspect-[4/3] object-contain">
+                        <img src="image/Products/Tempo 2+2 - Lifted.png" alt="Tempo 2+2 with the lifted package" loading="lazy" class="w-full aspect-[4/3] object-contain mix-blend-multiply">
                     </div>
                 </div>
             </section>
@@ -5407,7 +5407,7 @@ function renderBlogsPage() {
                     <li>
                         <a href="${routeHref('blog-details', post.slug)}" data-route="blog-details" data-slug="${post.slug}" class="group block">
                             <div class="media-zoom edge-light bg-stone aspect-[4/3] flex items-center justify-center p-6">
-                                <img src="${post.image}" alt="" loading="lazy" decoding="async" class="max-h-full w-auto object-contain">
+                                <img src="${post.image}" alt="" loading="lazy" decoding="async" class="max-h-full w-auto object-contain mix-blend-multiply">
                             </div>
                             <p class="text-sm text-mute mt-5">${post.category} · <time datetime="${post.date}">${formatBlogDate(post.date)}</time></p>
                             <h2 class="type-md text-ink mt-2 group-hover:underline decoration-1 underline-offset-4">${post.title}</h2>
@@ -5433,7 +5433,7 @@ function renderBlogDetailsPage() {
                 <h1 class="type-xl text-ink mt-4">${post.title}</h1>
             </header>
             <div class="mt-12 bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8">
-                <img src="${post.image}" alt="" fetchpriority="high" class="max-h-full w-auto object-contain">
+                <img src="${post.image}" alt="" fetchpriority="high" class="max-h-full w-auto object-contain mix-blend-multiply">
             </div>
             <div class="measure mx-auto mt-16 space-y-6 text-lg leading-[1.7]">
                 ${post.content.map(p => `<p>${p}</p>`).join('')}
