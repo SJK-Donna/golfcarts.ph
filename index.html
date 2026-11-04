@@ -51,7 +51,7 @@
                 <img src="image/GCPH_logo.png" alt="Golfcarts.ph" width="180" height="40" class="h-8 sm:h-9 w-auto max-w-[150px] sm:max-w-[170px] object-contain">
             </a>
 
-            <!-- Main navigation: the four ways to buy, then fleet, parts and service (built from MAIN_NAV / NAV_SEGMENTS in app.js) -->
+            <!-- Main navigation in the order from the website review (built from MAIN_NAV / NAV_SEGMENTS in app.js) -->
             <nav id="main-nav" aria-label="Main" class="hidden min-[1360px]:flex items-center"></nav>
 
             <div class="hidden min-[1360px]:flex items-center gap-1 flex-shrink-0">
@@ -75,13 +75,10 @@
         <div id="mobile-drawer" class="min-[1360px]:hidden hidden fixed inset-x-0 top-16 bottom-0 bg-paper border-t border-line overflow-y-auto">
             <nav aria-label="Mobile" class="px-5 sm:px-8 pt-4 pb-10 flex flex-col">
                 <a href="./" data-route="home" class="mobile-nav-link">Home</a>
-                <!-- The Golfer / Lifestyle & Private Use / Resort & Hospitality / Remanufactured (built from NAV_SEGMENTS in app.js) -->
+                <!-- The header's items in the same order (built from MAIN_NAV and NAV_SEGMENTS in app.js) -->
                 <div id="mobile-segment-menus"></div>
-                <a href="fleet/" data-route="solutions" class="mobile-nav-link">Fleet solutions</a>
                 <a href="carts/?category=Accessories" onclick="event.preventDefault(); setCategoryAndNavigate('Accessories')" class="mobile-nav-link">Parts and accessories</a>
-                <a href="service/" data-route="service" class="mobile-nav-link">Service and support</a>
                 <a href="carts/" data-route="products" class="mobile-nav-link">All carts</a>
-                <a href="blog/" data-route="blogs" class="mobile-nav-link">Blog</a>
                 <a href="about/" data-route="about" class="mobile-nav-link">About</a>
                 <a href="contact/" data-route="contact" class="mobile-nav-link">Contact</a>
                 <div class="pt-8 grid gap-3">
@@ -190,11 +187,11 @@
                 <div class="lg:col-span-2">
                     <h2 class="footer-head">Shop by use</h2>
                     <ul class="space-y-2.5">
-                        <li><a href="use/golfer/" data-route="segment" data-slug="golfer" class="footer-link">The Golfer</a></li>
-                        <li><a href="use/lifestyle/" data-route="segment" data-slug="lifestyle" class="footer-link">Lifestyle</a></li>
+                        <li><a href="use/private/" data-route="segment" data-slug="private" class="footer-link">Private golf carts</a></li>
+                        <li><a href="fleet/" data-route="solutions" class="footer-link">Fleet solutions</a></li>
+                        <li><a href="models/golfer-tempo-2/" onclick="event.preventDefault(); buildYourCart()" class="footer-link">Custom carts</a></li>
                         <li><a href="use/resort/" data-route="segment" data-slug="resort" class="footer-link">Resort and hospitality</a></li>
-                        <li><a href="use/remanufactured/" data-route="segment" data-slug="remanufactured" class="footer-link">Remanufactured</a></li>
-                        <li><a href="fleet/" data-route="solutions" class="footer-link">Fleet proposals</a></li>
+                        <li><a href="use/remanufactured/" data-route="segment" data-slug="remanufactured" class="footer-link">Rebuilt and pre owned</a></li>
                     </ul>
                 </div>
 
@@ -203,7 +200,8 @@
                     <ul class="space-y-2.5">
                         <li><a href="about/" data-route="about" class="footer-link">About</a></li>
                         <li><a href="service/" data-route="service" class="footer-link">Service and support</a></li>
-                        <li><a href="blog/" data-route="blogs" class="footer-link">Blog</a></li>
+                        <li><a href="carts/?category=Accessories" onclick="event.preventDefault(); setCategoryAndNavigate('Accessories')" class="footer-link">Parts and accessories</a></li>
+                        <li><a href="blog/" data-route="blogs" class="footer-link">Stories and guides</a></li>
                         <li><a href="contact/" data-route="contact" class="footer-link">Contact</a></li>
                     </ul>
                 </div>
