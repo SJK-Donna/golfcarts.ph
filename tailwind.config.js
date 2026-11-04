@@ -1,7 +1,7 @@
 /** Tailwind build config. Design tokens live in src/styles/tokens.css; the colours here point at them
  *  so a token change updates every utility. */
 module.exports = {
-    content: ['./index.html', './app.js', './scripts/**/*.mjs'],
+    content: ['./index.html', './app.js', './account.js', './scripts/**/*.mjs'],
     // Grid column classes that app.js builds at runtime from a count
     safelist: [{ pattern: /grid-cols-[1-6]/, variants: ['md', 'lg'] }],
     theme: {

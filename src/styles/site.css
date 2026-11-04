@@ -5,6 +5,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The homepage cart stage's backdrop colours, registered so they fade when the build changes */
+@property --stage-inner { syntax: '<color>'; inherits: true; initial-value: #FBFBF8; }
+@property --stage-mid { syntax: '<color>'; inherits: true; initial-value: #E9EEE0; }
+@property --stage-outer { syntax: '<color>'; inherits: true; initial-value: #C9D4B8; }
+
 @layer base {
     html {
         -webkit-text-size-adjust: 100%;
@@ -264,6 +269,10 @@
     @media (min-width: 1024px) {
         .site-header { padding: 0 3rem; }
     }
+    /* Full menu on the narrowest laptops: less side padding so the Be a Golfer icon fits */
+    @media (min-width: 1360px) and (max-width: 1439px) {
+        .site-header { padding: 0 1.5rem; }
+    }
     .mobile-nav-link,
     .mobile-segment > summary {
         display: flex;
@@ -461,16 +470,128 @@
             padding: 0;
         }
     }
-    .home-swatch {
-        width: 2.5rem;
-        height: 2.5rem;
-        border-radius: 9999px; /* swatches are the one place circles are used */
-        background: var(--swatch);
-        box-shadow: inset 0 0 0 1px var(--swatch-ring);
-        transition: box-shadow 0.25s var(--ease);
+    /* ---- Homepage cart stage: a light studio backdrop tinted for the shown build. It keeps the light theme's
+       ink in both themes, since the build photos (on white) are multiplied onto it. ---- */
+    .home-stage {
+        --ink: #151714;
+        --ink-2: #3E403A;
+        --paper: #F6F6F2;
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+        height: clamp(640px, 100svh, 880px);
+        color: var(--ink);
+        background: radial-gradient(ellipse 70% 75% at 55% 55%, var(--stage-inner) 0%, var(--stage-mid) 60%, var(--stage-outer) 100%);
+        transition: --stage-inner 1.2s var(--ease), --stage-mid 1.2s var(--ease), --stage-outer 1.2s var(--ease);
     }
-    .home-swatch[aria-checked='true'] {
-        box-shadow: inset 0 0 0 1px var(--swatch-ring), 0 0 0 3px var(--stone), 0 0 0 4.5px var(--ink);
+    .home-stage-leaves { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+    .home-stage-leaf { position: absolute; width: var(--size); opacity: 0.35; filter: blur(2px); }
+    .home-stage-leaf > div { will-change: transform; }
+    .home-stage-leaf svg { display: block; width: 100%; }
+
+    /* No z-index here, so the cart blends with the section's backdrop rather than an empty layer */
+    .home-stage-ui {
+        position: relative;
+        height: 100%;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 56px 48px 48px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-rows: 1fr auto;
+    }
+    .home-stage-ui > :not(.home-stage-cart) { position: relative; z-index: 2; }
+
+    /* The cart: placed, bobbing, leaning (pointer), driving (build change), in that order of wrappers */
+    .home-stage-cart {
+        position: absolute;
+        z-index: 1;
+        left: 57%;
+        top: 54%;
+        width: min(52vw, 740px);
+        aspect-ratio: 4 / 3;
+        translate: -50% -46%;
+        mix-blend-mode: multiply;
+        pointer-events: none;
+    }
+    .home-stage-bob { position: absolute; inset: 0; animation: home-stage-bob 6s ease-in-out infinite; }
+    .home-stage-tilt { position: absolute; inset: 0; will-change: transform; }
+    .home-stage-drive { position: absolute; inset: 0; }
+    .home-stage-drive img { width: 100%; height: 100%; object-fit: contain; }
+    @keyframes home-stage-bob {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-14px); }
+    }
+
+    /* Text and controls */
+    .home-stage-copy { grid-column: 1; grid-row: 1; align-self: start; max-width: 26rem; display: flex; flex-direction: column; gap: 1.25rem; }
+    .home-stage-eyebrow { font-size: 0.8125rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+    .home-stage-title { font-family: var(--font-display); font-weight: 400; font-size: clamp(3.25rem, 7vw, 7rem); line-height: 0.9; letter-spacing: -0.02em; }
+    .home-stage-tagline { font-family: var(--font-display); font-style: italic; font-size: clamp(1.25rem, 1.8vw, 1.6rem); line-height: 1.2; }
+    .home-stage-desc { color: var(--ink-2); line-height: 1.6; max-width: 34ch; }
+    .home-stage-swap { transition: opacity 0.35s var(--ease), translate 0.35s var(--ease); }
+    .home-stage-swap.is-out { opacity: 0; translate: 0 10px; }
+
+    .home-stage-models { grid-column: 2; grid-row: 1; justify-self: end; align-self: start; display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; }
+    .home-stage-cards { display: flex; gap: 0.625rem; }
+    .home-stage-card {
+        width: 9rem;
+        padding: 0.5rem 0.625rem 0.75rem;
+        text-align: left;
+        color: var(--ink);
+        background: var(--paper); /* opaque, so the thumbnail multiplies away cleanly */
+        border: 1px solid rgba(21, 23, 20, 0.12);
+        border-radius: var(--radius);
+        transition: background-color 0.25s var(--ease), border-color 0.25s var(--ease);
+    }
+    .home-stage-card:hover { background: #FFFFFF; border-color: rgba(21, 23, 20, 0.35); }
+    .home-stage-card[aria-pressed='true'] { background: #FFFFFF; border-color: var(--green); box-shadow: inset 0 0 0 1px var(--green); }
+    /* The thumbnails are on white too: multiplied onto the card */
+    .home-stage-card img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; mix-blend-mode: multiply; transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    .home-stage-card:hover img { transform: translateX(8px) scale(1.08); }
+    .home-stage-card span { display: block; margin-top: 0.25rem; font-size: 0.875rem; font-weight: 600; }
+    .home-stage-card small { display: block; margin-top: 0.125rem; font-size: 0.75rem; line-height: 1.3; color: var(--ink-2); }
+
+    .home-stage-shown { grid-column: 2; grid-row: 2; justify-self: end; align-self: end; display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; font-size: 0.875rem; color: var(--ink-2); }
+    .home-stage-shown b { color: var(--ink); font-weight: 600; }
+    .home-stage-swatches { display: flex; flex-wrap: wrap; gap: 0.625rem; }
+    .home-stage-swatches[hidden] { display: none; }
+    .home-stage-swatch {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 9999px; /* swatches are the one place circles are used */
+        box-shadow: inset 0 0 0 1px var(--swatch-ring);
+        outline: 1.5px solid transparent;
+        outline-offset: 3px;
+        transition: outline-color 0.25s var(--ease);
+    }
+    .home-stage-swatch:hover { outline-color: var(--swatch-ring); }
+    .home-stage-swatch[aria-checked='true'] { outline-color: var(--ink); }
+
+    .home-stage-facts { grid-column: 1; grid-row: 2; align-self: end; display: flex; gap: 2rem; }
+    .home-stage-facts dt { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); }
+    .home-stage-facts dd { margin-top: 0.25rem; font-family: var(--font-display); font-size: 1.625rem; }
+
+    .home-stage :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+    /* Below the desktop layout: cart first, then text, builds and figures */
+    @media (max-width: 1023px) {
+        .home-stage { height: auto; }
+        .home-stage-ui { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; padding: 32px 20px 32px; }
+        .home-stage-cart { position: relative; left: auto; top: auto; translate: none; grid-column: 1; grid-row: 1; width: min(100%, 600px); margin: 0 auto; }
+        .home-stage-shown { grid-column: 1; grid-row: 2; justify-self: center; align-items: center; }
+        .home-stage-copy { grid-column: 1; grid-row: 3; max-width: none; margin-top: 1.75rem; }
+        .home-stage-models { grid-column: 1; grid-row: 4; justify-self: stretch; align-items: stretch; margin-top: 1.5rem; }
+        .home-stage-cards { overflow-x: auto; }
+        .home-stage-card { flex: 1 0 7.5rem; }
+        .home-stage-facts { grid-column: 1; grid-row: 5; margin-top: 1.75rem; gap: 1.5rem; }
+        .home-stage-facts dd { font-size: 1.25rem; }
+        .home-stage .is-wide { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .home-stage { transition: none; }
+        .home-stage-bob { animation: none; }
+        .home-stage-card:hover img { transform: none; }
     }
     .home-logos {
         display: grid;
@@ -810,26 +931,6 @@
     .opt-group + .opt-group,
     .opt-subpanel + .opt-group {
         margin-top: 0.5rem;
-    }
-    /* Two groups that share the cart's mounts (ball washer and cooler), side by side from tablet width */
-    .opt-pair {
-        display: grid;
-        gap: 0 1rem;
-    }
-    @media (min-width: 768px) {
-        .opt-pair {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-    }
-    .opt-pair + .opt-group,
-    .opt-group + .opt-pair {
-        margin-top: 0.5rem;
-    }
-    /* The pair's two groups start on the same line (the usual gap between stacked groups pushed the second down) */
-    @media (min-width: 768px) {
-        .opt-pair > .opt-group + .opt-group {
-            margin-top: 0;
-        }
     }
     .opt-group-head {
         display: flex;
@@ -1837,114 +1938,61 @@
     @media (min-width: 1024px) {
         .branch-map { aspect-ratio: auto; min-height: 560px; }
     }
-    .branch-map svg {
+    /* The street map (Leaflet). Its own stacking context, so Leaflet's layers (z-index 400-1000) stay under
+       the sticky header. The tiles are toned down to sit with the site's palette, and dimmed in dark mode
+       (set by the header toggle). */
+    .branch-map-canvas {
         position: absolute;
         inset: 0;
-        width: 100%;
-        height: 100%;
+        isolation: isolate;
+        background: var(--stone);
+        font-family: var(--font-text);
     }
-    .branch-map-land {
-        fill: url(#branch-map-dots);
-        stroke: var(--map-coast);
-        stroke-width: 1;
-        vector-effect: non-scaling-stroke;
+    .branch-map-canvas .leaflet-tile-pane {
+        filter: grayscale(0.85) contrast(0.95);
     }
-    #branch-map-dots circle {
-        fill: var(--map-dot);
+    :root[data-theme="dark"] .branch-map-canvas .leaflet-tile-pane {
+        filter: grayscale(0.85) invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
     }
-    .branch-route {
-        fill: none;
-        stroke: var(--green);
-        stroke-width: 1.25;
-        stroke-dasharray: 4 6;
-        vector-effect: non-scaling-stroke;
-        opacity: 0.8;
-        animation: branch-route-flow 1.6s linear infinite;
-    }
-    @keyframes branch-route-flow {
-        to { stroke-dashoffset: -20; }
-    }
-    .branch-packet {
-        fill: var(--green-text);
-    }
-    .branch-pin {
+    /* Branch pins: a green dot with the branch name; larger when chosen or hovered in the list. Leaflet's
+       stylesheet loads after this one and sets its markers to display: block, hence the extra class. */
+    .leaflet-marker-icon.branch-marker {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: max-content;
+        translate: -7px -7px;
         cursor: pointer;
     }
-    .branch-pin-core {
-        fill: var(--green);
-        stroke: var(--paper);
-        stroke-width: 2;
-        transition: r 0.3s var(--ease);
+    .branch-marker-dot {
+        flex: none;
+        display: block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--green);
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 4px rgba(116, 158, 53, 0.3);
+        transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
     }
-    .branch-pin.is-selected .branch-pin-core,
-    .branch-pin.is-hovered .branch-pin-core {
-        r: 7;
+    .branch-marker.is-selected .branch-marker-dot,
+    .branch-marker.is-hovered .branch-marker-dot {
+        transform: scale(1.35);
+        box-shadow: 0 0 0 7px rgba(116, 158, 53, 0.35);
     }
-    .branch-pin-pulse {
-        fill: none;
-        stroke: var(--green);
-        stroke-width: 1.5;
-        transform-box: fill-box;
-        transform-origin: center;
-        animation: branch-pulse 2.4s var(--ease) infinite;
-    }
-    .branch-pin-pulse-late {
-        animation-delay: 1.2s;
-    }
-    @keyframes branch-pulse {
-        from { transform: scale(1); opacity: 0.9; }
-        to { transform: scale(4.5); opacity: 0; }
-    }
-    .branch-pin-label {
-        fill: var(--ink);
-        font-family: var(--font-text);
+    .branch-marker-label {
+        padding: 0.125rem 0.5rem;
+        border-radius: var(--radius);
+        background: var(--paper);
+        color: var(--ink);
         font-size: 13px;
         font-weight: 500;
-        paint-order: stroke;
-        stroke: var(--stone);
-        stroke-width: 4px;
-        stroke-linejoin: round;
+        line-height: 1.5;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
     }
-    .branch-pin.is-selected .branch-pin-label {
-        fill: var(--green-text);
+    .branch-marker.is-selected .branch-marker-label {
+        color: var(--green-text);
         font-weight: 600;
-    }
-    /* Overlays: fixed to the frame, so they stay put while the map moves underneath */
-    .branch-map-grid {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background-image:
-            linear-gradient(var(--map-grid) 1px, transparent 1px),
-            linear-gradient(90deg, var(--map-grid) 1px, transparent 1px);
-        background-size: 48px 48px;
-    }
-    .branch-map-sweep {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 160%;
-        aspect-ratio: 1;
-        translate: -50% -50%;
-        pointer-events: none;
-        background: conic-gradient(from 0deg, rgba(116, 158, 53, 0.14), rgba(116, 158, 53, 0) 70deg, rgba(116, 158, 53, 0) 360deg);
-        border-radius: 50%;
-        animation: branch-sweep 9s linear infinite;
-    }
-    @keyframes branch-sweep {
-        to { rotate: 360deg; }
-    }
-    .branch-map-hud {
-        position: absolute;
-        left: 1rem;
-        top: 1rem;
-        display: flex;
-        gap: 1rem;
-        font-size: 0.75rem;
-        font-variant-numeric: tabular-nums;
-        letter-spacing: 0.02em;
-        color: var(--ink-2);
-        pointer-events: none;
     }
     .branch-map-reset {
         position: absolute;
@@ -2084,6 +2132,14 @@
     button:hover .media-zoom img {
         transform: scale(1.03);
     }
+    /* Parts & Accessories' denser grid: tighter photo padding and a smaller name */
+    .accessory-grid .media-zoom {
+        padding: 1rem;
+    }
+    .accessory-grid .type-md {
+        font-size: 1.125rem;
+        line-height: 1.3;
+    }
 
     /* ---- Reveal: major sections only, once ---- */
     .rise {
@@ -2095,6 +2151,179 @@
         opacity: 1;
         transform: none;
     }
+
+    /* ---- Be a Golfer (account.js): header link, sign up / log in dialog, account page ---- */
+    .header-golfer {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        height: 2.5rem;
+        min-width: 2.5rem;
+        justify-content: center;
+        padding: 0 0.625rem;
+        border-radius: var(--radius);
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--ink);
+        white-space: nowrap;
+        transition: background-color 0.25s var(--ease);
+    }
+    .header-golfer:hover { background: var(--stone); }
+    .golfer-tabs, .admin-tabs { display: flex; border-bottom: 1px solid var(--line); }
+    .golfer-tabs button, .admin-tabs button {
+        padding: 0.875rem 1.25rem;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--mute);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+    }
+    .golfer-tabs button { flex: 1; }
+    .golfer-tabs button[aria-selected='true'], .admin-tabs button[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--green); }
+    .admin-tabs { overflow-x: auto; }
+    .admin-tabs button { white-space: nowrap; }
+    .golfer-perks { display: grid; gap: 0.5rem; }
+    .golfer-perks li { position: relative; padding-left: 1.5rem; }
+    .golfer-perks li::before { content: ''; position: absolute; left: 0.125rem; top: 0.5em; width: 0.75rem; height: 0.375rem; border: solid var(--green-text); border-width: 0 0 2px 2px; rotate: -45deg; }
+    .golfer-perks-lg { gap: 1.25rem; font-size: 1.0625rem; }
+    .golfer-perks-lg b { color: var(--ink); }
+    .golfer-check { display: flex; align-items: center; gap: 0.625rem; font-size: 0.9375rem; color: var(--ink); }
+    .golfer-check input { width: 1.125rem; height: 1.125rem; accent-color: var(--green); }
+    .golfer-error { font-size: 0.875rem; font-weight: 600; color: #B3261E; }
+    .golfer-error:empty { display: none; }
+    :root[data-theme='dark'] .golfer-error { color: #F2B8B5; }
+    .golfer-builds { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); }
+    .golfer-build { border: 1px solid var(--line); background: var(--paper); }
+    .golfer-build img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--stone); }
+    .golfer-rows { display: grid; gap: 0.375rem; font-size: 0.875rem; }
+    .golfer-rows div { display: grid; grid-template-columns: 7rem 1fr; gap: 0.75rem; }
+    .golfer-rows dt { color: var(--mute); }
+    .golfer-rows dd { color: var(--ink); }
+
+    /* ---- Admin (account.js) ---- */
+    .admin-table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+    .admin-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .admin-table th { text-align: left; font-weight: 600; color: var(--ink); background: var(--stone); padding: 0.75rem 1rem; white-space: nowrap; }
+    .admin-table td { padding: 0.75rem 1rem; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+    .admin-table summary { cursor: pointer; font-weight: 600; color: var(--ink); white-space: nowrap; }
+    .admin-table .golfer-rows { min-width: 18rem; }
+    .admin-table select { border: 1px solid var(--field-border); border-radius: var(--radius); background: var(--paper); color: var(--ink); padding: 0.375rem 0.5rem; }
+    .admin-table th.text-right { text-align: right; }
+    .bundle-parts { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .bundle-parts button { padding: 0.5rem 1rem; border: 1px solid var(--field-border); border-radius: var(--radius); font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+    .bundle-parts button:hover { background: var(--stone); }
+    .bundle-parts button[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+    .bundle-table .bundle-group th { background: var(--paper); border-top: 2px solid var(--line); padding-top: 1.25rem; white-space: normal; }
+    .bundle-tag { display: inline-flex; align-items: baseline; gap: 0.375rem; padding: 0.25rem 0.625rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--stone); color: var(--ink); font-weight: 600; }
+    .bundle-tag small { font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); }
+    .bundle-table .bundle-columns th { border-top: 1px solid var(--line); }
+    .bundle-table .bundle-editing td { background: var(--stone); }
+    .bundle-table .bundle-editing input { background: var(--paper); }
+    /* ---- Admin workspace (account.js renderAdminPage): its own sidebar and canvas; the site's header and footer
+       are hidden there (body.admin-mode, set in renderApp). One sans family, tabular figures, colour only for status. ---- */
+    .admin-mode #main-header, .admin-mode .site-footer { display: none; }
+    .admin-mode, .admin-mode #app-viewport { background: var(--adm-canvas); }
+    .admin-mode #app-viewport { padding-top: 0; }
+    .adm { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; font-family: var(--font-text); font-variant-numeric: tabular-nums; }
+    .adm-side { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 1.5rem; padding: 1.25rem 0.875rem; background: var(--adm-side); border-right: 1px solid var(--line); overflow-y: auto; }
+    .adm-brand { display: flex; align-items: center; gap: 0.625rem; padding: 0 0.5rem; }
+    .adm-brand span { padding-left: 0.625rem; border-left: 1px solid var(--line); font-size: 0.8125rem; font-weight: 600; color: var(--ink-2); }
+    .adm-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .adm-nav-group { padding: 1rem 0.625rem 0.375rem; font-size: 0.75rem; font-weight: 600; color: var(--mute); }
+    .adm-nav-group:first-child { padding-top: 0; }
+    .adm-nav button { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; padding: 0.5rem 0.625rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; color: var(--ink-2); text-align: left; }
+    .adm-nav button:hover { background: var(--adm-hover); color: var(--ink); }
+    .adm-nav button[aria-current='page'] { background: var(--adm-panel); color: var(--ink); font-weight: 600; box-shadow: inset 3px 0 0 var(--green); }
+    .adm-count { min-width: 1.375rem; padding: 0 0.375rem; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 0.75rem; font-weight: 600; line-height: 1.375rem; text-align: center; }
+    .adm-me { padding: 1rem 0.625rem 0; border-top: 1px solid var(--line); }
+    .adm-me-name { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+    .adm-me-role { font-size: 0.8125rem; color: var(--mute); }
+    .adm-me-links { display: flex; flex-direction: column; align-items: flex-start; gap: 0.375rem; margin-top: 0.75rem; font-size: 0.8125rem; color: var(--ink-2); }
+    .adm-me-links a:hover, .adm-me-links button:hover { color: var(--ink); text-decoration: underline; }
+    .adm-main { min-width: 0; padding: 2rem 2.5rem 4rem; }
+    .adm-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
+    .adm-title { font-family: var(--font-text); font-size: 1.375rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; color: var(--ink); }
+    .adm-sub { margin-top: 0.25rem; font-size: 0.875rem; color: var(--mute); }
+    .adm-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .adm-btn { display: inline-flex; align-items: center; height: 2.25rem; padding: 0 0.875rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--adm-panel); font-size: 0.8125rem; font-weight: 600; color: var(--ink); }
+    .adm-btn:hover { background: var(--adm-hover); }
+
+    /* The quotation pipeline: one stage per step, in order, with an arrow between them; a stage is also its filter */
+    .adm-pipeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 1.5rem; border: 1px solid var(--line); border-radius: 8px; background: var(--adm-panel); overflow: hidden; }
+    .adm-pipeline li { position: relative; }
+    .adm-pipeline li + li { border-left: 1px solid var(--line); }
+    .adm-pipeline li + li::before { content: ''; position: absolute; z-index: 1; left: -7px; top: 50%; width: 12px; height: 12px; transform: translateY(-50%) rotate(45deg); background: var(--adm-panel); border-top: 1px solid var(--line); border-right: 1px solid var(--line); pointer-events: none; }
+    .adm-pipeline button { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; width: 100%; height: 100%; padding: 0.875rem 1.25rem 0.875rem 1.5rem; text-align: left; }
+    .adm-pipeline button:hover { background: var(--adm-hover); }
+    .adm-pipeline button[aria-pressed='true'] { background: var(--adm-hover); box-shadow: inset 0 -3px 0 var(--green); }
+    /* The arrow belongs to the stage on its left, so it takes that stage's fill */
+    .adm-pipeline li:has(> button:hover) + li::before,
+    .adm-pipeline li:has(> button[aria-pressed='true']) + li::before { background: var(--adm-hover); }
+    .adm-pipeline-n { font-size: 1.75rem; font-weight: 600; line-height: 1; color: var(--ink); }
+    .adm-pipeline-label { font-size: 0.8125rem; color: var(--ink-2); }
+    .adm-pipeline-note { font-size: 0.75rem; font-weight: 600; color: var(--adm-on-bad); }
+
+    /* The sections' tables, panels and controls, made compact for the workspace */
+    .adm .admin-table-wrap { border: 1px solid var(--line); border-radius: 8px; background: var(--adm-panel); }
+    .adm .admin-table { font-size: 0.8125rem; }
+    .adm .admin-table th { padding: 0.625rem 0.875rem; background: var(--adm-panel); border-bottom: 1px solid var(--line); font-size: 0.75rem; color: var(--mute); }
+    .adm .admin-table td { padding: 0.625rem 0.875rem; }
+    .adm .admin-table tbody tr:hover > td { background: var(--adm-hover); }
+    .adm .admin-table select, .adm .quotation-num { border-radius: 6px; background: var(--adm-panel); }
+    .adm .bundle-table .bundle-group th { background: var(--adm-canvas); color: var(--ink); font-size: 0.8125rem; border-top: 1px solid var(--line); }
+    .adm .bundle-table .bundle-columns th { background: var(--adm-panel); }
+    .adm .bundle-table .bundle-editing td, .adm .bundle-table .bundle-editing:hover > td { background: var(--adm-canvas); }
+    .adm .bundle-tag { border-radius: 6px; background: var(--adm-panel); font-size: 0.8125rem; }
+    .adm .bundle-tag small { text-transform: none; letter-spacing: 0; font-size: 0.75rem; }
+    .adm .bundle-parts button { border-radius: 6px; background: var(--adm-panel); font-size: 0.8125rem; padding: 0.4375rem 0.875rem; }
+    .adm .bundle-parts button[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+    .adm .admin-card { border-radius: 8px; background: var(--adm-panel); }
+    .adm .type-md { font-family: var(--font-text); font-size: 1rem; font-weight: 600; letter-spacing: 0; line-height: 1.3; }
+    .adm .type-lg { font-family: var(--font-text); font-size: 1.375rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+    .adm .btn { min-height: 2.25rem; padding: 0 0.875rem; border-radius: 6px; font-size: 0.8125rem; }
+    .adm .field label { font-size: 0.8125rem; }
+    .adm .field input, .adm .field select, .adm .field textarea { border-radius: 6px; background: var(--adm-panel); font-size: 0.875rem; }
+    .adm .field input, .adm .field select { min-height: 2.5rem; height: 2.5rem; padding-top: 0; padding-bottom: 0; }
+    .adm .measure { font-size: 0.9375rem; }
+
+    /* Signing in: one panel on the workspace canvas */
+    .adm-signin { min-height: 100vh; display: grid; place-items: center; padding: 2rem 1rem; background: var(--adm-canvas); font-family: var(--font-text); }
+    .adm-signin-card { display: grid; gap: 1.25rem; width: min(100%, 24rem); padding: 2rem; border: 1px solid var(--line); border-radius: 10px; background: var(--adm-panel); }
+    .adm-signin-card .field input { border-radius: 6px; }
+    .adm-signin-card .btn { border-radius: 6px; }
+
+    /* Narrow screens: the sidebar becomes a bar across the top, its sections a scrolling row */
+    @media (max-width: 1023px) {
+        .adm { grid-template-columns: minmax(0, 1fr); }
+        .adm-side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; padding: 0.75rem 1rem; border-right: 0; border-bottom: 1px solid var(--line); }
+        .adm-nav { order: 3; flex: 1 0 100%; flex-direction: row; overflow-x: auto; gap: 0.25rem; }
+        .adm-nav-group { display: none; }
+        .adm-nav button { width: auto; white-space: nowrap; }
+        .adm-nav button[aria-current='page'] { box-shadow: inset 0 -2px 0 var(--green); }
+        .adm-me { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; padding: 0; border-top: 0; }
+        .adm-me-role { display: none; }
+        .adm-me-links { flex-direction: row; margin-top: 0; gap: 0.75rem; }
+        .adm-main { padding: 1.25rem 1rem 3rem; }
+        .adm-pipeline { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(9.5rem, 1fr); overflow-x: auto; }
+    }
+
+    /* Quotations (account.js) */
+    .quotation-status { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; background: var(--stone); color: var(--ink); }
+    .quotation-submitted { background: var(--adm-wait); color: var(--adm-on-wait); }
+    .quotation-approved { background: var(--adm-good); color: var(--adm-on-good); }
+    .quotation-returned { background: var(--adm-bad); color: var(--adm-on-bad); }
+    .quotation-sent { background: var(--ink); color: var(--paper); }
+    .quotation-num { width: 7.5rem; text-align: right; border: 1px solid var(--field-border); border-radius: var(--radius); background: var(--paper); color: var(--ink); padding: 0.375rem 0.5rem; }
+    .quotation-note { border-left: 3px solid #B3261E; background: var(--stone); padding: 0.75rem 1rem; font-size: 0.9375rem; color: var(--ink); }
+    .quotation-totals { display: grid; gap: 0.5rem; align-content: start; font-size: 0.9375rem; }
+    .quotation-totals div { display: flex; justify-content: space-between; align-items: center; gap: 1rem; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; }
+    .quotation-totals dt { color: var(--ink-2); }
+    .quotation-totals dd { color: var(--ink); text-align: right; }
+    .quotation-totals .quotation-total { font-size: 1.25rem; font-weight: 700; border-bottom: 2px solid var(--ink); }
+    .quotation-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
+    .admin-card { border: 1px solid var(--line); padding: 1.25rem 1.5rem; }
+    .admin-card summary { cursor: pointer; }
+    .admin-badge { display: inline-block; margin-left: 0.5rem; padding: 0.125rem 0.5rem; border-radius: var(--radius); background: var(--green); color: var(--on-green); font-size: 0.75rem; font-weight: 600; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2112,15 +2341,8 @@
     .lineup .lineup-cart:focus-visible {
         transform: none;
     }
-    .branch-map-sweep {
-        display: none;
-    }
-    .branch-route,
-    .branch-pin-pulse {
-        animation: none;
-    }
-    .branch-pin-pulse {
-        opacity: 0;
+    .branch-marker-dot {
+        transition: none;
     }
     .battery-bar,
     .battery-row {

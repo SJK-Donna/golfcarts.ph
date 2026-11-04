@@ -36,12 +36,13 @@ const MASKS = {
             polys: [
             // Front cowl, below the dash line, down to the black bumper
             [[742, 606], [800, 589], [1000, 582], [1150, 583], [1210, 607], [1236, 640], [1246, 715], [1248, 760], [1100, 805], [900, 805], [740, 765], [715, 700]],
-            // Side panel and rear corner, under the seat
-            [[290, 670], [318, 610], [400, 605], [425, 650], [470, 698], [738, 695], [745, 750], [722, 815], [600, 845], [420, 845], [400, 770], [300, 760]]
+            // Side panel and rear corner, under the seat, up to the hip restraint bar's lower edge
+            [[290, 670], [318, 610], [400, 605], [404, 612], [418, 654], [512, 699], [738, 695], [745, 750], [722, 815], [600, 845], [420, 845], [393, 768], [300, 760]]
         ] },
         // fringeLight: the white seat's outermost pixels, blended with the post or trim beside them, are taken in too
+        // Below the hip restraint bar's lower edge is the side panel, not seat: the same white, so the outline stops there
         seat: { refs: ['#d4d1cc', '#dedcd8', '#e9e8e5', '#bdbab5'], kL: 2.5, tol: 10, minL: 50, fringeLight: true, polys: [
-            [[225, 248], [240, 233], [420, 235], [445, 258], [445, 330], [418, 345], [410, 392], [245, 392], [226, 345]]
+            [[225, 248], [240, 233], [420, 235], [445, 258], [445, 330], [418, 345], [410, 392], [289, 392], [234, 364], [226, 343]]
         ] },
         canopy: { refs: ['#9d9c98', '#a5a4a0', '#d9d8d4', '#eeeeec', '#c0bfbb'], kL: 2.5, tol: 10, minL: 45, full: true, solid: true, allowWhite: true, polys: [
             [[340, 190], [450, 125], [600, 80], [700, 72], [900, 85], [1100, 135], [1115, 150], [1100, 153], [1000, 162], [800, 190], [600, 208], [400, 205], [345, 196]]
@@ -49,9 +50,16 @@ const MASKS = {
     },
     'golfer-2-scratch-right': {
         body: { refs: ['#ddd6cc', '#c3b8af', '#eeeadf', '#d2c9bd', '#b3a79c', '#9d9185', '#8a7f74', '#a8a097'], kL: 2.5, tol: 8, minL: 38, full: true,
-            // Headlights (their white LED bars match the paint) and the badge; and (traced) the top of the rear
-            // fender, the rocker below the side panel and the front bumper, where the paint's grey shadows ran on
-            exclude: [[[958, 684], [1082, 688], [1106, 740], [1094, 766], [994, 756], [960, 722]], [[1248, 668], [1290, 656], [1298, 740], [1266, 754], [1250, 722]], [[1150, 721], [1224, 721], [1224, 760], [1150, 760]],
+            // Left headlight: its white LED bars match the paint, so nothing there starts the body, but the paint runs up
+            // to its black frame (see guarded)
+            guard: [[[958, 684], [1082, 688], [1106, 740], [1094, 766], [994, 756], [960, 722]]],
+            // Traced: the left headlight inside the middle of its black frame (the LED bars touch the frame, so growth got
+            // in), the right headlight out to its frame's outer edge, and the badge out to its rim; a light speck on the
+            // rear fender and the hip restraint bar's highlight; and the top of the rear fender, the rocker below the
+            // side panel and the front bumper, where the paint's grey shadows ran on
+            exclude: [[[963, 686], [1073, 701], [1090, 714], [1110, 741], [1108, 751], [1098, 765], [1030, 755], [986, 739], [972, 725], [961, 699]],
+                [[1264, 662], [1273, 655], [1289, 662], [1294, 686], [1291, 716], [1276, 740], [1260, 754], [1249, 750], [1246, 700], [1252, 680]],
+                [[1146, 719], [1221, 714], [1224, 752], [1149, 756]], [[290, 765], [345, 765], [345, 800], [290, 800]], [[452, 634], [484, 634], [484, 650], [452, 650]],
                 ...traced([
                     [[158, 398], [185, 400], [200, 405], [215, 415], [150, 420]],
                     [[230, 472], [275, 476], [275, 488], [230, 488]],
@@ -59,7 +67,8 @@ const MASKS = {
                 ])],
             polys: [
             [[790, 620], [850, 585], [1000, 568], [1180, 593], [1300, 648], [1335, 700], [1335, 812], [1100, 852], [900, 842], [800, 812], [775, 750]],
-            [[284, 655], [300, 625], [330, 622], [480, 640], [520, 700], [800, 700], [802, 770], [780, 852], [450, 870], [420, 875], [375, 815], [284, 770]]
+            // up to the panel's lit top lip under the cushion
+            [[284, 655], [300, 625], [330, 622], [480, 640], [518, 688], [590, 692], [800, 700], [802, 770], [780, 852], [450, 870], [420, 875], [375, 815], [284, 770]]
         ] },
         // tones: the Tsunami seat's grey panels and silver stripes, traced (light from the left makes the black
         // outer bolsters as bright as the panels, so lightness can't tell them apart); the rest is black bolster
@@ -77,10 +86,11 @@ const MASKS = {
                     [[327.5, 355], [360, 351], [357.5, 372.5], [337.5, 375]]
                 ]
             },
-            // Traced on the photo; the hip restraint bar in front of the cushion is left alone
+            // Traced on the photo; the hip restraint bar in front of the cushion is left alone, and the outline stops at the
+            // cushion's dark bottom edge, as the side panel's lit lip below it is as light as the seat
             exclude: [[[232, 328], [250, 320], [300, 382], [300, 396], [285, 396], [232, 350]]],
             polys: [
-            [[248, 222], [262, 214], [300, 214], [308, 228], [350, 226], [356, 216], [400, 216], [408, 232], [422, 248], [440, 258], [444, 300], [440, 340], [452, 352], [452, 384], [420, 392], [350, 396], [302, 396], [286, 388], [246, 348], [232, 334], [230, 300], [232, 255]]
+            [[248, 222], [262, 214], [300, 214], [308, 228], [350, 226], [356, 216], [400, 216], [408, 232], [422, 248], [440, 258], [444, 300], [440, 340], [452, 352], [452, 384], [420, 392], [350, 396], [326, 396], [297, 387.5], [286, 388], [246, 348], [232, 334], [230, 300], [232, 255]]
         ] },
         // The roof and its underside, down to where the side curtains hang from it
         canopy: { refs: ['#a18d72', '#7a6850', '#c4b294', '#d6c7aa', '#8f7c62'], kL: 2.5, tol: 10, full: true, polys: [
@@ -89,9 +99,15 @@ const MASKS = {
     },
     'golfer-2-pro': {
         body: { refs: ['#828085', '#827b6c', '#d2d5e1', '#9b999e', '#6b6a6f', '#b4b4ba', '#5a595e', '#4a494e', '#e6e7ee', '#3e3d42', '#333237'], kL: 2.5, tol: 11, minL: 18, growMinL: 12, full: true,
-            // Headlights, badge, and (traced) the charcoal plastic: the rear fender with the rocker strip below the
-            // side panel, and the front fender and bumper below the headlights. In shadow they match the dark paint.
-            exclude: [[[916, 676], [1062, 688], [1074, 766], [1056, 778], [934, 758], [916, 712]], [[1198, 658], [1262, 646], [1268, 742], [1210, 754]], [[1098, 712], [1190, 712], [1190, 764], [1098, 764]],
+            // Left headlight: the paint runs up to its dark frame (see guarded)
+            guard: [[[916, 676], [1062, 688], [1074, 766], [1056, 778], [934, 758], [916, 712]]],
+            // Traced: the right headlight's lens and frame (seen side-on, the frame doesn't close, so growth would get in)
+            // and the badge's chrome rim; the charcoal plastic (the rear fender with the rocker strip below the side
+            // panel, and the front fender and bumper below the headlights), which in shadow matches the dark paint; and
+            // the side vent with its lower slats and the front fender's edge beside it
+            exclude: [[[1236, 659], [1248, 655], [1255, 663], [1256, 701], [1254, 717], [1219, 749], [1212, 744], [1210, 689]],
+                [[1100, 719], [1182, 711], [1187, 750], [1103, 762]],
+                [[611, 806], [620, 799], [727, 784], [732, 772], [737, 756], [762, 756], [762, 880], [600, 880], [605, 862], [607, 840]],
                 ...traced([
                     [[148.3, 386.7], [166.7, 382.7], [186.7, 386], [205, 396.7], [217.3, 414], [227.3, 436.7], [234, 453.3], [241.7, 466], [340, 474.3], [343.3, 493.3],
                         [240, 493.3], [230, 480], [220, 460], [206.7, 440], [183.3, 426.7], [150, 450]],
@@ -102,7 +118,8 @@ const MASKS = {
                 ])],
             polys: [
             [[790, 625], [870, 580], [1000, 572], [1150, 593], [1252, 648], [1275, 750], [1255, 812], [1100, 845], [900, 842], [800, 812], [775, 750]],
-            [[268, 650], [310, 618], [410, 648], [440, 700], [800, 700], [802, 770], [762, 862], [450, 870], [410, 875], [365, 810], [290, 770], [262, 720]]
+            // up to the light rim of the panel's top, below the seat frame
+            [[268, 650], [310, 618], [400, 632], [430, 646], [443, 659], [552, 703], [800, 700], [802, 770], [762, 862], [450, 870], [410, 875], [365, 810], [290, 770], [262, 720]]
         ] },
         // fringe: the caramel seat's soft outline is taken in too, or a caramel line showed round a repainted seat.
         // tones: the pleated centre panels (two-tone seats paint them in the lighter color; the rest is bolster).
@@ -292,6 +309,12 @@ function toLab(r, g, b) {
 const hexLab = h => toLab(...[1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)));
 
 // Inside one of the part's cut-outs, unless also inside one of its `include` outlines (a gap in a cut-out)
+// guard: outlines (lights, badges) where no pixel starts the part, though growth may still reach in over smooth paint;
+// it stops at the jump to the light's dark frame, so the paint runs right up to the frame and no further
+function guarded(spec, x, y) {
+    return !!(spec.guard && spec.guard.some(p => inPoly(x, y, p)));
+}
+
 function cutOut(spec, x, y) {
     return !!(spec.exclude && spec.exclude.some(p => inPoly(x, y, p)) && !(spec.include && spec.include.some(p => inPoly(x, y, p))));
 }
@@ -395,7 +418,7 @@ for (const [name, parts] of order) {
             continue;
         }
         const scale = list => list && list.map(poly => poly.map(([x, y]) => [x * K, y * K]));
-        const spec = traced.full ? traced : { ...traced, polys: scale(traced.polys), exclude: scale(traced.exclude), include: scale(traced.include) };
+        const spec = traced.full ? traced : { ...traced, polys: scale(traced.polys), exclude: scale(traced.exclude), include: scale(traced.include), guard: scale(traced.guard) };
         const refs = spec.refs.map(hexLab);
         for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
             if (!spec.polys.some(p => inPoly(x, y, p))) continue;
@@ -404,7 +427,7 @@ for (const [name, parts] of order) {
             const [L, a, b] = toLab(data[i], data[i + 1], data[i + 2]);
             if (spec.minL && L < spec.minL) continue;
             if (blownWhite(part, spec, L, a, b)) continue;
-            if (cutOut(spec, x, y)) continue;
+            if (cutOut(spec, x, y) || guarded(spec, x, y)) continue;
             if (part === 'body' && (mask[i + 1] || mask[i + 2])) continue;
             if (spec.seed) {
                 if (spec.seed(L, a, b)) mask[i + channel[part]] = 255;

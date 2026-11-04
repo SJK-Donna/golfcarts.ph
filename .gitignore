@@ -10,9 +10,10 @@ credentials*.json
 node_modules/
 
 # Build output / caches
-# css/ and fonts/ in the root are build copies for previewing the source folder (npm run build)
+# css/, fonts/ and vendor/ in the root are build copies for previewing the source folder (npm run build)
 /css/
 /fonts/
+/vendor/
 dist/
 build/
 _site/
@@ -25,3 +26,6 @@ _site/
 Thumbs.db
 .vscode/
 .idea/
+
+# Private data for Supabase (supplier costs): loaded by hand, never committed
+supabase/private/

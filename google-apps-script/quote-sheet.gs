@@ -1,11 +1,20 @@
-// Quote requests from golfcarts.ph: each one is saved as a row in this Sheet, and the customer and the
-// owner both get an email with the quotation attached as a PDF.
+// Quote requests from golfcarts.ph: each one is saved as a row in this Sheet; the customer gets an email saying it
+// was received (no prices), and the owner and the sales managers get it with the build attached as a PDF.
+// Priced quotations: a sales manager prepares one in the site's admin (Supabase), a master admin approves it, and
+// the admin asks this script for its PDF (action quotationPdf) or to email it to the customer (action
+// sendQuotation). The script loads the quotation from Supabase with the staff member's own sign-in, so it only
+// ever sends what the database lets that person see, and only once a master admin has approved it.
 //
 // Setup (in the Google Sheet): Extensions > Apps Script, paste this file, save, then
 // Deploy > New deployment > Web app, Execute as: Me, Who has access: Anyone. Put the web app URL in
 // QUOTE_SHEET_URL in app.js. After editing this file, Deploy > Manage deployments > Edit > New version.
 
 const OWNER_EMAIL = 'donnavalonda@sjkguahan.com';
+// Told about every new request, with the owner
+const SALES_EMAILS = ['jerusvergara@sjkguahan.com', 'jasperbuiza@sjkguahan.com'];
+// The site's Supabase project and its publishable key (the same as in account.js; safe to share)
+const SUPABASE_URL = 'https://xcmkkvzxstzxqefhhgxa.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_zEHyhUcCcO14meqwN3uPuQ_3jLs4-CM';
 const COMPANY = {
   name: 'Golfcarts.ph',
   legal: 'SJK Guahan Inc.',
@@ -24,6 +33,7 @@ function doPost(e) {
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
+    if (e.parameter.action === 'quotationPdf' || e.parameter.action === 'sendQuotation') return json(quotationAction(e.parameter));
     const q = readRequest(e.parameter);
     saveRow(q);
     sendEmails(q);
@@ -87,18 +97,18 @@ function sendEmails(q) {
   if (q.logo) inlineImages.logo = q.logo;
   if (q.photo) inlineImages.photo = q.photo;
   const logo = q.logo && 'cid:logo', photo = q.photo && 'cid:photo';
+  // The customer: an acknowledgement with their build, no prices and no PDF; the priced quotation follows once approved
   MailApp.sendEmail({
     to: q.email,
     replyTo: OWNER_EMAIL,
     name: COMPANY.name,
-    subject: 'Your quotation request ' + q.reference,
+    subject: 'We received your quotation request ' + q.reference,
     htmlBody: emailHtml(q, logo, photo, 'Thank you, ' + esc(q.name) + '!',
-      'We received your quotation request. Your build is summarized below and attached as a PDF. Our team will contact you with pricing and availability.'),
-    inlineImages: inlineImages,
-    attachments: [pdf]
+      'We received your quotation request. Your build is summarized below. Our sales team will prepare your quotation and email it to you.'),
+    inlineImages: inlineImages
   });
   MailApp.sendEmail({
-    to: OWNER_EMAIL,
+    to: [OWNER_EMAIL].concat(SALES_EMAILS).join(','),
     replyTo: q.email,
     name: COMPANY.site + ' quotes',
     subject: 'New quotation request ' + q.reference + ' from ' + q.name,
@@ -228,6 +238,120 @@ function quotationHtml(q, logo, photo) {
     '<p style="font-size:12px;line-height:1.6;margin:0">Pricing for this build will be confirmed by our sales team. ' +
     'This document summarizes the build requested and is not yet a final price offer.</p>' +
     '<div style="page-break-inside:avoid">' + heading('What happens next') + nextSteps() + footer() + '</div></body></html>';
+}
+
+// ---------- Priced quotations (from the admin) ----------
+
+// A Supabase REST call made as the signed-in staff member (their access token), so the database's rules apply
+function supabase(path, token, method, body) {
+  const res = UrlFetchApp.fetch(SUPABASE_URL + path, {
+    method: method || 'get',
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token, Prefer: 'return=representation' },
+    contentType: 'application/json',
+    payload: body ? JSON.stringify(body) : undefined,
+    muteHttpExceptions: true
+  });
+  const text = res.getContentText();
+  if (res.getResponseCode() >= 300) throw new Error('Supabase ' + res.getResponseCode() + ': ' + text.slice(0, 300));
+  return text ? JSON.parse(text) : null;
+}
+
+// quotationPdf: the quotation's PDF, to preview. sendQuotation: emails it to the customer (approved ones only)
+// and marks it sent. Returns { ok, pdf? } or { ok: false, error }.
+function quotationAction(p) {
+  const token = String(p.token || '');
+  const id = parseInt(p.id, 10);
+  if (!token || !id) throw new Error('Sign in to the admin first');
+  const user = supabase('/auth/v1/user', token);
+  const found = supabase('/rest/v1/quotations?id=eq.' + id + '&select=*', token);
+  if (!found || !found.length) throw new Error('Quotation not found, or you do not have access to it');
+  const qt = found[0];
+  const logo = imageBlob(p.logo, 'logo.png'), photo = imageBlob(p.photo, 'cart.jpg');
+  const dataUrl = b => b && 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes());
+  const q = quotationRequest(qt);
+  const pdf = Utilities.newBlob(pricedQuotationHtml(q, qt, dataUrl(logo), dataUrl(photo)), MimeType.HTML)
+    .getAs(MimeType.PDF).setName('Quotation ' + qt.reference + '.pdf');
+  if (p.action === 'quotationPdf') return { ok: true, pdf: Utilities.base64Encode(pdf.getBytes()) };
+
+  if (qt.status !== 'approved') throw new Error('Only an approved quotation can be sent');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(q.email)) throw new Error('The customer has no valid email');
+  const inlineImages = {};
+  if (logo) inlineImages.logo = logo;
+  MailApp.sendEmail({
+    to: q.email,
+    replyTo: user.email,
+    bcc: OWNER_EMAIL,
+    name: COMPANY.name,
+    subject: 'Your quotation ' + qt.reference + ' from ' + COMPANY.name,
+    htmlBody: '<div style="font-family:Arial,Helvetica,sans-serif;max-width:620px;margin:0 auto;color:' + C.ink + '">' +
+      '<div style="padding:16px 0;border-bottom:1px solid ' + C.line + '">' + logoOrName(logo && 'cid:logo', 40) + '</div>' +
+      '<h2 style="font-size:20px;margin:20px 0 6px">Your quotation is ready, ' + esc(q.name) + '</h2>' +
+      '<p style="font-size:14px;line-height:1.6;margin:0">Thank you for your interest in ' + esc(qt.title || 'our carts') + '. Your quotation ' +
+      esc(qt.reference) + ' is attached as a PDF. Reply to this email with any questions, or to confirm your order.</p>' +
+      '<p style="font-size:14px;margin:12px 0 0">Total: <b>' + peso(quotationTotals(qt).total) + '</b></p>' + footer() + '</div>',
+    inlineImages: inlineImages,
+    attachments: [pdf]
+  });
+  supabase('/rest/v1/quotations?id=eq.' + id, token, 'patch', { status: 'sent' });
+  return { ok: true };
+}
+
+// The quotation in the shape the request templates use
+function quotationRequest(qt) {
+  const c = qt.customer || {};
+  const rows = (qt.build_rows || []).filter(r => Array.isArray(r) && r.length === 2);
+  return { date: new Date(), reference: qt.reference, name: c.name || '', email: c.email || '', phone: c.phone || '',
+    branch: c.branch || '', model: qt.title || '', quantity: String(qt.units || 1), notes: '', rows: rows };
+}
+
+// Each line's unit price times its qty; the per-cart subtotal; times the number of carts, less the discount
+function quotationTotals(qt) {
+  const lines = (qt.lines || []).map(l => {
+    const qty = l.qty == null ? 1 : Number(l.qty);
+    const unit = l.price_php == null ? 0 : Number(l.price_php);
+    return { item: [l.part, l.option].filter(Boolean).join(' · '), description: l.description || '', qty: qty, unit: unit, amount: unit * qty };
+  });
+  const perCart = lines.reduce((s, l) => s + l.amount, 0);
+  const units = Number(qt.units || 1), discount = Number(qt.discount_php || 0);
+  return { lines: lines, perCart: perCart, units: units, discount: discount, total: perCart * units - discount };
+}
+
+function peso(n) {
+  return 'PHP ' + Number(n || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// The priced quotation: the request's layout, with a price table in place of the "pricing to follow" note
+function pricedQuotationHtml(q, qt, logo, photo) {
+  const t = quotationTotals(qt);
+  const cell = 'padding:6px 8px;border:1px solid ' + C.line + ';font-size:11px;vertical-align:top';
+  const head = 'padding:7px 8px;font-size:11px;font-weight:bold;color:#ffffff;background:' + C.ink;
+  const money = 'text-align:right;white-space:nowrap';
+  const sum = (label, value, bold) => '<tr><td colspan="3" style="' + cell + ';text-align:right' + (bold ? ';font-weight:bold' : '') + '">' + label +
+    '</td><td style="' + cell + ';' + money + (bold ? ';font-weight:bold;font-size:13px' : '') + '">' + value + '</td></tr>';
+  const priceTable = '<table style="width:100%;border-collapse:collapse;margin-top:8px">' +
+    '<tr><td style="' + head + '">ITEM</td><td style="' + head + ';text-align:center">QTY</td><td style="' + head + ';' + money + '">UNIT PRICE</td><td style="' + head + ';' + money + '">AMOUNT</td></tr>' +
+    t.lines.map(l => '<tr style="page-break-inside:avoid"><td style="' + cell + '"><b>' + esc(l.item) + '</b>' + (l.description ? '<br><span style="color:' + C.mute + '">' + esc(l.description) + '</span>' : '') +
+      '</td><td style="' + cell + ';text-align:center">' + l.qty + '</td><td style="' + cell + ';' + money + '">' + peso(l.unit) + '</td><td style="' + cell + ';' + money + '">' + peso(l.amount) + '</td></tr>').join('') +
+    sum('Price per cart', peso(t.perCart)) +
+    (t.units !== 1 ? sum('Number of carts', String(t.units)) : '') +
+    (t.discount ? sum('Discount', '- ' + peso(t.discount)) : '') +
+    sum('TOTAL', peso(t.total), true) + '</table>';
+  const date = Utilities.formatDate(q.date, 'Asia/Manila', 'MMMM d, yyyy');
+  return '<html><body style="font-family:Arial,Helvetica,sans-serif;color:' + C.ink + ';margin:28px 36px">' +
+    '<table style="width:100%;border-collapse:collapse"><tr>' +
+    '<td style="vertical-align:middle">' + logoOrName(logo, 46) + '</td>' +
+    '<td style="text-align:right;vertical-align:middle">' +
+    '<div style="font-size:26px;font-weight:bold;letter-spacing:1px;color:' + C.ink + '">QUOTATION</div>' +
+    '<div style="font-size:12px">Quotation No: <b>' + esc(q.reference) + '</b></div>' +
+    '<div style="font-size:12px">Date: ' + date + '</div></td></tr></table>' +
+    '<div style="border-bottom:3px solid ' + C.green + ';margin-top:10px"></div>' +
+    issued(q) +
+    hero(q, photo) +
+    specTable(buildRows(q)) +
+    heading('Price') + priceTable +
+    (qt.notes ? heading('Notes') + '<p style="font-size:12px;line-height:1.6;margin:0;white-space:pre-line">' + esc(qt.notes) + '</p>' : '') +
+    (qt.terms ? heading('Terms') + '<p style="font-size:11px;line-height:1.6;margin:0;white-space:pre-line;color:' + C.mute + '">' + esc(qt.terms) + '</p>' : '') +
+    footer() + '</body></html>';
 }
 
 function esc(v) {
