@@ -1370,7 +1370,7 @@ function goToHomeSection(sectionId) {
 }
 
 // Quote requests are saved in Supabase (recordQuote in account.js); the database then has the customer and the
-// staff emailed (supabase/functions/quotation-mail). Resolves false when the request couldn't be saved
+// staff emailed (google-apps-script/golfcarts-mail.gs). Resolves false when the request couldn't be saved
 async function sendQuoteRequest(form, fields, slug) {
     const button = form.querySelector('button[type="submit"]');
     if (button) button.disabled = true;

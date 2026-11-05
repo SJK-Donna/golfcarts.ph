@@ -315,10 +315,12 @@ create trigger quotations_workflow before insert or update on public.quotations
 -- The model photo for the quotation PDF (a path on the website, e.g. image/Products/builds/golfer-2-golfer.jpg)
 alter table public.quotations add column if not exists photo text not null default '';
 
--- ---------- Emails: sent by the Edge Function quotation-mail (supabase/functions/quotation-mail), through Resend ----------
--- The database tells the function when something happened (a quote request arrives; a quotation is submitted,
--- approved, returned or sent), with a secret only the two of them know (Vault secret "notify_secret", the same as
--- the function's NOTIFY_SECRET). The function reads the rest from the database itself and logs each email here.
+-- ---------- Emails: sent by the Google Apps Script google-apps-script/golfcarts-mail.gs, from a Google account ----------
+-- The database tells the script when something happened (a quote request arrives; a quotation is submitted,
+-- approved, returned or sent): it posts the record and the staff email lists to the script's web app address, with a
+-- secret only the two of them know. Both live in Vault: "mail_script_url" (the web app's /exec address) and
+-- "notify_secret" (the same as the script's NOTIFY_SECRET property). The script reports each email back through
+-- log_mail, with the same secret, and staff see them in the admin.
 create extension if not exists pg_net;
 
 create table if not exists public.email_log (
@@ -333,23 +335,47 @@ create table if not exists public.email_log (
 );
 create index if not exists email_log_ref on public.email_log (ref_table, ref_id);
 
--- Tells the function about an event; does nothing until the Vault secret is set, and never stops the change itself
+-- Tells the script about an event; does nothing until both Vault secrets are set, and never stops the change itself
 create or replace function public.notify_mail(event text, ref_id bigint) returns void
 language plpgsql security definer set search_path = public as $$
 declare
     secret text;
+    script_url text;
+    rec jsonb;
 begin
     select decrypted_secret into secret from vault.decrypted_secrets where name = 'notify_secret' limit 1;
-    if secret is null then return; end if;
+    select decrypted_secret into script_url from vault.decrypted_secrets where name = 'mail_script_url' limit 1;
+    if secret is null or script_url is null then return; end if;
+    if event = 'quote_created' then
+        select to_jsonb(q) into rec from public.quotes q where q.id = ref_id;
+    else
+        select to_jsonb(q) into rec from public.quotations q where q.id = ref_id;
+    end if;
     perform net.http_post(
-        url := 'https://xcmkkvzxstzxqefhhgxa.supabase.co/functions/v1/quotation-mail',
-        headers := jsonb_build_object('Content-Type', 'application/json', 'x-notify-secret', secret),
-        body := jsonb_build_object('event', event, 'id', ref_id)
+        url := script_url,
+        headers := jsonb_build_object('Content-Type', 'application/json'),
+        body := jsonb_build_object('secret', secret, 'event', event, 'id', ref_id, 'record', rec,
+            'staff', jsonb_build_object(
+                'master', coalesce((select jsonb_agg(email order by email) from public.staff where role = 'master'), '[]'::jsonb),
+                'sales', coalesce((select jsonb_agg(email order by email) from public.staff where role = 'sales'), '[]'::jsonb)))
     );
 exception when others then
-    raise warning 'quotation-mail not notified: %', sqlerrm;
+    raise warning 'mail script not notified: %', sqlerrm;
 end $$;
 revoke execute on function public.notify_mail(text, bigint) from public, anon, authenticated;
+
+-- The script logs each email it sent (or failed to send). Callable without a sign-in, so the secret is required.
+create or replace function public.log_mail(secret text, kind text, ref_table text, ref_id bigint, to_addresses text, status text, error text default '')
+returns void language plpgsql security definer set search_path = public as $$
+begin
+    if secret is null or secret is distinct from (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret' limit 1) then
+        raise exception 'Not allowed';
+    end if;
+    insert into public.email_log (kind, ref_table, ref_id, to_addresses, status, error)
+    values (left(kind, 60), ref_table, ref_id, left(to_addresses, 1000), status, left(coalesce(error, ''), 1000));
+end $$;
+revoke execute on function public.log_mail(text, text, text, bigint, text, text, text) from public;
+grant execute on function public.log_mail(text, text, text, bigint, text, text, text) to anon, authenticated;
 
 create or replace function public.quote_created_mail() returns trigger
 language plpgsql security definer set search_path = public as $$
