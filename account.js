@@ -1871,10 +1871,23 @@ function exportAdminData() {
         `golfcarts-admin-${exported.slice(0, 10)}.json`);
 }
 
+// The quote requests as a spreadsheet (CSV, opens in Excel or Google Sheets)
 function exportAdminQuotes() {
     if (!pageData || !pageData.quotes) return;
-    const exported = new Date().toISOString();
-    downloadJson({ exported, by: currentAdmin().email, quotes: pageData.quotes }, `golfcarts-quotes-${exported.slice(0, 10)}.json`);
+    const cell = v => {
+        let s = String(v == null ? '' : v);
+        if (/^[=+\-@]/.test(s)) s = "'" + s; // so a customer's text can't run as a spreadsheet formula
+        return `"${s.replace(/"/g, '""')}"`;
+    };
+    const head = ['Reference', 'Date', 'Status', 'Name', 'Email', 'Phone', 'Model', 'Quantity', 'Branch', 'Source', 'Build', 'Notes', 'Status by', 'Status changed'];
+    const lines = pageData.quotes.map(q => [q.reference, q.created_at ? new Date(q.created_at).toLocaleString('en-PH') : '', q.status, q.name, q.email, q.phone, q.model, q.quantity, q.branch, q.source,
+        (q.rows || []).filter(r => Array.isArray(r)).map(r => `${r[0]}: ${r[1]}`).join('; '), q.notes, q.status_by, q.status_at ? new Date(q.status_at).toLocaleString('en-PH') : '']);
+    const csv = '﻿' + [head, ...lines].map(r => r.map(cell).join(',')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `golfcarts-quotes-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGolferModal(); });

@@ -25,8 +25,9 @@ const OWNER_EMAIL = 'donnavalonda@sjkguahan.com';
 // The site's Supabase project and its publishable key (the same as in account.js; safe to share)
 const SUPABASE_URL = 'https://xcmkkvzxstzxqefhhgxa.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_zEHyhUcCcO14meqwN3uPuQ_3jLs4-CM';
-// The live site, where the logo and cart photos are fetched from, and the admin is linked to
-const SITE_URL = 'https://golfcarts.ph/';
+// The live site, where the logo and cart photos are fetched from, and the admin is linked to.
+// GitHub Pages for now: golfcarts.ph doesn't point at this site yet. Change it when it does.
+const SITE_URL = 'https://sjk-donna.github.io/golfcarts.ph/';
 const COMPANY = {
   name: 'Golfcarts.ph',
   legal: 'SJK Guahan Inc.',
