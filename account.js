@@ -1670,20 +1670,38 @@ function rebuildQuotationLines() {
     if (suggested.unmatched.length) showToast(`Check: ${suggested.unmatched.join(', ')}`);
 }
 
-// The quotation's content as the database stores it. With the PDF's pages 2 and 3 (once schema.sql has added their
-// columns): the model's specifications, the warranty from the pricing settings, and upgrades the model can take
+// The quotation's content as the database stores it
 function quotationContent(qt) {
     const { customer, title, build_rows, build_group, units, lines, exchange_rate, freight_pct, margin_pct, discount_php, notes, terms } = qt;
-    const content = { customer, title, build_rows, build_group, units, lines, exchange_rate, freight_pct, margin_pct, discount_php, notes, terms };
-    if ('pdf_extra' in qt) Object.assign(content, { pdf_extra: quotationPdfExtra(qt), warranty: (pageData.pricing && pageData.pricing.warranty) || '' });
-    return content;
+    return { customer, title, build_rows, build_group, units, lines, exchange_rate, freight_pct, margin_pct, discount_php, notes, terms };
+}
+
+// The PDF's pages 2 and 3 as they should be now (once schema.sql has added their columns): the model's specifications,
+// the warranty from the pricing settings, and upgrades the model can take. Not part of the content, so storing them
+// doesn't send an approved quotation back to draft; a sent one keeps what it was sent with.
+function quotationPdfFields(qt) {
+    if (!('pdf_extra' in qt) || qt.status === 'sent') return {};
+    return { pdf_extra: quotationPdfExtra(qt), warranty: (pageData.pricing && pageData.pricing.warranty) || '' };
+}
+
+// Stores them if they changed (before a preview), keeping any unsaved edits in the editor
+async function refreshQuotationPdfFields() {
+    const fields = quotationPdfFields(quotationDraft);
+    const saved = pageData.quotations.find(x => x.id === quotationOpen);
+    if (!saved || !Object.keys(fields).some(k => JSON.stringify(fields[k]) !== JSON.stringify(saved[k]))) return;
+    const { data, error } = await sb.from('quotations').update(fields).eq('id', quotationOpen).select().single();
+    if (error) throw new Error(error.message);
+    pageData.quotations = pageData.quotations.map(x => x.id === data.id ? data : x);
+    Object.assign(quotationDraft, fields, { updated_by: data.updated_by, updated_at: data.updated_at });
 }
 
 const PDF_OFFER_LIMIT = 9;
 
 function quotationPdfExtra(qt) {
     const quote = pageData.quotes.find(q => q.id === qt.quote_id) || {};
-    const product = findProductRef(quote.slug) || findProductRef(rowValue(qt.build_rows, 'Model'));
+    const product = findProductRef(quote.slug)
+        || PRODUCTS_DATA.find(p => `${p.name} (${categoryLabel(p.category)})` === quote.model || p.name === quote.model)
+        || findProductRef(rowValue(qt.build_rows, 'Model'));
     if (!product) return { specs: [], offers: [] };
     const specs = [['Seating', product.seating], ['Range', product.range], ['Top speed', product.speed], ['Battery', product.battery],
         ['Charging time', product.chargingTime], ['Powertrain', product.powertrain], ...Object.entries(product.specs || {})]
@@ -1702,7 +1720,7 @@ function quotationPdfExtra(qt) {
 }
 
 async function writeQuotation(change, message) {
-    const { data: saved, error } = await sb.from('quotations').update(change).eq('id', quotationOpen).select().single();
+    const { data: saved, error } = await sb.from('quotations').update({ ...quotationPdfFields(quotationDraft), ...change }).eq('id', quotationOpen).select().single();
     if (error) { showToast(`Not saved: ${error.message}`); return false; }
     pageData.quotations = pageData.quotations.map(x => x.id === saved.id ? saved : x);
     quotationDraft = JSON.parse(JSON.stringify(saved));
@@ -1805,6 +1823,7 @@ async function previewQuotation() {
     // Opened before the wait, so the browser doesn't block it as a pop-up
     const win = window.open('', '_blank');
     try {
+        await refreshQuotationPdfFields();
         const url = URL.createObjectURL(await quotationMail('preview'));
         if (win) win.location = url; else window.open(url, '_blank');
     } catch (err) {
