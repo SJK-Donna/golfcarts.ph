@@ -244,7 +244,8 @@ function totals(qt) {
 // Images on the live site as data URLs (the PDF carries its images inline), fetched together; '' for any that
 // isn't an image (a wrong SITE_URL returns a web page, which would show as a broken image)
 function siteImages(paths) {
-  const wanted = paths.map(function (p) { return p ? SITE_URL + encodeURI(String(p).replace(/^\//, '')) : ''; });
+  // A path on the site, or a full address (a photo uploaded in the admin, in Supabase Storage)
+  const wanted = paths.map(function (p) { return !p ? '' : /^https?:\/\//.test(p) ? String(p) : SITE_URL + encodeURI(String(p).replace(/^\//, '')); });
   const urls = wanted.filter(Boolean);
   let responses = [];
   try {

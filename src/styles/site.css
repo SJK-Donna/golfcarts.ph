@@ -2600,6 +2600,19 @@
     .admin-card { border: 1px solid var(--line); padding: 1.25rem 1.5rem; }
     .admin-card summary { cursor: pointer; }
     .admin-badge { display: inline-block; margin-left: 0.5rem; padding: 0.125rem 0.5rem; border-radius: var(--radius); background: var(--green); color: var(--on-green); font-size: 0.75rem; font-weight: 600; }
+    .admin-badge-warn { background: var(--ink); color: var(--paper); }
+    /* Products: photo tiles with Replace / Original, and the spec rows */
+    .admin-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, calc(50% - 0.375rem)), 1fr)); gap: 0.75rem; }
+    .admin-photo { margin: 0; border: 1px solid var(--line); background: var(--adm-panel); }
+    .admin-photo-img { display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 3; background: var(--stone); }
+    .admin-photo-img img { width: 100%; height: 100%; object-fit: contain; }
+    .admin-photo figcaption { display: grid; gap: 0.25rem; padding: 0.5rem 0.625rem; }
+    .admin-photo-actions { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; }
+    .admin-photo-actions label { cursor: pointer; }
+    .admin-photo-actions label:has(+ input:focus-visible) { outline: 2px solid var(--green); outline-offset: 2px; }
+    .admin-photo-actions button:disabled { opacity: 0.35; cursor: default; }
+    .admin-spec-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 0.5rem; align-items: center; }
+    .admin-spec-row input { min-width: 0; min-height: 2.5rem; padding: 0 0.625rem; border: 1px solid var(--field-border); border-radius: var(--radius); background: var(--paper); color: var(--ink); font-size: 0.875rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

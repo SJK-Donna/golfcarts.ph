@@ -15,7 +15,7 @@
 -- ---------- Staff: who can use the admin, and as what ----------
 create table if not exists public.staff (
     email text primary key check (email = lower(email)),
-    role text not null check (role in ('master', 'sales')),
+    role text not null check (role in ('master', 'sales', 'marketing')),
     added_at timestamptz not null default now()
 );
 
@@ -27,8 +27,11 @@ insert into public.staff (email, role) values
     ('jerusvergara@sjkguahan.com', 'sales'),
     ('jasperbuiza@sjkguahan.com', 'sales')
 on conflict (email) do nothing;
+-- Marketing (added 2026-11-05): a table made before it allowed only master and sales
+alter table public.staff drop constraint if exists staff_role_check;
+alter table public.staff add constraint staff_role_check check (role in ('master', 'sales', 'marketing'));
 
--- The signed-in person's staff role ('master', 'sales'), or null for golfers and visitors.
+-- The signed-in person's staff role ('master', 'sales', 'marketing'), or null for golfers and visitors.
 -- security definer: it reads staff without going through staff's own policies (which call this function).
 create or replace function public.staff_role() returns text
 language sql stable security definer set search_path = public as $$
@@ -428,10 +431,10 @@ drop policy if exists staff_manage on public.staff;
 create policy staff_manage on public.staff for all to authenticated
     using (public.staff_role() = 'master') with check (public.staff_role() = 'master');
 
--- golfers: their own profile; staff read all
+-- golfers: their own profile; master admins and sales managers read all (not marketing)
 drop policy if exists golfers_read on public.golfers;
 create policy golfers_read on public.golfers for select to authenticated
-    using (id = auth.uid() or public.staff_role() is not null);
+    using (id = auth.uid() or public.staff_role() in ('master', 'sales'));
 drop policy if exists golfers_update_own on public.golfers;
 create policy golfers_update_own on public.golfers for update to authenticated
     using (id = auth.uid()) with check (id = auth.uid());
@@ -439,10 +442,10 @@ create policy golfers_update_own on public.golfers for update to authenticated
 revoke update on public.golfers from authenticated;
 grant update (name, phone, news) on public.golfers to authenticated;
 
--- saved builds: their own; staff read all
+-- saved builds: their own; master admins and sales managers read all
 drop policy if exists builds_read on public.saved_builds;
 create policy builds_read on public.saved_builds for select to authenticated
-    using (golfer_id = auth.uid() or public.staff_role() is not null);
+    using (golfer_id = auth.uid() or public.staff_role() in ('master', 'sales'));
 drop policy if exists builds_insert_own on public.saved_builds;
 create policy builds_insert_own on public.saved_builds for insert to authenticated
     with check (golfer_id = auth.uid());
@@ -456,7 +459,7 @@ create policy quotes_insert on public.quotes for insert to anon, authenticated
     with check ((golfer_id is null or golfer_id = auth.uid()) and status = 'New' and status_by is null);
 drop policy if exists quotes_read on public.quotes;
 create policy quotes_read on public.quotes for select to authenticated
-    using (golfer_id = auth.uid() or public.staff_role() is not null);
+    using (golfer_id = auth.uid() or public.staff_role() in ('master', 'sales'));
 drop policy if exists quotes_status on public.quotes;
 create policy quotes_status on public.quotes for update to authenticated
     using (public.staff_role() in ('master', 'sales')) with check (public.staff_role() in ('master', 'sales'));
@@ -467,12 +470,32 @@ create policy quotes_delete on public.quotes for delete to authenticated
 revoke update on public.quotes from anon, authenticated;
 grant update (status) on public.quotes to authenticated;
 
--- site edits: read by every visitor (the site applies them); written by master admins
+-- site edits: read by every visitor (the site applies them); written by master admins and marketing
 drop policy if exists edits_read on public.site_edits;
 create policy edits_read on public.site_edits for select to anon, authenticated using (true);
 drop policy if exists edits_write on public.site_edits;
 create policy edits_write on public.site_edits for all to authenticated
-    using (public.staff_role() = 'master') with check (public.staff_role() = 'master');
+    using (public.staff_role() in ('master', 'marketing')) with check (public.staff_role() in ('master', 'marketing'));
+
+-- Photos uploaded in the admin's Products (product, build, gallery and accessory photos): a public Storage bucket, so
+-- the site shows them to everyone; master admins and marketing upload and replace them. JPEG and PNG up to 10 MB
+-- (the admin resizes them to 1920px before uploading).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('site-photos', 'site-photos', true, 10485760, array['image/jpeg', 'image/png'])
+on conflict (id) do update set public = true, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
+drop policy if exists site_photos_read on storage.objects;
+create policy site_photos_read on storage.objects for select to authenticated
+    using (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'));
+drop policy if exists site_photos_upload on storage.objects;
+create policy site_photos_upload on storage.objects for insert to authenticated
+    with check (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'));
+drop policy if exists site_photos_change on storage.objects;
+create policy site_photos_change on storage.objects for update to authenticated
+    using (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'))
+    with check (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'));
+drop policy if exists site_photos_delete on storage.objects;
+create policy site_photos_delete on storage.objects for delete to authenticated
+    using (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'));
 
 -- bundles and sku_usd: read by staff (sales managers price quotations from them); changed by master admins only
 drop policy if exists bundles_master on public.bundles;

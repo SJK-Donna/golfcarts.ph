@@ -561,12 +561,18 @@ const ADMIN_ROLES = {
     sales: {
         label: 'Sales manager',
         can: ['quotes.view', 'quotes.status', 'quotations.prepare', 'golfers.view', 'golfers.news', 'export.quotes']
+    },
+    // Keeps the catalog looking right: product photos, text and specs, accessory photos, the homepage event. No
+    // customers, quotes, prices or costs
+    marketing: {
+        label: 'Marketing',
+        can: ['products.edit', 'content.edit']
     }
 };
 
 const ADMIN_PERMISSION_LABELS = [
     ['quotes.view', 'See quotes'], ['quotes.status', 'Change quote status'], ['quotes.delete', 'Delete quotes'],
-    ['golfers.view', 'See golfers'], ['golfers.news', 'Copy news emails'], ['products.edit', 'Edit products and prices'],
+    ['golfers.view', 'See golfers'], ['golfers.news', 'Copy news emails'], ['products.edit', 'Edit product photos, text and specs'],
     ['quotations.prepare', 'Prepare, submit and send quotations'], ['quotations.approve', 'Approve or return quotations'],
     ['pricing.edit', 'Set exchange rate, freight and margin'],
     ['content.edit', 'Edit site content'], ['bundles.view', 'See and edit bundles'], ['export.quotes', 'Export quotes'], ['export.all', 'Export all data'], ['users.manage', 'Manage staff']
@@ -583,17 +589,28 @@ function adminName(email) {
     return email ? email.split('@')[0] : '';
 }
 
-// --- Site edits (product text and prices, the homepage event): read by every visitor, written by master admins ---
-// The text as shipped, so an edit can be undone
+// --- Site edits (product photos, text and specs, accessory photos, the homepage event): read by every visitor,
+// written by master admins and marketing ---
+// What a product edit may change. An edit stores only the fields that differ from the shipped ones
+// specGroups: a model's own copy of its shared spec sheet (SPEC_SHEETS), once edited
+const PRODUCT_EDIT_FIELDS = ['tagline', 'description', 'image', 'gallery', 'galleryLevels', 'buildPhotos', 'seating', 'range', 'speed', 'battery', 'chargingTime', 'powertrain', 'specs', 'specGroups'];
+const clone = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+const productFields = p => Object.fromEntries(PRODUCT_EDIT_FIELDS.filter(k => p[k] !== undefined).map(k => [k, clone(p[k])]));
+// As shipped, so an edit can be undone
 const ADMIN_ORIGINALS = {
-    products: Object.fromEntries(PRODUCTS_DATA.map(p => [p.slug, { tagline: p.tagline || '', description: p.description || '' }])),
+    products: Object.fromEntries(PRODUCTS_DATA.map(p => [p.slug, productFields(p)])),
+    accessories: Object.fromEntries(ACCESSORY_CATALOG.flatMap(g => g.items.map(i => [i.id, i.image || '']))),
     event: { title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text.slice() }
 };
-// From the site_edits table: { 'product:<slug>': { value, updated_by }, event: { ... } }
+// From the site_edits table: { 'product:<slug>': { value, updated_by }, 'accessory:<id>': { value: { image } }, event: { ... } }
 let siteEdits = {};
 
 function applyAdminEdits() {
-    PRODUCTS_DATA.forEach(p => Object.assign(p, ADMIN_ORIGINALS.products[p.slug], (siteEdits[`product:${p.slug}`] || {}).value));
+    PRODUCTS_DATA.forEach(p => Object.assign(p, clone(ADMIN_ORIGINALS.products[p.slug]), clone((siteEdits[`product:${p.slug}`] || {}).value)));
+    ACCESSORY_CATALOG.forEach(g => g.items.forEach(i => {
+        const edit = (siteEdits[`accessory:${i.id}`] || {}).value;
+        i.image = (edit && edit.image) || ADMIN_ORIGINALS.accessories[i.id] || undefined;
+    }));
     Object.assign(HOME_EVENT, ADMIN_ORIGINALS.event, (siteEdits.event || {}).value);
 }
 
@@ -703,7 +720,7 @@ function adminHeading(data) {
         quotations: ['Quotations', data ? `${plural(quotations.length, 'quotation')}, ${quotations.filter(q => q.status === 'submitted').length} waiting for approval` : '', ''],
         golfers: ['Golfers', data ? `${plural((data.golfers || []).length, 'member')}, ${(data.golfers || []).filter(g => g.news).length} want member news` : '', ''],
         bundles: ['Bundles', 'Cost lines for each build, in USD. Quotations are priced from these.', ''],
-        products: ['Products', 'The tagline and description on each model page.', ''],
+        products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
         content: ['Site content', 'The event story on the homepage.', ''],
         users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`]
     };
@@ -735,9 +752,9 @@ function renderAdminPage() {
         // come back as null, and the rest of the admin still loads
         const costs = can('bundles.view') || can('quotations.prepare');
         const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing] = await Promise.all([
-            rows(sb.from('quotes').select('*').order('created_at', { ascending: false })),
-            rows(sb.from('golfers').select('*').order('joined_at', { ascending: false })),
-            rows(sb.from('saved_builds').select('golfer_id')),
+            can('quotes.view') ? rows(sb.from('quotes').select('*').order('created_at', { ascending: false })) : Promise.resolve([]),
+            can('golfers.view') ? rows(sb.from('golfers').select('*').order('joined_at', { ascending: false })) : Promise.resolve([]),
+            can('golfers.view') ? rows(sb.from('saved_builds').select('golfer_id')) : Promise.resolve([]),
             can('users.manage') ? rows(sb.from('staff').select('*').order('added_at')) : Promise.resolve([]),
             costs ? rows(sb.from('bundles').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
             costs ? rows(sb.from('sku_usd').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
@@ -877,32 +894,336 @@ function copyNewsEmails() {
     navigator.clipboard.writeText(emails).then(() => showToast('News emails copied.'), () => showToast(emails));
 }
 
-function renderAdminProducts() {
-    return `<div class="space-y-4">${PRODUCTS_DATA.filter(p => p.category !== 'Accessories').map(p => {
-        const edit = siteEdits[`product:${p.slug}`];
-        return `
-        <details class="admin-card">
-            <summary><span class="font-semibold text-ink">${escapeHtml(p.name)}</span> <span class="text-mute">${escapeHtml(categoryLabel(p.category))}</span>${edit ? ` <span class="admin-badge">Edited${edit.updated_by ? ` by ${escapeHtml(adminName(edit.updated_by))}` : ''}</span>` : ''}</summary>
-            <form data-no-prefill onsubmit="saveProductEdit(event, '${p.slug}')" class="grid sm:grid-cols-2 gap-x-6 gap-y-5 pt-5">
-                <div class="field sm:col-span-2"><label for="ap-tag-${p.slug}">Tagline</label><input id="ap-tag-${p.slug}" name="tagline" type="text" value="${escapeHtml(p.tagline)}"></div>
-                <div class="field sm:col-span-2"><label for="ap-desc-${p.slug}">Description</label><textarea id="ap-desc-${p.slug}" name="description" rows="3">${escapeHtml(p.description)}</textarea></div>
-                <div class="sm:col-span-2 flex flex-wrap gap-4 items-center">
-                    <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm">Save</button>
-                    ${edit ? `<button type="button" onclick="resetProductEdit('${p.slug}')" class="link text-sm">Undo edits</button>` : ''}
-                </div>
-            </form>
-        </details>`;
-    }).join('')}</div>`;
+// --- Products: photos, text and specs (master admins and marketing) ---
+// Photos go to the public Supabase Storage bucket below; a product's edits are saved together with Save
+const SITE_PHOTO_BUCKET = 'site-photos';
+const SITE_PHOTO_MAX = 1920; // px on the long side, as the site's own photos
+const CART_SPEC_FIELDS = [['seating', 'Seating'], ['range', 'Range'], ['speed', 'Top speed'], ['battery', 'Battery'], ['chargingTime', 'Charging time'], ['powertrain', 'Powertrain']];
+let productOpen = null;  // the product whose card is open
+const productDrafts = {}; // slug -> its fields being edited, before Save
+let photoBusy = '';      // the photo being uploaded, e.g. 'golfer-tempo-2:image'
+
+function productDraft(slug) {
+    if (!productDrafts[slug]) {
+        const p = PRODUCTS_DATA.find(x => x.slug === slug);
+        const draft = productFields(p);
+        draft.specRows = Object.entries(draft.specs || {});
+        // A model on a shared spec sheet is edited as that sheet (what its page shows)
+        if (SPEC_SHEETS[p.specSheet]) draft.sheetRows = clone(p.specGroups || SPEC_SHEETS[p.specSheet]);
+        productDrafts[slug] = draft;
+    }
+    return productDrafts[slug];
 }
 
-function saveProductEdit(e, slug) {
+// A draft's fields as an edit: specs back from rows, and only what differs from the shipped product
+function productEditValue(slug) {
+    const d = productDraft(slug), original = ADMIN_ORIGINALS.products[slug];
+    const fields = { ...d, specs: Object.fromEntries(d.specRows.map(([k, v]) => [k.trim(), v.trim()]).filter(([k]) => k)) };
+    delete fields.specRows;
+    if (!original.specs && !Object.keys(fields.specs).length) delete fields.specs;
+    delete fields.sheetRows;
+    if (d.sheetRows) {
+        const p = PRODUCTS_DATA.find(x => x.slug === slug);
+        const groups = d.sheetRows.map(g => ({ title: g.title.trim(), rows: g.rows.map(([k, v]) => [k.trim(), v.trim()]).filter(([k]) => k) })).filter(g => g.title && g.rows.length);
+        fields.specGroups = JSON.stringify(groups) === JSON.stringify(SPEC_SHEETS[p.specSheet]) ? undefined : groups;
+    }
+    const value = Object.fromEntries(Object.entries(fields).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(original[k])));
+    return Object.keys(value).length ? value : null;
+}
+
+function productDirty(slug) {
+    if (!productDrafts[slug]) return false;
+    const saved = (siteEdits[`product:${slug}`] || {}).value || null;
+    return JSON.stringify(productEditValue(slug)) !== JSON.stringify(saved);
+}
+
+// Smaller than SITE_PHOTO_MAX, as JPEG (or PNG when it was one, to keep a cut-out's transparent background)
+async function shrinkPhoto(file) {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, SITE_PHOTO_MAX / Math.max(bitmap.width, bitmap.height));
+    const type = file.type === 'image/png' || file.type === 'image/webp' ? 'image/png' : 'image/jpeg';
+    if (scale === 1 && file.type === type && file.size < 1.5e6) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('the photo could not be read'))), type, 0.86));
+}
+
+async function uploadSitePhoto(file, folder) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('choose a JPG, PNG or WebP photo');
+    const blob = await shrinkPhoto(file);
+    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${blob.type === 'image/png' ? 'png' : 'jpg'}`;
+    const { error } = await sb.storage.from(SITE_PHOTO_BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: '31536000' });
+    if (error) throw new Error(/bucket not found/i.test(error.message) ? 'photo storage isn\'t set up yet (re-run supabase/schema.sql)' : error.message);
+    return sb.storage.from(SITE_PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+// target: 'image', 'build:<level id>', 'gallery:<index>' or 'gallery:new'
+async function chooseProductPhoto(slug, target, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    photoBusy = `${slug}:${target}`;
+    renderApp();
+    try {
+        const url = await uploadSitePhoto(file, `products/${slug}`);
+        const d = productDraft(slug);
+        const [kind, key] = target.split(':');
+        if (kind === 'image') d.image = url;
+        if (kind === 'build') d.buildPhotos = { ...(d.buildPhotos || {}), [key]: url };
+        if (kind === 'gallery') {
+            d.gallery = (d.gallery || []).slice();
+            if (key === 'new') {
+                d.gallery.push(url);
+                if (d.galleryLevels) d.galleryLevels = [...d.galleryLevels, null];
+            } else d.gallery[Number(key)] = url;
+        }
+        showToast('Photo uploaded. Save to put it on the site.');
+    } catch (err) {
+        showToast(`Not uploaded: ${err.message}.`);
+    }
+    photoBusy = '';
+    renderApp();
+}
+
+function restoreProductPhoto(slug, target) {
+    const d = productDraft(slug), original = ADMIN_ORIGINALS.products[slug];
+    const [kind, key] = target.split(':');
+    if (kind === 'image') d.image = original.image;
+    if (kind === 'build') d.buildPhotos = { ...(d.buildPhotos || {}), [key]: (original.buildPhotos || {})[key] };
+    renderApp();
+}
+
+function moveGalleryPhoto(slug, i, step) {
+    const d = productDraft(slug), j = i + step;
+    if (j < 0 || j >= d.gallery.length) return;
+    d.gallery = d.gallery.slice();
+    [d.gallery[i], d.gallery[j]] = [d.gallery[j], d.gallery[i]];
+    if (d.galleryLevels) {
+        d.galleryLevels = d.galleryLevels.slice();
+        [d.galleryLevels[i], d.galleryLevels[j]] = [d.galleryLevels[j], d.galleryLevels[i]];
+    }
+    renderApp();
+}
+
+function removeGalleryPhoto(slug, i) {
+    const d = productDraft(slug);
+    if (d.gallery.length <= 1) { showToast('A model keeps at least one gallery photo.'); return; }
+    d.gallery = d.gallery.filter((_, k) => k !== i);
+    if (d.galleryLevels) d.galleryLevels = d.galleryLevels.filter((_, k) => k !== i);
+    renderApp();
+}
+
+function setProductField(slug, key, value) {
+    productDraft(slug)[key] = value;
+}
+
+function setProductSpec(slug, i, part, value) {
+    productDraft(slug).specRows[i][part] = value;
+}
+
+function addProductSpec(slug) {
+    productDraft(slug).specRows.push(['', '']);
+    renderApp();
+}
+
+function removeProductSpec(slug, i) {
+    productDraft(slug).specRows.splice(i, 1);
+    renderApp();
+}
+
+function setSheetCell(slug, gi, ri, part, value) {
+    productDraft(slug).sheetRows[gi].rows[ri][part] = value;
+}
+
+function addSheetRow(slug, gi) {
+    productDraft(slug).sheetRows[gi].rows.push(['', '']);
+    renderApp();
+}
+
+function removeSheetRow(slug, gi, ri) {
+    productDraft(slug).sheetRows[gi].rows.splice(ri, 1);
+    renderApp();
+}
+
+function toggleProductCard(slug, open) {
+    if (open) productOpen = slug;
+    else if (productOpen === slug) productOpen = null;
+}
+
+async function saveProductEdit(e, slug) {
     e.preventDefault();
-    const data = new FormData(e.target);
-    saveSiteEdit(`product:${slug}`, { tagline: data.get('tagline').trim(), description: data.get('description').trim() }, 'Product saved.');
+    const value = productEditValue(slug);
+    delete productDrafts[slug];
+    await saveSiteEdit(`product:${slug}`, value, value ? 'Saved. It shows on the site now.' : 'Saved: back to the original.');
+}
+
+function discardProductEdit(slug) {
+    delete productDrafts[slug];
+    renderApp();
 }
 
 function resetProductEdit(slug) {
-    saveSiteEdit(`product:${slug}`, null, 'Back to the original text.');
+    if (!confirm('Put back the original photos, text and specs of this model?')) return;
+    delete productDrafts[slug];
+    saveSiteEdit(`product:${slug}`, null, 'Back to the original.');
+}
+
+// A photo with its Replace button (a file picker) and, when it was changed, a way back
+function photoTile({ src, label, slug, target, changed, extra = '' }) {
+    const id = `ph-${slug}-${target.replace(/[^a-z0-9]/gi, '-')}`;
+    const busy = photoBusy === `${slug}:${target}`;
+    return `
+        <figure class="admin-photo">
+            <span class="admin-photo-img">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo</span>'}</span>
+            <figcaption>
+                <span class="text-xs font-semibold text-ink">${escapeHtml(label)}</span>${changed ? ' <span class="admin-badge">New</span>' : ''}
+                <span class="admin-photo-actions">
+                    <label for="${id}" class="link text-xs">${busy ? 'Uploading…' : src ? 'Replace' : 'Add'}</label>
+                    <input id="${id}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseProductPhoto('${slug}', '${target}', this)"${busy ? ' disabled' : ''}>
+                    ${extra}
+                </span>
+            </figcaption>
+        </figure>`;
+}
+
+function renderProductEditor(p) {
+    const slug = p.slug, d = productDraft(slug), original = ADMIN_ORIGINALS.products[slug];
+    const edit = siteEdits[`product:${slug}`];
+    const buildSet = getProductBuildSet(p);
+    const levelName = id => ((buildSet && buildSet.builds.find(b => b.id === id)) || {}).name || '';
+    const isCart = p.category !== 'Accessories';
+    const gallery = d.gallery || [];
+    return `
+        <details class="admin-card"${productOpen === slug ? ' open' : ''} ontoggle="toggleProductCard('${slug}', this.open)">
+            <summary><span class="font-semibold text-ink">${escapeHtml(p.name)}</span> <span class="text-mute">${escapeHtml(categoryLabel(p.category))}</span>${edit ? ` <span class="admin-badge">Edited${edit.updated_by ? ` by ${escapeHtml(adminName(edit.updated_by))}` : ''}</span>` : ''}${productDirty(slug) ? ' <span class="admin-badge admin-badge-warn">Not saved</span>' : ''}</summary>
+            <form data-no-prefill onsubmit="saveProductEdit(event, '${slug}')" class="grid gap-6 pt-5">
+                <section>
+                    <h3 class="text-sm font-semibold text-ink mb-2">Photos</h3>
+                    <div class="admin-photos">
+                        ${photoTile({ src: d.image, label: 'Main photo', slug, target: 'image', changed: d.image !== original.image,
+                            extra: d.image !== original.image ? `<button type="button" onclick="restoreProductPhoto('${slug}', 'image')" class="link text-xs">Original</button>` : '' })}
+                        ${buildSet ? buildSet.builds.map(b => {
+                            const src = (d.buildPhotos || {})[b.id], was = (original.buildPhotos || {})[b.id];
+                            return photoTile({ src, label: `${b.name} build`, slug, target: `build:${b.id}`, changed: src !== was,
+                                extra: src !== was ? `<button type="button" onclick="restoreProductPhoto('${slug}', 'build:${b.id}')" class="link text-xs">Original</button>` : '' });
+                        }).join('') : ''}
+                    </div>
+                    <p class="text-xs text-mute mt-2">The main photo shows on the model cards and the model page${buildSet ? '; each build photo shows when that build is chosen, and in its quotation PDF' : ''}. Large photos are resized to ${SITE_PHOTO_MAX}px. The colour preview photos stay as they are (they are painted by the site).</p>
+                </section>
+                <section>
+                    <h3 class="text-sm font-semibold text-ink mb-2">Gallery (model page)</h3>
+                    <div class="admin-photos">
+                        ${gallery.map((src, i) => photoTile({ src, label: `Photo ${i + 1}${d.galleryLevels && d.galleryLevels[i] ? ` · ${levelName(d.galleryLevels[i])}` : ''}`, slug, target: `gallery:${i}`,
+                            changed: src !== (original.gallery || [])[i],
+                            extra: `<button type="button" onclick="moveGalleryPhoto('${slug}', ${i}, -1)" class="link text-xs"${i === 0 ? ' disabled' : ''} aria-label="Move photo ${i + 1} earlier">←</button>
+                                <button type="button" onclick="moveGalleryPhoto('${slug}', ${i}, 1)" class="link text-xs"${i === gallery.length - 1 ? ' disabled' : ''} aria-label="Move photo ${i + 1} later">→</button>
+                                <button type="button" onclick="removeGalleryPhoto('${slug}', ${i})" class="link text-xs">Remove</button>` })).join('')}
+                        ${photoTile({ src: '', label: 'New photo', slug, target: 'gallery:new', changed: false })}
+                    </div>
+                </section>
+                <section class="grid sm:grid-cols-2 gap-x-6 gap-y-5">
+                    <h3 class="text-sm font-semibold text-ink sm:col-span-2 -mb-2">Text</h3>
+                    <div class="field sm:col-span-2"><label for="ap-tag-${slug}">Tagline</label><input id="ap-tag-${slug}" type="text" value="${escapeHtml(d.tagline)}" onchange="setProductField('${slug}', 'tagline', this.value.trim())"></div>
+                    <div class="field sm:col-span-2"><label for="ap-desc-${slug}">Description</label><textarea id="ap-desc-${slug}" rows="3" onchange="setProductField('${slug}', 'description', this.value.trim())">${escapeHtml(d.description)}</textarea></div>
+                </section>
+                <section class="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-5">
+                    <h3 class="text-sm font-semibold text-ink sm:col-span-2 lg:col-span-3 -mb-2">Specifications</h3>
+                    ${isCart ? CART_SPEC_FIELDS.map(([key, label]) => `
+                        <div class="field"><label for="ap-${key}-${slug}">${label}</label><input id="ap-${key}-${slug}" type="text" value="${escapeHtml(d[key] || '')}" onchange="setProductField('${slug}', '${key}', this.value.trim())"></div>`).join('') : ''}
+                    ${d.sheetRows ? `<div class="sm:col-span-2 lg:col-span-3 grid gap-5">
+                        <p class="text-xs text-mute -mb-3">The spec sheet on the model page and page 2 of the quotation PDF${p.specGroups ? '' : ' (shared with the other models of this size until you change it here)'}</p>
+                        ${d.sheetRows.map((g, gi) => `
+                        <div>
+                            <p class="text-xs font-semibold text-ink mb-2">${escapeHtml(g.title)}</p>
+                            <div class="grid gap-2">${g.rows.map(([k, v], ri) => `
+                                <div class="admin-spec-row">
+                                    <input type="text" value="${escapeHtml(k)}" aria-label="${escapeHtml(g.title)} ${ri + 1} name" onchange="setSheetCell('${slug}', ${gi}, ${ri}, 0, this.value)">
+                                    <input type="text" value="${escapeHtml(v)}" aria-label="${escapeHtml(g.title)} ${ri + 1} value" onchange="setSheetCell('${slug}', ${gi}, ${ri}, 1, this.value)">
+                                    <button type="button" onclick="removeSheetRow('${slug}', ${gi}, ${ri})" class="link text-xs">Remove</button>
+                                </div>`).join('')}
+                            </div>
+                            <button type="button" onclick="addSheetRow('${slug}', ${gi})" class="link text-sm mt-2">Add to ${escapeHtml(g.title)}</button>
+                        </div>`).join('')}
+                    </div>` : `<div class="sm:col-span-2 lg:col-span-3">
+                        <p class="text-xs text-mute mb-2">The spec table on the model page${isCart ? ' and page 2 of the quotation PDF' : ''}</p>
+                        <div class="grid gap-2">${d.specRows.map(([k, v], i) => `
+                            <div class="admin-spec-row">
+                                <input type="text" value="${escapeHtml(k)}" aria-label="Specification ${i + 1} name" placeholder="e.g. Brakes" onchange="setProductSpec('${slug}', ${i}, 0, this.value)">
+                                <input type="text" value="${escapeHtml(v)}" aria-label="Specification ${i + 1} value" placeholder="e.g. Hydraulic disc" onchange="setProductSpec('${slug}', ${i}, 1, this.value)">
+                                <button type="button" onclick="removeProductSpec('${slug}', ${i})" class="link text-xs">Remove</button>
+                            </div>`).join('')}
+                        </div>
+                        <button type="button" onclick="addProductSpec('${slug}')" class="link text-sm mt-2">Add a specification</button>
+                    </div>`}
+                </section>
+                <div class="flex flex-wrap gap-4 items-center">
+                    <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm"${photoBusy ? ' disabled' : ''}>Save</button>
+                    ${productDrafts[slug] ? `<button type="button" onclick="discardProductEdit('${slug}')" class="link text-sm">Cancel changes</button>` : ''}
+                    ${edit ? `<button type="button" onclick="resetProductEdit('${slug}')" class="link text-sm">Back to the original</button>` : ''}
+                    <a href="${routeHref('product-details', slug)}" class="link text-sm" target="_blank" rel="noopener">See the model page</a>
+                </div>
+            </form>
+        </details>`;
+}
+
+// Accessory and upgrade photos (the cart builder, the model pages and page 3 of the quotation PDF): saved as soon as
+// a photo is chosen
+async function chooseAccessoryPhoto(id, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    photoBusy = `accessory:${id}`;
+    renderApp();
+    try {
+        const url = await uploadSitePhoto(file, `accessories/${id}`);
+        photoBusy = '';
+        await saveSiteEdit(`accessory:${id}`, { image: url }, 'Accessory photo saved.');
+    } catch (err) {
+        photoBusy = '';
+        renderApp();
+        showToast(`Not uploaded: ${err.message}.`);
+    }
+}
+
+function resetAccessoryPhoto(id) {
+    saveSiteEdit(`accessory:${id}`, null, 'Back to the original photo.');
+}
+
+function renderAccessoryPhotos() {
+    return `
+        <details class="admin-card"${productOpen === 'accessory-photos' ? ' open' : ''} ontoggle="toggleProductCard('accessory-photos', this.open)">
+            <summary><span class="font-semibold text-ink">Upgrade and accessory photos</span> <span class="text-mute">Cart builder and quotation PDF</span></summary>
+            <div class="pt-5 grid gap-6">${ACCESSORY_CATALOG.map(g => `
+                <section>
+                    <h3 class="text-sm font-semibold text-ink mb-2">${escapeHtml(g.group)}</h3>
+                    <div class="admin-photos">${g.items.map(i => {
+                        const edited = !!siteEdits[`accessory:${i.id}`];
+                        const src = i.image || (findProductRef(i.product) || {}).image || '';
+                        const fid = `acc-${i.id}`;
+                        return `
+                        <figure class="admin-photo">
+                            <span class="admin-photo-img">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo</span>'}</span>
+                            <figcaption>
+                                <span class="text-xs font-semibold text-ink">${escapeHtml(i.name)}</span>${edited ? ' <span class="admin-badge">New</span>' : ''}
+                                <span class="admin-photo-actions">
+                                    <label for="${fid}" class="link text-xs">${photoBusy === `accessory:${i.id}` ? 'Uploading…' : src ? 'Replace' : 'Add'}</label>
+                                    <input id="${fid}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseAccessoryPhoto('${i.id}', this)">
+                                    ${edited ? `<button type="button" onclick="resetAccessoryPhoto('${i.id}')" class="link text-xs">Original</button>` : ''}
+                                </span>
+                            </figcaption>
+                        </figure>`;
+                    }).join('')}</div>
+                </section>`).join('')}
+            </div>
+        </details>`;
+}
+
+function renderAdminProducts() {
+    const carts = PRODUCTS_DATA.filter(p => p.category !== 'Accessories'), accessories = PRODUCTS_DATA.filter(p => p.category === 'Accessories');
+    return `
+        <div class="space-y-4">${carts.map(renderProductEditor).join('')}</div>
+        <h2 class="type-md text-ink mt-10 mb-4">Accessories</h2>
+        <div class="space-y-4">${renderAccessoryPhotos()}${accessories.map(renderProductEditor).join('')}</div>`;
 }
 
 function renderAdminContent() {
@@ -1703,9 +2024,8 @@ function quotationPdfExtra(qt) {
         || PRODUCTS_DATA.find(p => `${p.name} (${categoryLabel(p.category)})` === quote.model || p.name === quote.model)
         || findProductRef(rowValue(qt.build_rows, 'Model'));
     if (!product) return { specs: [], offers: [] };
-    const specs = [['Seating', product.seating], ['Range', product.range], ['Top speed', product.speed], ['Battery', product.battery],
-        ['Charging time', product.chargingTime], ['Powertrain', product.powertrain], ...Object.entries(product.specs || {})]
-        .filter(([, v]) => v && v !== 'N/A');
+    // The model page's specifications, as edited in Products
+    const specs = getDetailSpecGroups(product).flatMap(g => g.rows).filter(([, v]) => v && v !== 'N/A');
     // What the model can still take, minus what the customer already chose; one from each group in turn, so the
     // page shows a spread
     const chosen = (qt.build_rows || []).map(r => String(r[1] || '')).join(' | ').toLowerCase();

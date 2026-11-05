@@ -4161,7 +4161,9 @@ function getDetailSpecGroups(product) {
     if (product.category === 'Accessories') {
         return [{ title: 'Specifications', rows: Object.entries(product.specs || {}) }];
     }
-    if (SPEC_SHEETS[product.specSheet]) return [...SPEC_SHEETS[product.specSheet], { title: 'Capacity', rows: [['Seating', product.seating]] }];
+    // A model's own copy of its spec sheet, when it was edited in the admin
+    const sheet = product.specGroups || SPEC_SHEETS[product.specSheet];
+    if (sheet) return [...sheet, { title: 'Capacity', rows: [['Seating', product.seating]] }];
     const groups = [
         { title: 'Performance', rows: [['Range', product.range], ['Top Speed', product.speed], ['Powertrain', product.powertrain]] },
         { title: 'Battery & Charging', rows: [['Battery', product.battery], ['Charging Time', product.chargingTime]] },
