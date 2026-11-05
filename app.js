@@ -1631,6 +1631,7 @@ function initMobileMenu() {
             toggleMobileMenu(false);
             closeQuoteModal();
             closeWheelUpgrade();
+            closeFinder();
         }
     });
 }
@@ -1715,6 +1716,120 @@ function setCategoryFilter(cat) {
 
 // --- PILLAR MENUS (The Golfer / Lifestyle & Private Use / Resort & Hospitality / Remanufactured) ---
 
+// ==========================================
+// CART FINDER: "Private Golf Carts" in the header opens three steps over the page, so a visitor chooses before
+// they browse: what the cart is for (The Golfer or Lifestyle & Private Use), how many seats, then the build. The
+// last choice opens that model's page on that build. The models and builds come from NAV_SEGMENTS, VEHICLE_MODELS,
+// PRODUCTS_DATA and TEMPO_LINES, so the finder offers what the menus and model pages do.
+// ==========================================
+const FINDER_USES = [
+    { id: 'golfer', label: 'The Golfer', short: 'Golfer', text: 'For regular golf: bag cover, golf accessories and the builds golfers ask for.', image: 'image/Products/builds/golfer-2-scratch-right.jpg' },
+    { id: 'lifestyle', label: 'Lifestyle & Private Use', short: 'Lifestyle', text: 'For family transport and getting around a home, village, estate or farm.', image: 'image/Products/builds/lifestyle-4-signature.jpg' }
+];
+
+let finder = { step: 1, use: null, model: null };
+let finderReturnFocus = null;
+
+// The models for a use, in the menu's order: { key, label, product }
+function finderModels(useId) {
+    const sub = NAV_SEGMENTS.find(s => s.id === 'private').subcategories.find(s => s.id === useId);
+    return sub.groups.flatMap(g => g.items).map(key => ({ key, ...VEHICLE_MODELS[key], product: PRODUCTS_DATA.find(p => p.slug === VEHICLE_MODELS[key].slug) }))
+        .filter(m => m.product);
+}
+
+function openFinder() {
+    const box = document.getElementById('finder');
+    if (!box) { openSegment('private'); return; }
+    if (box.classList.contains('hidden')) finderReturnFocus = document.activeElement;
+    finder = { step: 1, use: null, model: null };
+    toggleMobileMenu(false);
+    renderFinder();
+    box.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+}
+
+function closeFinder() {
+    const box = document.getElementById('finder');
+    if (!box || box.classList.contains('hidden')) return;
+    box.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+    if (finderReturnFocus && finderReturnFocus.focus) finderReturnFocus.focus();
+}
+
+function finderChoose(value) {
+    if (finder.step === 1) finder = { step: 2, use: value, model: null };
+    else if (finder.step === 2) finder = { ...finder, step: 3, model: value };
+    else {
+        // The build: open its model page on it, at the build section
+        const model = VEHICLE_MODELS[finder.model];
+        closeFinder();
+        navigateTo('product-details', model.slug);
+        setTimeout(() => { selectBuildLevel(value); scrollToDetailSection('build'); }, 350);
+        return;
+    }
+    renderFinder();
+}
+
+function finderBack() {
+    finder = finder.step === 3 ? { ...finder, step: 2, model: null } : { step: 1, use: null, model: null };
+    renderFinder();
+}
+
+function finderCard({ value, image, title, badge, text, detail }) {
+    return `<button type="button" class="finder-card" onclick="finderChoose('${value}')">
+        <span class="finder-photo"><img src="${image}" alt="" decoding="async"></span>
+        <span class="finder-card-body">
+            <span class="finder-card-title">${title}${badge ? ` <span class="finder-badge">${badge}</span>` : ''}</span>
+            ${detail ? `<span class="finder-card-detail">${detail}</span>` : ''}
+            ${text ? `<span class="finder-card-text">${text}</span>` : ''}
+        </span>
+    </button>`;
+}
+
+function renderFinder() {
+    const dialog = document.getElementById('finder-dialog');
+    const use = FINDER_USES.find(u => u.id === finder.use);
+    const model = finder.model && VEHICLE_MODELS[finder.model];
+    let title, cards;
+    if (finder.step === 1) {
+        title = 'What will you use your cart for?';
+        cards = FINDER_USES.map(u => finderCard({ value: u.id, image: u.image, title: u.label, text: u.text }));
+    } else if (finder.step === 2) {
+        title = 'How many seats do you need?';
+        cards = finderModels(finder.use).map(m => finderCard({ value: m.key, image: m.image, title: m.label, badge: m.badge, detail: m.product.seating }));
+    } else {
+        const product = PRODUCTS_DATA.find(p => p.slug === model.slug);
+        title = `Choose your ${model.name} build`;
+        cards = TEMPO_LINES[product.version].levels.map(level => finderCard({
+            value: level.id, image: (product.buildPhotos && product.buildPhotos[level.id]) || product.image,
+            title: level.name, detail: level.tagline, text: level.about || level.blurb || ''
+        }));
+    }
+    const trail = [use && use.label, model && model.label].filter(Boolean);
+    dialog.innerHTML = `
+        <div class="finder-head">
+            <ol class="finder-steps" aria-label="Step ${finder.step} of 3">
+                ${['Use', 'Seats', 'Build'].map((s, i) => `<li${i + 1 === finder.step ? ' aria-current="step"' : ''}${i + 1 < finder.step ? ' class="is-done"' : ''}>${s}</li>`).join('')}
+            </ol>
+            <button type="button" onclick="closeFinder()" aria-label="Close" class="auth-close">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+        ${trail.length ? `<p class="finder-trail">${trail.map(escapeTrail).join(' <span aria-hidden="true">/</span> ')}</p>` : ''}
+        <h2 id="finder-title" class="finder-title">${title}</h2>
+        <div class="finder-grid ${{ 2: 'finder-grid-2', 3: 'finder-grid-3', 4: 'finder-grid-4' }[cards.length] || ''}">${cards.join('')}</div>
+        <div class="finder-foot">
+            ${finder.step > 1 ? '<button type="button" onclick="finderBack()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Back</button>' : '<span></span>'}
+            <a href="${routeHref('segment', finder.use || 'private')}" data-route="segment" data-slug="${finder.use || 'private'}" onclick="closeFinder()" class="link text-sm">See all ${use ? use.short : 'Private Golf Carts'} models</a>
+        </div>`;
+    const first = dialog.querySelector('.finder-card');
+    if (first) setTimeout(() => first.focus(), 0);
+}
+
+function escapeTrail(text) {
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+}
+
 function modelAnchorId(segmentId, subId, modelKey) {
     return `${segmentId}-${subId}-${modelKey}`;
 }
@@ -1783,6 +1898,10 @@ function renderMainNav() {
     if (!nav) return;
     nav.innerHTML = MAIN_NAV.map(item => {
         const seg = item.segment && NAV_SEGMENTS.find(s => s.id === item.segment);
+        // Private Golf Carts opens the cart finder (use, seats, build) rather than a dropdown
+        if (seg && seg.id === 'private') {
+            return `<a href="${routeHref('segment', seg.id)}" onclick="event.preventDefault(); openFinder()" class="nav-link header-nav-link" data-segment="${seg.id}" aria-haspopup="dialog">${seg.label}</a>`;
+        }
         if (seg) {
             return `
                 <div class="segment-menu header-menu relative">
@@ -1802,6 +1921,7 @@ function renderSegmentMenus() {
         mobile.innerHTML = MAIN_NAV.map(item => {
             const seg = item.segment && NAV_SEGMENTS.find(s => s.id === item.segment);
             if (!seg) return `<a href="${item.href}" ${item.page ? `data-route="${item.page}"` : `onclick="event.preventDefault(); toggleMobileMenu(); ${item.action}"`} class="mobile-nav-link">${item.label}</a>`;
+            if (seg.id === 'private') return `<button type="button" onclick="openFinder()" class="mobile-nav-link w-full text-left" aria-haspopup="dialog">${seg.label}</button>`;
             return `
             <details class="mobile-segment">
                 <summary><span>${seg.label}</span><span class="disclosure-sign" aria-hidden="true"></span></summary>
@@ -3848,6 +3968,48 @@ function updateDetailBuildSummary() {
     updateBuildPanel();
 }
 
+// MAGNIFIER on the color preview: a round lens that follows the mouse over the photo, showing it COLOR_LENS_ZOOM
+// times larger. On touch screens the photo still scrolls the page, so the lens only follows a finger once the
+// magnifier button is on (it then holds the photo still under the finger).
+const COLOR_LENS_ZOOM = 2.5;
+
+function toggleColorLens() {
+    const frame = document.querySelector('.colors-fit-frame');
+    if (!frame) return;
+    const on = frame.classList.toggle('color-lens-on');
+    const btn = document.getElementById('color-lens-toggle');
+    if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    if (!on) hideColorLens();
+}
+
+function hideColorLens() {
+    const lens = document.getElementById('color-lens');
+    if (lens) lens.classList.add('hidden');
+}
+
+function moveColorLens(e) {
+    if (e.pointerType !== 'mouse' && !e.currentTarget.classList.contains('color-lens-on')) return;
+    const img = document.getElementById('detail-color-img');
+    const lens = document.getElementById('color-lens');
+    if (!img || !lens || !img.naturalWidth) return;
+    // Where the photo is drawn inside the img box (object-contain)
+    const box = img.getBoundingClientRect();
+    const scale = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight);
+    const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+    const x = e.clientX - (box.left + (box.width - w) / 2), y = e.clientY - (box.top + (box.height - h) / 2);
+    if (x < 0 || y < 0 || x > w || y > h) { hideColorLens(); return; }
+    if (lens.dataset.src !== img.src) { lens.style.backgroundImage = `url("${img.src}")`; lens.dataset.src = img.src; }
+    const size = lens.offsetWidth || 160;
+    const frame = lens.parentElement.getBoundingClientRect();
+    lens.style.backgroundSize = `${w * COLOR_LENS_ZOOM}px ${h * COLOR_LENS_ZOOM}px`;
+    lens.style.backgroundPosition = `${size / 2 - x * COLOR_LENS_ZOOM}px ${size / 2 - y * COLOR_LENS_ZOOM}px`;
+    // Kept inside the frame (which clips); a finger would cover the lens, so on touch it sits above the finger
+    const clamp = (v, max) => Math.max(0, Math.min(max - size, v));
+    lens.style.left = `${clamp(e.clientX - frame.left - size / 2, frame.width)}px`;
+    lens.style.top = `${clamp(e.clientY - frame.top - size / 2 - (e.pointerType === 'mouse' ? 0 : size * 0.7), frame.height)}px`;
+    lens.classList.remove('hidden');
+}
+
 function hasLiveColorPreview(slug) {
     return typeof COLOR_PREVIEW !== 'undefined' && !!COLOR_PREVIEW[slug];
 }
@@ -4718,8 +4880,8 @@ function renderBuildCompareTable(buildSet) {
 function renderBuildSection(product, buildSet) {
     return `
         <section id="build" class="detail-section rise scroll-mt-32 home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12">
-            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-12">
-                <h2 class="type-xl text-ink lg:col-span-7">${buildSet.title}</h2>
+            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-8">
+                <h2 class="type-lg text-ink lg:col-span-7">${buildSet.title}</h2>
                 ${buildSet.note ? `<p class="measure lg:col-span-5">${buildSet.note}</p>` : ''}
             </div>
 
@@ -4730,7 +4892,7 @@ function renderBuildSection(product, buildSet) {
                     const pkgOn = pkg && b.id === detailBuild.level && tempoPackageOn(product, k);
                     return `
                     <div data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} flex flex-col">
-                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" class="text-left p-6 lg:p-8 ${pkg ? 'pb-5 lg:pb-5' : ''} flex flex-col gap-5 flex-1">
+                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" class="text-left p-5 lg:p-6 ${pkg ? 'pb-4 lg:pb-4' : ''} flex flex-col gap-4 flex-1">
                         ${(product.buildPhotos && product.buildPhotos[b.id]) || product.image ? `
                             <span class="build-card-photo"><img src="${(product.buildPhotos && product.buildPhotos[b.id]) || product.image}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
                         <span class="flex items-start justify-between gap-4">
@@ -4740,14 +4902,14 @@ function renderBuildSection(product, buildSet) {
                             </span>
                             <span class="build-card-check" aria-hidden="true"></span>
                         </span>
-                        <ul class="home-list text-[0.9375rem]">
+                        <ul class="home-list text-sm">
                             ${b.includes.map(x => `<li>${x}</li>`).join('')}
                         </ul>
                         ${b.note && !pkg ? `<span class="block text-sm text-mute mt-auto">${b.note}</span>` : ''}
                         ${b.proposed ? '<span class="block text-sm text-green-text font-medium">Proposed package, confirmed in your quote</span>' : ''}
                     </button>
                     ${pkg ? `
-                        <label class="flex items-start gap-3 px-6 lg:px-8 pb-6 lg:pb-8 text-sm text-ink-2 cursor-pointer">
+                        <label class="flex items-start gap-3 px-5 lg:px-6 pb-5 lg:pb-6 text-sm text-ink-2 cursor-pointer">
                             <input type="checkbox" data-build="${b.id}" ${pkgOn ? 'checked' : ''} onchange="toggleTempoPackage('${b.id}', this.checked)" class="build-package-check w-4 h-4 mt-0.5 accent-[#151714] flex-shrink-0">
                             <span>${b.note}</span>
                         </label>` : ''}
@@ -4885,14 +5047,16 @@ function renderDetailColorPickers(product) {
                         </div>
                     </div>
                 `).join('')}
-                ${t.type === 'seat' && family && family.seatGroups === CLUB_CAR_SEAT_GROUPS ? `
-                    <div id="detail-seat-photo" class="seat-photo-panel hidden" aria-live="polite">
-                        <p class="text-sm text-mute">Seat photo: <span class="seat-photo-name text-ink"></span></p>
-                        <div class="seat-photo-grid"></div>
-                    </div>
-                ` : ''}
             </div>
         `).join('')}
+
+        ${seatGroups.length && family && family.seatGroups === CLUB_CAR_SEAT_GROUPS ? `
+            <!-- Below the canopy, so body, seat and canopy all fit on one screen -->
+            <div id="detail-seat-photo" class="seat-photo-panel hidden" aria-live="polite">
+                <p class="text-sm text-mute">Seat photo: <span class="seat-photo-name text-ink"></span></p>
+                <div class="seat-photo-grid"></div>
+            </div>
+        ` : ''}
 
         ${seatGroups.length || canopyOptions.length ? `
             <p class="text-sm text-ink-2 border-l-2 border-green pl-4">${isTempoVersion(product)
@@ -5034,23 +5198,27 @@ function renderProductDetailsPage() {
 
         ${isVehicle ? `
         <!-- Colors: the preview stays pinned on desktop while the pickers scroll past it -->
-        <section id="colors" class="detail-section rise scroll-mt-32 home-section border-t border-line">
+        <section id="colors" class="detail-section colors-fit rise scroll-mt-32 home-section border-t border-line">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
-                <h2 class="type-xl text-ink mb-12">${bodyColors.length ? 'Your color. Your seat.' : 'Make it yours.'}</h2>
+                <h2 class="colors-fit-title text-ink">${bodyColors.length ? 'Your color. Your seat.' : 'Make it yours.'}</h2>
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
-                    <div class="lg:col-span-7 lg:sticky lg:top-36">
-                        <div class="relative bg-stone px-4 sm:px-8 py-8">
-                            <div class="relative aspect-[4/3] overflow-hidden flex items-center justify-center">
+                    <div class="lg:col-span-6 lg:sticky lg:top-36">
+                        <div class="relative bg-stone px-4 sm:px-6 py-5">
+                            <div class="colors-fit-frame relative overflow-hidden flex items-center justify-center" onpointermove="moveColorLens(event)" onpointerdown="moveColorLens(event)" onpointerleave="hideColorLens()">
                                 <img id="detail-color-img" src="${startColor && startColor.image ? startColor.image : (hasLiveColorPreview(detailPreviewKey(product)) ? COLOR_PREVIEW[detailPreviewKey(product)].base : product.image)}" alt="${product.name} color preview" class="w-full h-full object-contain mix-blend-multiply">
+                                <div id="color-lens" class="color-lens hidden" aria-hidden="true"></div>
                             </div>
+                            <button type="button" id="color-lens-toggle" class="color-lens-toggle" onclick="toggleColorLens()" aria-pressed="false" aria-label="Magnify the photo" title="Magnify: point at the photo (on a phone, tap here then drag on the photo)">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4M11 8v6M8 11h6"/></svg>
+                            </button>
                             <p id="detail-color-photo-note" class="${startColor && !startColor.image ? '' : 'hidden'} text-sm text-ink-2 mt-2">Photo shows a standard finish</p>
                             <!-- Live summary of the selected body / seat / canopy colors -->
                             <div id="detail-build-summary" class="flex flex-wrap gap-x-6 gap-y-2 border-t border-line pt-4 mt-4" aria-live="polite"></div>
                         </div>
                     </div>
 
-                    <div class="lg:col-span-5 space-y-10">
-                        <div id="detail-color-pickers" class="space-y-10">${renderDetailColorPickers(product)}</div>
+                    <div class="lg:col-span-6 space-y-8">
+                        <div id="detail-color-pickers" class="space-y-8">${renderDetailColorPickers(product)}</div>
 
                         <div class="flex flex-wrap gap-3">
                             ${tempo ? `<button type="button" onclick="scrollToDetailSection('options')" class="btn btn-primary">Choose equipment</button>` : ''}
@@ -5066,13 +5234,13 @@ function renderProductDetailsPage() {
 
         ${tempo ? `
         <!-- Equipment and upgrades: what the chosen build includes and what can be added (the "Versions" document) -->
-        <section id="options" class="detail-section rise scroll-mt-32 home-section border-t border-line">
+        <section id="options" class="detail-section options-fit rise scroll-mt-32 home-section border-t border-line">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12 items-start">
                 <!-- Your build: stays in view beside the choices on desktop -->
                 <aside class="lg:col-span-4 lg:self-stretch space-y-8" aria-label="Your build">
                     <div>
-                        <h2 class="type-xl text-ink">Equipment and upgrades.</h2>
-                        <p class="measure mt-4">What your build includes, and what you can add to it. The choices change with the build level.</p>
+                        <h2 class="colors-fit-title text-ink">Equipment and upgrades.</h2>
+                        <p class="text-sm text-ink-2 measure">What your build includes, and what you can add to it. The choices change with the build level.</p>
                     </div>
                     <div id="detail-build-panel" class="build-panel lg:sticky lg:top-36" aria-live="polite">${renderBuildPanel(product)}</div>
                 </aside>

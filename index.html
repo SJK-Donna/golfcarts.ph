@@ -145,6 +145,11 @@
     </div>
 
     <!-- Be a Golfer dialog: sign up or log in (contents rendered by renderGolferModal() in account.js) -->
+    <!-- Cart finder: Private Golf Carts' three steps, use, seats and build (renderFinder() in app.js) -->
+    <div id="finder" class="finder hidden" onclick="if (event.target === this) closeFinder()">
+        <div id="finder-dialog" role="dialog" aria-modal="true" aria-labelledby="finder-title" class="finder-dialog"></div>
+    </div>
+
     <div id="golfer-modal" class="fixed inset-0 z-50 hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-0 sm:p-6" onclick="if (event.target === this) closeGolferModal()">
         <div id="golfer-dialog" role="dialog" aria-modal="true" aria-labelledby="golfer-modal-title" class="relative w-full max-w-[54rem] mx-auto sm:my-[6vh] bg-paper border border-line min-h-full sm:min-h-0"></div>
     </div>

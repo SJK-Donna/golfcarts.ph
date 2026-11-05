@@ -62,6 +62,9 @@ const COLOR_PREVIEW = {
     'lifestyle-tempo-2': TEMPO_TWO_SEAT_PREVIEW,
     // White seats and a tan roof (kept out by bodyBox), so the paint's pale pink reflections can safely count as body
     'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', bodyMinSat: 0.12, bodyBox: [0.3, 1] },
+    // The red Elite photo, with a paint map (scripts/build-color-masks.mjs): the JPEG's colour noise in the
+    // backdrop, tyres and chrome would otherwise repaint with the body
+    'lifestyle-tempo-4': { base: 'image/Products/builds/lifestyle-4-elite.jpg', mask: 'image/Products/builds/masks/lifestyle-4-elite.png' },
     // No roof in this photo: the top of the front cowl is the highest paint, so the body can reach the top
     'transporter-400': { base: 'image/Products/Transporter 4.png', bodyBox: [0, 1] },
     'carryall-500': { base: 'image/Products/CA500.png' }
@@ -640,6 +643,52 @@ async function loadMaskRegions(slug, cfg, base) {
 
 // Returns a data URL of the cart repainted with the given body / seat / canopy swatch values.
 // `choice.seatBands` (optional) paints the seat as vertical stripes instead of one colour.
+// Photos picked by colour (no paint map): the body is the pixels clearly in the paint's hue, so the paint's pale
+// edges (soft highlights and shading too faint to count) kept the photo's colour. Under a dark colour they read as
+// reflections; under white or grey they showed as green or blue streaks (Transporter, Carryall). The pale pixels
+// in the paint's hue within a few pixels of the body take the chosen colour's tint, keeping their lightness, so
+// a highlight stays a highlight. Found once per photo (`regions.fringe`).
+function tintBodyFringe(out, base, regions, target, cfg) {
+    if (!regions.fringe) {
+        const w = base.w, h = base.h, reach = 4;
+        const taken = new Uint8Array(w * h), near = new Uint8Array(w * h);
+        [regions.body, regions.seat, regions.canopy].forEach(r => r && r.idx.forEach(i => { taken[i] = 1; }));
+        regions.body.idx.forEach(i => {
+            const x = i % w, y = (i - x) / w;
+            for (let dy = -reach; dy <= reach; dy++) {
+                const yy = y + dy;
+                if (yy < 0 || yy >= h) continue;
+                for (let dx = -reach; dx <= reach; dx++) {
+                    const xx = x + dx;
+                    if (xx >= 0 && xx < w) near[yy * w + xx] = 1;
+                }
+            }
+        });
+        const bodyBox = cfg.bodyBox || [0.18, 1];
+        const height = Math.max(1, base.bottom - base.top);
+        // Pale ones are tinted below; dark ones (the paint's deep shadow, too dull to count as body) are shadowed
+        // paint, and are painted like the body
+        const fringe = [], shadow = [];
+        for (let i = 0; i < w * h; i++) {
+            if (!near[i] || taken[i] || base.imageData.data[i * 4 + 3] < 20) continue;
+            const yFrac = (Math.floor(i / w) - base.top) / height;
+            if (yFrac < bodyBox[0] || yFrac > bodyBox[1]) continue;
+            const l = base.light[i], s = base.sat[i], hueNear = hueDistance(base.hue[i], base.bodyHue) <= 22;
+            if (hueNear && s >= 0.04 && l >= 0.15 && l <= 0.99) fringe.push(i);
+            else if (hueNear && s >= 0.03 && l >= 0.02 && l < 0.15) shadow.push(i);
+        }
+        regions.fringe = fringe;
+        regions.shadow = { idx: shadow, midL: regions.body.midL, minX: regions.body.minX, maxX: regions.body.maxX };
+    }
+    const [th, ts] = target;
+    regions.fringe.forEach(i => {
+        // As colourful as the chosen colour, in proportion to how tinted the pixel was (body pixels start at 0.28)
+        const s = ts * Math.min(1, base.sat[i] / 0.28);
+        const [r, g, b] = hslToRgb(th, s, base.light[i]);
+        out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b;
+    });
+}
+
 async function renderCartPreview(slug, choice) {
     const cfg = COLOR_PREVIEW[slug];
     if (!cfg) return null;
@@ -697,9 +746,17 @@ async function renderCartPreview(slug, choice) {
     }
     const body = parseSwatch(choice.body);
     if (body && regions.body) {
+        // A light colour on a photo of dark paint (the deep green Transporter, the dark blue Carryall): the photo's
+        // sharp reflections copied at full strength turned a white or grey body striped, so the lighter the colour,
+        // the more the photo's light and dark are softened
+        const soften = regions.body.midL < 0.4 ? 0.65 * Math.max(0, Math.min(1, (body.hsl[2] - 0.45) / 0.45)) : 0;
         if (cfg.shade) shadeRegion(out, base, regions.body, body.hsl, gradient(body));
-        else paintRegion(out, base, regions.body, body.hsl, gradient(body));
+        else paintRegion(out, base, regions.body, body.hsl, gradient(body), null, 0.85 * (1 - soften));
         if (cfg.mask) blendRegionEdges(out, base, regions.body);
+        else {
+            tintBodyFringe(out, base, regions, body.hsl, cfg);
+            if (!cfg.shade) paintRegion(out, base, regions.shadow, body.hsl, gradient(body), null, 0.85 * (1 - soften));
+        }
     }
 
     const canvas = document.createElement('canvas');
