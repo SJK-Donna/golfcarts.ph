@@ -314,6 +314,13 @@ create trigger quotations_workflow before insert or update on public.quotations
 
 -- The model photo for the quotation PDF (a path on the website, e.g. image/Products/builds/golfer-2-golfer.jpg)
 alter table public.quotations add column if not exists photo text not null default '';
+-- The PDF's page 2 and 3, filled in by the admin when the quotation is saved: the warranty (copied from the pricing
+-- settings) and pdf_extra = { specs: [[label, value]], offers: [{ group, name, image }] }, the model's specifications
+-- and upgrades it can take. A line in `lines` with "upgrade": true gets its own price; the others are one package price.
+alter table public.quotations add column if not exists warranty text not null default '';
+alter table public.quotations add column if not exists pdf_extra jsonb not null default '{}';
+-- The warranty every quotation carries, set by master admins in the admin's pricing settings
+alter table public.pricing_settings add column if not exists warranty text not null default '';
 
 -- ---------- Emails: sent by the Google Apps Script google-apps-script/golfcarts-mail.gs, from a Google account ----------
 -- The database tells the script when something happened (a quote request arrives; a quotation is submitted,

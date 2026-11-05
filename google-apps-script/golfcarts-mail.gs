@@ -229,7 +229,7 @@ function requestRows(q) {
 function totals(qt) {
   const lines = (qt.lines || []).map(function (l) {
     const qty = l.qty == null ? 1 : Number(l.qty), unit = l.price_php == null ? 0 : Number(l.price_php);
-    return { item: [l.part, l.option].filter(Boolean).join(' · '), description: l.description || '', qty: qty, unit: unit, amount: unit * qty };
+    return { item: [l.part, l.option].filter(Boolean).join(' · '), description: l.description || '', qty: qty, unit: unit, amount: unit * qty, upgrade: !!l.upgrade };
   });
   const perCart = lines.reduce(function (s, l) { return s + l.amount; }, 0);
   const units = Number(qt.units || 1), discount = Number(qt.discount_php || 0);
@@ -237,75 +237,146 @@ function totals(qt) {
 }
 
 // ---------- The quotation PDF ----------
+// Page 1: the quotation, with the build as one package price and each upgrade priced on its own.
+// Page 2: the specifications (the build chosen, and the model's) and the warranty.
+// Page 3: a brochure of upgrades the model can take (when the admin saved some with the quotation).
 
-// An image on the live site as a data URL (the PDF carries its images inline), or ''
-function siteImage(path) {
-  if (!path) return '';
+// Images on the live site as data URLs (the PDF carries its images inline), fetched together; '' for any that
+// isn't an image (a wrong SITE_URL returns a web page, which would show as a broken image)
+function siteImages(paths) {
+  const wanted = paths.map(function (p) { return p ? SITE_URL + encodeURI(String(p).replace(/^\//, '')) : ''; });
+  const urls = wanted.filter(Boolean);
+  let responses = [];
   try {
-    const res = UrlFetchApp.fetch(SITE_URL + String(path).replace(/^\//, ''), { muteHttpExceptions: true });
-    if (res.getResponseCode() !== 200) return '';
-    const blob = res.getBlob();
-    return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    responses = UrlFetchApp.fetchAll(urls.map(function (u) { return { url: u, muteHttpExceptions: true }; }));
   } catch (err) {
-    return '';
+    return paths.map(function () { return ''; });
   }
+  let next = 0;
+  return wanted.map(function (u) {
+    if (!u) return '';
+    const res = responses[next++];
+    if (!res || res.getResponseCode() !== 200) return '';
+    const blob = res.getBlob();
+    const type = blob.getContentType() || '';
+    return /^image\//.test(type) ? 'data:' + type + ';base64,' + Utilities.base64Encode(blob.getBytes()) : '';
+  });
 }
 
 function quotationPdf(qt) {
-  return Utilities.newBlob(quotationHtml(qt, siteImage('image/GCPH_logo.png'), siteImage(qt.photo)), MimeType.HTML)
+  const offers = ((qt.pdf_extra || {}).offers || []).filter(function (o) { return o && o.name; });
+  const images = siteImages(['image/GCPH_logo.png', qt.photo].concat(offers.map(function (o) { return o.image; })));
+  return Utilities.newBlob(quotationHtml(qt, images[0], images[1], offers.map(function (o, i) { return { group: o.group, name: o.name, image: images[i + 2] }; })), MimeType.HTML)
     .getAs(MimeType.PDF).setName('Quotation ' + qt.reference + '.pdf');
 }
 
-function quotationHtml(qt, logo, photo) {
+// The price lines as the customer sees them: the build's own lines as one package, then the upgrades
+function customerLines(qt, model, build) {
+  const t = totals(qt);
+  const upgrades = t.lines.filter(function (l) { return l.upgrade; });
+  const pkg = t.lines.filter(function (l) { return !l.upgrade; }).reduce(function (s, l) { return s + l.amount; }, 0);
+  const rows = t.lines.some(function (l) { return !l.upgrade; })
+    ? [{ item: model + (build ? ' · ' + build : ''), description: 'Complete cart as specified on page 2', qty: 1, unit: pkg, amount: pkg }] : [];
+  return { t: t, rows: rows.concat(upgrades) };
+}
+
+function quotationHtml(qt, logo, photo, offers) {
   const c = qt.customer || {};
+  const extra = qt.pdf_extra || {};
   const rows = (qt.build_rows || []).filter(function (r) { return Array.isArray(r) && r.length === 2; }).map(function (r) { return [String(r[0]), String(r[1])]; });
   const model = (rows.filter(function (r) { return r[0] === 'Model'; })[0] || [])[1] || qt.title || 'Your golf cart';
   const build = (rows.filter(function (r) { return r[0] === 'Build'; })[0] || [])[1] || '';
   const spec = rows.filter(function (r) { return r[0] !== 'Model' && r[0] !== 'Build'; }).concat([['Quantity', String(qt.units || 1)]]);
-  const t = totals(qt);
+  const modelSpecs = (extra.specs || []).filter(function (r) { return Array.isArray(r) && r.length === 2; });
+  const priced = customerLines(qt, model, build), t = priced.t;
   const date = Utilities.formatDate(qt.sent_at ? new Date(qt.sent_at) : new Date(), 'Asia/Manila', 'MMMM d, yyyy');
   const block = function (title, lines) {
-    return '<td style="width:50%;vertical-align:top;font-size:12px;line-height:1.6"><div style="font-size:13px;font-weight:bold;color:' + C.greenText + '">' + title + '</div>' + lines.map(esc).join('<br>') + '</td>';
+    return '<td style="width:50%;vertical-align:top;font-size:11px;line-height:1.5"><div style="font-size:12px;font-weight:bold;color:' + C.greenText + '">' + title + '</div>' + lines.map(esc).join('<br>') + '</td>';
   };
   const heading = function (text) {
-    return '<div style="font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:' + C.greenText + ';border-bottom:2px solid ' + C.green + ';padding-bottom:4px;margin:16px 0 6px">' + text + '</div>';
+    return '<div style="font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:' + C.greenText + ';border-bottom:2px solid ' + C.green + ';padding-bottom:4px;margin:14px 0 6px">' + text + '</div>';
   };
-  const specCell = 'padding:7px 10px;border:1px solid ' + C.green + ';vertical-align:top;font-size:12px';
+  const logoHtml = function (h) {
+    return logo ? '<img src="' + logo + '" alt="' + COMPANY.name + '" style="height:' + h + 'px">' : '<span style="font-size:' + Math.round(h / 2) + 'px;font-weight:bold">' + COMPANY.name + '</span>';
+  };
+  // The small header of pages 2 and 3
+  const pageHead = function (label) {
+    return '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle">' + logoHtml(34) + '</td>' +
+      '<td style="text-align:right;vertical-align:middle;font-size:11px;color:' + C.mute + '"><b style="color:' + C.ink + ';letter-spacing:1px">' + label + '</b><br>Quotation ' + esc(qt.reference) + ' · ' + date + '</td></tr></table>' +
+      '<div style="border-bottom:3px solid ' + C.green + ';margin-top:8px"></div>';
+  };
+  const footer = '<table style="width:100%;border-collapse:collapse;margin-top:18px"><tr><td style="background:' + C.ink + ';color:#ffffff;padding:10px 16px;font-size:10px">' +
+    '<b>' + COMPANY.name + '</b> by ' + COMPANY.legal + ' &middot; ' + COMPANY.site + ' &middot; ' + COMPANY.email + ' &middot; ' + COMPANY.phone + '</td></tr></table>';
+  const pageBreak = '<div style="page-break-before:always"></div>';
+  const specCell = 'padding:6px 9px;border:1px solid ' + C.green + ';vertical-align:top;font-size:11px';
+  const specTable = function (title, list) {
+    return '<table style="width:100%;border-collapse:collapse"><tr><td colspan="2" style="' + specCell + ';background:' + C.green + ';color:#ffffff;font-weight:bold">' + title + '</td></tr>' +
+      list.map(function (r) { return '<tr style="page-break-inside:avoid"><td style="' + specCell + ';width:42%;color:' + C.mute + '">' + esc(r[0]) + '</td><td style="' + specCell + ';white-space:pre-line">' + esc(r[1]) + '</td></tr>'; }).join('') + '</table>';
+  };
   const cell = 'padding:6px 8px;border:1px solid ' + C.line + ';font-size:11px;vertical-align:top';
-  const head = 'padding:7px 8px;font-size:11px;font-weight:bold;color:#ffffff;background:' + C.ink;
+  const head = 'padding:6px 8px;font-size:10px;font-weight:bold;color:#ffffff;background:' + C.ink;
   const money = 'text-align:right;white-space:nowrap';
   const sum = function (label, value, strong) {
     return '<tr><td colspan="3" style="' + cell + ';text-align:right' + (strong ? ';font-weight:bold' : '') + '">' + label + '</td><td style="' + cell + ';' + money + (strong ? ';font-weight:bold;font-size:13px' : '') + '">' + value + '</td></tr>';
   };
-  return '<html><body style="font-family:Arial,Helvetica,sans-serif;color:' + C.ink + ';margin:28px 36px">' +
-    '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle">' +
-    (logo ? '<img src="' + logo + '" alt="' + COMPANY.name + '" style="height:46px">' : '<span style="font-size:22px;font-weight:bold">' + COMPANY.name + '</span>') + '</td>' +
-    '<td style="text-align:right;vertical-align:middle"><div style="font-size:26px;font-weight:bold;letter-spacing:1px">QUOTATION</div>' +
-    '<div style="font-size:12px">Quotation No: <b>' + esc(qt.reference) + '</b></div><div style="font-size:12px">Date: ' + date + '</div></td></tr></table>' +
-    '<div style="border-bottom:3px solid ' + C.green + ';margin-top:10px"></div>' +
-    '<table style="width:100%;border-collapse:collapse;margin-top:14px"><tr>' +
+
+  // ---- Page 1: the quotation
+  const page1 = '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle">' + logoHtml(44) + '</td>' +
+    '<td style="text-align:right;vertical-align:middle"><div style="font-size:24px;font-weight:bold;letter-spacing:1px">QUOTATION</div>' +
+    '<div style="font-size:11px">Quotation No: <b>' + esc(qt.reference) + '</b></div><div style="font-size:11px">Date: ' + date + '</div></td></tr></table>' +
+    '<div style="border-bottom:3px solid ' + C.green + ';margin-top:8px"></div>' +
+    '<table style="width:100%;border-collapse:collapse;margin-top:12px"><tr>' +
     block('ISSUED TO:', ['Name: ' + (c.name || ''), 'Mobile: ' + (c.phone || ''), 'Email: ' + (c.email || '')].concat(c.branch ? ['Nearest branch: ' + c.branch] : [])) +
     block('ISSUED BY:', [COMPANY.name + ' (' + COMPANY.legal + ')', 'Phone: ' + COMPANY.phone, 'Email: ' + COMPANY.email, 'Address: ' + COMPANY.address]) + '</tr></table>' +
-    '<div style="text-align:center;margin-top:20px"><div style="font-size:24px;font-weight:bold">' + esc(model) + '</div>' +
-    (build ? '<div style="font-size:15px;font-weight:bold;color:' + C.greenText + ';margin-top:4px">' + esc(build) + '</div>' : '') +
-    (photo ? '<img src="' + photo + '" alt="" style="width:280px;max-width:100%;margin-top:10px">' : '') + '</div>' +
-    '<table style="width:100%;border-collapse:collapse;margin-top:16px"><tr>' +
-    '<td style="' + specCell + ';width:38%;background:' + C.green + ';color:#ffffff;font-weight:bold">SPECIFICATION / ITEM</td>' +
-    '<td style="' + specCell + ';background:' + C.ink + ';border-color:' + C.ink + ';color:#ffffff;font-weight:bold;text-align:center">DETAILS</td></tr>' +
-    spec.map(function (r) { return '<tr style="page-break-inside:avoid"><td style="' + specCell + '">' + esc(r[0]) + '</td><td style="' + specCell + ';white-space:pre-line">' + esc(r[1]) + '</td></tr>'; }).join('') + '</table>' +
+    '<div style="text-align:center;margin-top:14px"><div style="font-size:21px;font-weight:bold">' + esc(model) + '</div>' +
+    (build ? '<div style="font-size:14px;font-weight:bold;color:' + C.greenText + ';margin-top:2px">' + esc(build) + '</div>' : '') +
+    (photo ? '<img src="' + photo + '" alt="" style="height:190px;max-width:100%;margin-top:8px">' : '') + '</div>' +
     heading('Price') +
-    '<table style="width:100%;border-collapse:collapse;margin-top:8px"><tr><td style="' + head + '">ITEM</td><td style="' + head + ';text-align:center">QTY</td>' +
+    '<table style="width:100%;border-collapse:collapse;margin-top:6px"><tr><td style="' + head + '">ITEM</td><td style="' + head + ';text-align:center">QTY</td>' +
     '<td style="' + head + ';' + money + '">UNIT PRICE</td><td style="' + head + ';' + money + '">AMOUNT</td></tr>' +
-    t.lines.map(function (l) {
+    priced.rows.map(function (l) {
       return '<tr style="page-break-inside:avoid"><td style="' + cell + '"><b>' + esc(l.item) + '</b>' + (l.description ? '<br><span style="color:' + C.mute + '">' + esc(l.description) + '</span>' : '') +
         '</td><td style="' + cell + ';text-align:center">' + l.qty + '</td><td style="' + cell + ';' + money + '">' + peso(l.unit) + '</td><td style="' + cell + ';' + money + '">' + peso(l.amount) + '</td></tr>';
     }).join('') +
-    sum('Price per cart', peso(t.perCart)) + (t.units !== 1 ? sum('Number of carts', String(t.units)) : '') +
+    (t.units !== 1 || priced.rows.length > 1 ? sum('Price per cart', peso(t.perCart)) : '') + (t.units !== 1 ? sum('Number of carts', String(t.units)) : '') +
     (t.discount ? sum('Discount', '- ' + peso(t.discount)) : '') + sum('TOTAL', peso(t.total), true) + '</table>' +
-    (qt.notes ? heading('Notes') + '<p style="font-size:12px;line-height:1.6;margin:0;white-space:pre-line">' + esc(qt.notes) + '</p>' : '') +
-    (qt.terms ? heading('Terms') + '<p style="font-size:11px;line-height:1.6;margin:0;white-space:pre-line;color:' + C.mute + '">' + esc(qt.terms) + '</p>' : '') +
-    '<table style="width:100%;border-collapse:collapse;margin-top:24px"><tr><td style="background:' + C.ink + ';color:#ffffff;padding:12px 18px;font-size:11px">' +
-    '<b>' + COMPANY.name + '</b> by ' + COMPANY.legal + ' &middot; ' + COMPANY.site + ' &middot; ' + COMPANY.email + ' &middot; ' + COMPANY.phone + '</td></tr></table></body></html>';
+    (qt.notes ? heading('Notes') + '<p style="font-size:11px;line-height:1.5;margin:0;white-space:pre-line">' + esc(qt.notes) + '</p>' : '') +
+    (qt.terms ? heading('Terms') + '<p style="font-size:10px;line-height:1.5;margin:0;white-space:pre-line;color:' + C.mute + '">' + esc(qt.terms) + '</p>' : '') +
+    footer;
+
+  // ---- Page 2: specifications and warranty
+  const page2 = pageBreak + pageHead('SPECIFICATIONS & WARRANTY') +
+    '<div style="font-size:20px;font-weight:bold;margin-top:16px">' + esc(model) + (build ? ' <span style="color:' + C.greenText + '">· ' + esc(build) + '</span>' : '') + '</div>' +
+    heading('Specifications') +
+    (modelSpecs.length
+      ? '<table style="width:100%;border-collapse:collapse"><tr><td style="width:50%;vertical-align:top;padding-right:8px">' + specTable('YOUR BUILD', spec) + '</td>' +
+        '<td style="width:50%;vertical-align:top;padding-left:8px">' + specTable('MODEL SPECIFICATIONS', modelSpecs) + '</td></tr></table>'
+      : specTable('YOUR BUILD', spec)) +
+    heading('Warranty') +
+    '<p style="font-size:11px;line-height:1.6;margin:0;white-space:pre-line">' + esc(qt.warranty || 'Warranty terms are confirmed with your order. Ask your sales consultant for the details for your cart.') + '</p>' +
+    footer;
+
+  // ---- Page 3: upgrades the model can take
+  const cellsPerRow = 3;
+  const offerRows = [];
+  for (let i = 0; i < offers.length; i += cellsPerRow) offerRows.push(offers.slice(i, i + cellsPerRow));
+  const page3 = !offers.length ? '' : pageBreak + pageHead('UPGRADES & ACCESSORIES') +
+    '<div style="font-size:20px;font-weight:bold;margin-top:16px">Make your ' + esc(model) + ' yours</div>' +
+    '<p style="font-size:12px;line-height:1.5;margin:4px 0 12px;color:' + C.mute + '">Upgrades and accessories that fit your cart. Add any of them to your order: reply to this quotation or call us, and we will price them for you.</p>' +
+    '<table style="width:100%;border-collapse:separate;border-spacing:8px">' + offerRows.map(function (row) {
+      return '<tr style="page-break-inside:avoid">' + row.map(function (o) {
+        return '<td style="width:33%;vertical-align:top;background:' + C.stone + ';padding:10px;text-align:center">' +
+          (o.image ? '<img src="' + o.image + '" alt="" style="height:110px;max-width:100%">' : '<div style="height:110px"></div>') +
+          '<div style="font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:' + C.greenText + ';margin-top:6px">' + esc(o.group) + '</div>' +
+          '<div style="font-size:11px;font-weight:bold;margin-top:2px">' + esc(o.name) + '</div></td>';
+      }).join('') + new Array(cellsPerRow - row.length + 1).join('<td style="width:33%"></td>') + '</tr>';
+    }).join('') + '</table>' +
+    '<table style="width:100%;border-collapse:collapse;margin-top:14px"><tr><td style="border:2px solid ' + C.green + ';padding:12px 16px;font-size:12px;line-height:1.6">' +
+    '<b>More from ' + COMPANY.name + '</b><br>Golf carts, lifestyle carts, resort shuttles and utility carts, plus parts and service at our branches in ' + COMPANY.branches + '.' +
+    ' See the full range at <b>' + COMPANY.site + '</b> or call <b>' + COMPANY.phone + '</b>.</td></tr></table>' +
+    footer;
+
+  return '<html><body style="font-family:Arial,Helvetica,sans-serif;color:' + C.ink + ';margin:22px 32px">' + page1 + page2 + page3 + '</body></html>';
 }
 
 function json(obj) {

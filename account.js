@@ -1422,6 +1422,7 @@ async function prepareQuotation(quoteId) {
         exchange_rate: pricing.exchange_rate, freight_pct: pricing.freight_pct, margin_pct: pricing.margin_pct, terms: QUOTATION_TERMS,
         notes: quote.notes || '', photo: quotationPhoto(quote)
     });
+    if ('warranty' in pricing) Object.assign(draft, { pdf_extra: quotationPdfExtra(draft), warranty: pricing.warranty || '' });
     const { data: saved, error } = await sb.from('quotations').insert(draft).select().single();
     if (error) { showToast(`The quotation could not be created: ${error.message}`); return; }
     pageData.quotations.unshift(saved);
@@ -1462,6 +1463,9 @@ function renderAdminQuotations(data) {
             </div>
             ${[['exchange_rate', 'Exchange rate (₱ per $1)'], ['freight_pct', 'Freight %'], ['margin_pct', 'Margin %']].map(([key, label]) => `
                 <div class="field"><label for="ps-${key}">${label}</label><input id="ps-${key}" name="${key}" type="text" inputmode="decimal" value="${Number(p[key])}"${can('pricing.edit') ? '' : ' disabled'}></div>`).join('')}
+            ${'warranty' in p ? `<div class="field sm:col-span-4"><label for="ps-warranty">Warranty (page 2 of every quotation PDF)</label>
+                <textarea id="ps-warranty" name="warranty" rows="4" placeholder="e.g. 2 years on the battery, 1 year on the motor and controller…"${can('pricing.edit') ? '' : ' disabled'}>${escapeHtml(p.warranty)}</textarea>
+                <p class="text-xs text-mute mt-1">A quotation picks this up when it's next saved.</p></div>` : ''}
             ${can('pricing.edit') ? '<button type="submit" class="btn btn-primary min-h-[3rem] px-5 text-sm">Save pricing</button>' : '<p class="text-xs text-mute">Set by a master admin.</p>'}
             ${Number(p.margin_pct) === 0 ? '<p class="golfer-error sm:col-span-4">The margin is 0%: quotations would be priced at landed cost.</p>' : ''}
         </form>
@@ -1488,6 +1492,7 @@ async function savePricingSettings(e) {
         values[key] = parseAmount(String(data.get(key) || ''));
         if (values[key] == null || Number.isNaN(values[key]) || values[key] < 0) { showToast('Enter numbers for the rate, freight and margin.'); return; }
     }
+    if (data.has('warranty')) values.warranty = String(data.get('warranty')).trim();
     const { data: saved, error } = await sb.from('pricing_settings').update(values).eq('id', 1).select().single();
     if (error) { showToast(`Not saved: ${error.message}`); return; }
     pageData.pricing = saved;
@@ -1537,19 +1542,20 @@ function renderQuotationEditor(data) {
         ${editable && qt.build_group ? `<p class="text-sm mt-3"><button type="button" onclick="rebuildQuotationLines()" class="link">Fill lines from this bundle again</button> <span class="text-mute">(replaces the lines below with the ones the request's build points at)</span></p>` : ''}
 
         <div class="admin-table-wrap mt-6"><table class="admin-table bundle-table">
-            <thead><tr><th>SKU</th><th>Part</th><th>Option</th><th>Description</th><th class="text-right">Qty</th><th class="text-right">Cost (USD)</th><th class="text-right">Cost (₱)</th><th class="text-right">Price (₱)</th><th class="text-right">Amount (₱)</th>${editable ? '<th><span class="sr-only">Remove</span></th>' : ''}</tr></thead>
+            <thead><tr><th>SKU</th><th>Part</th><th>Option</th><th>Description</th><th title="Shown with its own price in the PDF. The other lines are one package price.">Upgrade</th><th class="text-right">Qty</th><th class="text-right">Cost (USD)</th><th class="text-right">Cost (₱)</th><th class="text-right">Price (₱)</th><th class="text-right">Amount (₱)</th>${editable ? '<th><span class="sr-only">Remove</span></th>' : ''}</tr></thead>
             <tbody>${qt.lines.map((l, i) => `<tr>
                 <td class="whitespace-nowrap">${escapeHtml(l.sku)}</td>
                 <td>${escapeHtml(l.part)}</td>
                 <td>${escapeHtml(l.option)}</td>
                 <td>${escapeHtml(l.description)}</td>
+                <td class="text-center">${editable ? `<input type="checkbox" onchange="setQuotationUpgrade(${i}, this.checked)" aria-label="Upgrade"${l.upgrade ? ' checked' : ''}>` : (l.upgrade ? 'Yes' : '')}</td>
                 <td class="text-right">${num(`setQuotationLine(${i}, 'qty', this.value)`, l.qty)}</td>
                 <td class="text-right whitespace-nowrap">${formatUsd(l.cost_usd)}</td>
                 <td class="text-right whitespace-nowrap text-mute">${formatPhp(quotationCostPhp(qt, l))}</td>
                 <td class="text-right whitespace-nowrap">${editable ? num(`setQuotationLine(${i}, 'price_php', this.value)`, l.price_php) : formatPhp(l.price_php)}${l.manual ? `<p class="text-xs text-mute">typed${editable ? ` · <button type="button" onclick="useFormulaPrice(${i})" class="link">use formula</button>` : ''}</p>` : ''}${l.price_php == null ? '<p class="golfer-error text-xs">No price</p>' : ''}</td>
                 <td class="text-right whitespace-nowrap">${formatPhp(Number(l.price_php || 0) * Number(l.qty == null ? 1 : l.qty))}</td>
                 ${editable ? `<td><button type="button" onclick="removeQuotationLine(${i})" class="link text-xs">Remove</button></td>` : ''}
-            </tr>`).join('') || `<tr><td colspan="10" class="text-mute">No lines yet.</td></tr>`}</tbody>
+            </tr>`).join('') || `<tr><td colspan="11" class="text-mute">No lines yet.</td></tr>`}</tbody>
         </table></div>
         ${editable ? `<div class="flex flex-wrap gap-4 items-end mt-4">
             <div class="field grow max-w-2xl"><label for="qe-add">Add a line from the bundle</label>
@@ -1614,6 +1620,11 @@ function setQuotationLine(i, key, text) {
     renderApp();
 }
 
+function setQuotationUpgrade(i, on) {
+    quotationDraft.lines[i] = { ...quotationDraft.lines[i], upgrade: on };
+    renderApp();
+}
+
 function useFormulaPrice(i) {
     const line = { ...quotationDraft.lines[i], manual: false };
     line.price_php = quotationFormulaPrice(quotationDraft, line);
@@ -1632,11 +1643,12 @@ function addQuotationLine(value) {
         const part = prompt('Part (e.g. Add-on)') || '';
         const description = prompt('Description') || '';
         if (!part && !description) return;
-        quotationDraft.lines.push({ sheet_row: null, sku: '', part, option: '', description, qty: 1, cost_usd: null, price_php: null, manual: true });
+        // Lines added after the bundle's are upgrades: priced on their own in the PDF
+        quotationDraft.lines.push({ sheet_row: null, sku: '', part, option: '', description, qty: 1, cost_usd: null, price_php: null, manual: true, upgrade: true });
     } else {
         const b = pageData.bundles.find(x => x.sheet_row === Number(value));
         if (!b) return;
-        const line = bundleToQuotationLine(b);
+        const line = { ...bundleToQuotationLine(b), upgrade: true };
         line.price_php = quotationFormulaPrice(quotationDraft, line);
         quotationDraft.lines.push(line);
     }
@@ -1658,10 +1670,35 @@ function rebuildQuotationLines() {
     if (suggested.unmatched.length) showToast(`Check: ${suggested.unmatched.join(', ')}`);
 }
 
-// The quotation's content as the database stores it
+// The quotation's content as the database stores it. With the PDF's pages 2 and 3 (once schema.sql has added their
+// columns): the model's specifications, the warranty from the pricing settings, and upgrades the model can take
 function quotationContent(qt) {
     const { customer, title, build_rows, build_group, units, lines, exchange_rate, freight_pct, margin_pct, discount_php, notes, terms } = qt;
-    return { customer, title, build_rows, build_group, units, lines, exchange_rate, freight_pct, margin_pct, discount_php, notes, terms };
+    const content = { customer, title, build_rows, build_group, units, lines, exchange_rate, freight_pct, margin_pct, discount_php, notes, terms };
+    if ('pdf_extra' in qt) Object.assign(content, { pdf_extra: quotationPdfExtra(qt), warranty: (pageData.pricing && pageData.pricing.warranty) || '' });
+    return content;
+}
+
+const PDF_OFFER_LIMIT = 9;
+
+function quotationPdfExtra(qt) {
+    const quote = pageData.quotes.find(q => q.id === qt.quote_id) || {};
+    const product = findProductRef(quote.slug) || findProductRef(rowValue(qt.build_rows, 'Model'));
+    if (!product) return { specs: [], offers: [] };
+    const specs = [['Seating', product.seating], ['Range', product.range], ['Top speed', product.speed], ['Battery', product.battery],
+        ['Charging time', product.chargingTime], ['Powertrain', product.powertrain], ...Object.entries(product.specs || {})]
+        .filter(([, v]) => v && v !== 'N/A');
+    // What the model can still take, minus what the customer already chose; one from each group in turn, so the
+    // page shows a spread
+    const chosen = (qt.build_rows || []).map(r => String(r[1] || '')).join(' | ').toLowerCase();
+    const groups = getCompatibleAccessoryGroups(product.name, null).map(g => ({ group: g.group, items: g.items
+        .map(i => ({ group: g.group, name: i.name, image: String(i.image || (findProductRef(i.product) || {}).image || '').replace(/\.webp$/i, '') }))
+        .filter(i => i.image && !chosen.includes(i.name.toLowerCase())) }));
+    const offers = [];
+    for (let round = 0; offers.length < PDF_OFFER_LIMIT && groups.some(g => g.items[round]); round++) {
+        groups.forEach(g => { if (g.items[round] && offers.length < PDF_OFFER_LIMIT) offers.push(g.items[round]); });
+    }
+    return { specs, offers };
 }
 
 async function writeQuotation(change, message) {
