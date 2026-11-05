@@ -1764,7 +1764,7 @@ function finderChoose(value) {
         const model = VEHICLE_MODELS[finder.model];
         closeFinder();
         navigateTo('product-details', model.slug);
-        setTimeout(() => { selectBuildLevel(value); scrollToDetailSection('build'); }, 350);
+        setTimeout(() => { focusBuildLevel(value); scrollToDetailSection('build'); }, 350);
         return;
     }
     renderFinder();
@@ -2701,7 +2701,7 @@ function buildFromHomeStage() {
     const { level } = homeStageBuilds()[homeStageIndex];
     navigateTo('product-details', HOME_STAGE_SLUG);
     setTimeout(() => {
-        selectBuildLevel(level.id);
+        focusBuildLevel(level.id);
         scrollToDetailSection('build');
     }, 350);
 }
@@ -4378,6 +4378,9 @@ function selectBuildLevel(id) {
         const active = card.dataset.build === id;
         card.classList.toggle('build-card-active', active);
         card.querySelector('[role="radio"]').setAttribute('aria-checked', active ? 'true' : 'false');
+        // Phones show the cards as a swipe row: bring the chosen one into view (sideways only)
+        const row = card.parentElement;
+        if (active && row.scrollWidth > row.clientWidth) row.scrollTo({ left: card.offsetLeft - row.offsetLeft - parseFloat(getComputedStyle(row).paddingLeft), behavior: 'smooth' });
     });
     const product = currentDetailProduct();
     if (product && isTempoVersion(product)) {
@@ -4397,6 +4400,8 @@ function selectBuildLevel(id) {
     }
     if (product) updateDetailBuildText(product);
     updateBuildSummaryLine();
+    // The chosen build is drawn large: redraw so the new choice takes its place
+    if (detailBuildFocus) redrawBuildSection();
 }
 
 // The colors of the current build's photo, so the color preview starts out looking like that build. Once the
@@ -4877,24 +4882,16 @@ function renderBuildCompareTable(buildSet) {
         </div>`;
 }
 
-function renderBuildSection(product, buildSet) {
+// One build card. focus: the chosen build drawn large (see renderFocusedBuilds)
+function renderBuildCard(product, b, k, focus) {
+    // Tempo Scratch / Pro: the note's upgrades are a checkbox, kept outside the card's select button
+    const pkg = isTempoVersion(product) && TEMPO_UPGRADE_PACKAGE[k].length > 0;
+    const pkgOn = pkg && b.id === detailBuild.level && tempoPackageOn(product, k);
     return `
-        <section id="build" class="detail-section rise scroll-mt-32 home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12">
-            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-8">
-                <h2 class="type-lg text-ink lg:col-span-7">${buildSet.title}</h2>
-                ${buildSet.note ? `<p class="measure lg:col-span-5">${buildSet.note}</p>` : ''}
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-${buildSet.builds.length} gap-4" role="radiogroup" aria-label="Build level">
-                ${buildSet.builds.map((b, k) => {
-                    // Tempo Scratch / Pro: the note's upgrades are a checkbox, kept outside the card's select button
-                    const pkg = isTempoVersion(product) && TEMPO_UPGRADE_PACKAGE[k].length > 0;
-                    const pkgOn = pkg && b.id === detailBuild.level && tempoPackageOn(product, k);
-                    return `
-                    <div data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} flex flex-col">
-                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" class="text-left p-5 lg:p-6 ${pkg ? 'pb-4 lg:pb-4' : ''} flex flex-col gap-4 flex-1">
+                    <div data-build="${b.id}" class="build-card edge-light ${b.id === detailBuild.level ? 'build-card-active' : ''} ${focus ? 'build-card-focus' : ''} flex flex-col">
+                    <button type="button" role="radio" aria-checked="${b.id === detailBuild.level}" onclick="selectBuildLevel('${b.id}')" class="text-left p-5 lg:p-6 ${pkg ? 'pb-4 lg:pb-4' : ''} flex flex-col gap-4 flex-1 ${focus ? 'md:grid md:grid-cols-2 md:gap-x-8 md:content-start' : ''}">
                         ${(product.buildPhotos && product.buildPhotos[b.id]) || product.image ? `
-                            <span class="build-card-photo"><img src="${(product.buildPhotos && product.buildPhotos[b.id]) || product.image}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
+                            <span class="build-card-photo ${focus ? 'md:row-span-4' : ''}"><img src="${(product.buildPhotos && product.buildPhotos[b.id]) || product.image}" alt="${product.name} ${b.name} build" loading="lazy" decoding="async"></span>` : ''}
                         <span class="flex items-start justify-between gap-4">
                             <span>
                                 <span class="block type-md text-ink">${b.name}</span>
@@ -4914,8 +4911,72 @@ function renderBuildSection(product, buildSet) {
                             <span>${b.note}</span>
                         </label>` : ''}
                     </div>`;
-                }).join('')}
+}
+
+// After a visitor has chosen a build (the Private Golf Carts finder, or the homepage's Build button): that build
+// large, the others as small cards under "Changed your mind?", and a way back to all of them side by side
+let detailBuildFocus = false;
+
+function renderFocusedBuilds(product, buildSet) {
+    const k = Math.max(0, buildSet.builds.findIndex(b => b.id === detailBuild.level));
+    const photo = b => (product.buildPhotos && product.buildPhotos[b.id]) || product.image;
+    return `
+        <div class="build-focus" role="radiogroup" aria-label="Build level">
+            ${renderBuildCard(product, buildSet.builds[k], k, true)}
+            <div class="build-focus-side">
+            <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+                <h3 class="text-base font-semibold text-ink">Changed your mind? Choose another build</h3>
+                <button type="button" class="link text-sm" onclick="setBuildFocus(false)">Compare all builds</button>
             </div>
+            <div class="build-minis mt-3">
+                ${buildSet.builds.filter((_, i) => i !== k).map(b => `
+                    <button type="button" role="radio" aria-checked="false" class="build-mini" onclick="selectBuildLevel('${b.id}')">
+                        ${photo(b) ? `<span class="build-mini-photo"><img src="${photo(b)}" alt="" loading="lazy" decoding="async"></span>` : ''}
+                        <span class="build-mini-text">
+                            <span class="build-mini-name">${b.name}</span>
+                            <span class="build-mini-tagline">${b.tagline}</span>
+                            <span class="build-mini-cta">Choose ${b.name}</span>
+                        </span>
+                    </button>`).join('')}
+            </div>
+            </div>
+        </div>`;
+}
+
+// Redraws the build section in place (the chosen build changed, or the view switched)
+function redrawBuildSection() {
+    const product = currentDetailProduct();
+    const buildSet = product && getProductBuildSet(product);
+    const section = document.getElementById('build');
+    if (!section || !buildSet) return;
+    section.outerHTML = renderBuildSection(product, buildSet);
+    // Already faded in (see .rise): the new copy shows at once
+    document.getElementById('build').classList.add('is-visible');
+}
+
+function setBuildFocus(on) {
+    detailBuildFocus = on;
+    redrawBuildSection();
+}
+
+// Opens a build chosen elsewhere: that build, shown large
+function focusBuildLevel(id) {
+    detailBuildFocus = true;
+    selectBuildLevel(id); // redraws the section, now focused
+}
+
+function renderBuildSection(product, buildSet) {
+    return `
+        <section id="build" class="detail-section rise scroll-mt-32 home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12">
+            <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-8">
+                <h2 class="type-lg text-ink lg:col-span-7">${buildSet.title}</h2>
+                ${buildSet.note ? `<p class="measure lg:col-span-5">${buildSet.note}</p>` : ''}
+            </div>
+
+            ${detailBuildFocus ? renderFocusedBuilds(product, buildSet) : `
+            <div class="build-cards md:grid ${{ 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }[buildSet.builds.length] || 'md:grid-cols-3'} gap-4" role="radiogroup" aria-label="Build level">
+                ${buildSet.builds.map((b, k) => renderBuildCard(product, b, k, false)).join('')}
+            </div>`}
 
             ${isTempoVersion(product) ? `
                 <!-- Tempo builds: the running summary is the side panel beside Equipment and upgrades -->
@@ -5015,7 +5076,7 @@ function renderDetailColorPickers(product) {
                         <div class="flex flex-wrap gap-3" role="radiogroup" aria-label="${group.tier}">
                             ${group.colors.map(c => {
                                 const i = idx++;
-                                return `<button type="button" role="radio" aria-checked="${i === activeIdx}" onclick="selectDetailColor(${i}, true)" title="${attrText(c.name)}" aria-label="${attrText(c.name)}" class="detail-swatch ${i === activeIdx ? 'detail-swatch-active' : ''}" style="background:${c.hex}"></button>`;
+                                return `<button type="button" role="radio" aria-checked="${i === activeIdx}" onclick="selectDetailColor(${i}, true)" data-tip="${attrText(c.name)}" aria-label="${attrText(c.name)}" class="detail-swatch ${i === activeIdx ? 'detail-swatch-active' : ''}" style="background:${c.hex}"></button>`;
                             }).join('')}
                         </div>
                     </div>
@@ -5040,9 +5101,7 @@ function renderDetailColorPickers(product) {
                             ${group.options.map(opt => {
                                 const active = detailBuild[t.type] === opt;
                                 return `
-                                <button type="button" onclick="selectDetailTrim(this.dataset.type, this.dataset.value, true)" data-type="${t.type}" data-value="${attrText(opt)}" aria-pressed="${active}" class="detail-trim ${active ? 'detail-trim-active' : ''}">
-                                    <span class="detail-trim-dot" style="background:${getTrimHex(t.type, opt) || '#D6D6CE'}"></span>${opt}
-                                </button>`;
+                                <button type="button" onclick="selectDetailTrim(this.dataset.type, this.dataset.value, true)" data-type="${t.type}" data-value="${attrText(opt)}" aria-pressed="${active}" aria-label="${attrText(opt)}" data-tip="${attrText(opt)}" class="detail-trim trim-swatch ${active ? 'detail-trim-active' : ''}" style="background:${getTrimHex(t.type, opt) || '#D6D6CE'}"></button>`;
                             }).join('')}
                         </div>
                     </div>
@@ -5078,6 +5137,7 @@ function renderProductDetailsPage() {
     const startColorIdx = Math.max(0, bodyColors.findIndex(c => c.image));
     const startColor = bodyColors[startColorIdx];
     // Seat and canopy start as "Standard" (as photographed) until the visitor picks a color
+    detailBuildFocus = false;
     detailBuild = {
         body: startColor ? startColor.name : null, seat: null, canopy: null,
         level: buildSet ? buildSet.builds[levelIdx].id : null,
