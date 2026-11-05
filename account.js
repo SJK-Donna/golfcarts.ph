@@ -429,7 +429,7 @@ function quoteSavedBuild(id) {
 }
 
 // --- Quotes: every request from the site, for the admin and the golfer's history. Saving it is what sends the
-// customer's acknowledgement and the staff's notice (the database calls quotation-mail). Resolves { error } ---
+// customer's acknowledgement and the staff's notice (the database calls the email script). Resolves { error } ---
 async function recordQuote(fields, slug) {
     if (!sb) return { error: new Error('Requests can\'t be sent from this page') };
     let quoteRows = [];
@@ -1261,7 +1261,7 @@ async function deleteBundleLine(sheetRow) {
 // --- Quotations: a priced offer for a quote request, built from the bundle for the request's model and build.
 // A sales manager prepares it (prices are USD x rate x (1 + freight) x (1 + margin), and any line can be typed
 // over), submits it; a master admin approves it or returns it with a note; then it is emailed to the customer as a
-// PDF by the Edge Function quotation-mail, as are the notices for each step. The database's workflow trigger decides
+// PDF by the email script (google-apps-script/golfcarts-mail.gs), as are the notices for each step. The database's workflow trigger decides
 // which step each role may take ---
 const QUOTATION_STATUS_LABELS = { draft: 'Draft', submitted: 'Waiting for approval', approved: 'Approved', returned: 'Returned', sent: 'Sent' };
 const QUOTATION_TERMS = 'Prices are in Philippine pesos (PHP). This quotation is valid for 15 days from its date. Delivery lead time is confirmed on order.';
@@ -1702,9 +1702,10 @@ async function deleteQuotation() {
     showToast('Quotation deleted.');
 }
 
-// The Edge Function quotation-mail (supabase/functions/quotation-mail) makes the PDF and sends the emails; it
-// checks this sign-in against the staff list itself
-const QUOTATION_MAIL_URL = `${SUPABASE_URL}/functions/v1/quotation-mail`;
+// The Google Apps Script google-apps-script/golfcarts-mail.gs makes the PDF and sends the emails; it reads the
+// quotation with this sign-in, so the database decides whether this person may. Its web app address (ends in /exec),
+// the same as the Vault secret "mail_script_url"; empty until the script is deployed.
+const MAIL_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDiEGgwlisk4dikiTy7svACFWwlowq37yMsBKL39rUACzHPDevVKcVvt_U8REKxOKhfg/exec';
 const EMAIL_KINDS = { quotation_submitted: 'Approval request to master admins', quotation_approved: 'Approved notice to the sales manager',
     quotation_returned: 'Returned notice to the sales manager', quotation_sent: 'Quotation to the customer' };
 const quotationEmails = {}; // quotation id -> its email_log rows
@@ -1713,16 +1714,18 @@ async function quotationMail(action) {
     const { data } = await sb.auth.getSession();
     const token = data.session && data.session.access_token;
     if (!token) throw new Error('sign in again.');
-    const res = await fetch(QUOTATION_MAIL_URL, {
+    if (!MAIL_SCRIPT_URL) throw new Error('the email script isn\'t set up yet (MAIL_SCRIPT_URL in account.js).');
+    // Plain text, so the browser sends it to Apps Script directly (a JSON content type would need a CORS check
+    // Apps Script doesn't answer)
+    const res = await fetch(MAIL_SCRIPT_URL, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, id: quotationOpen })
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, id: quotationOpen, token })
     });
-    if (res.ok && (res.headers.get('content-type') || '').includes('application/pdf')) return res.blob();
-    if (res.status === 404) throw new Error('the quotation-mail function isn\'t deployed in Supabase yet.');
     let result = {};
     try { result = await res.json(); } catch (err) { /* no JSON: the status says enough */ }
-    if (!res.ok || !result.ok) throw new Error(result.error || `the email service answered ${res.status}.`);
+    if (!res.ok || !result.ok) throw new Error(result.error || `the email script answered ${res.status}.`);
+    if (result.pdf) return new Blob([Uint8Array.from(atob(result.pdf), ch => ch.charCodeAt(0))], { type: 'application/pdf' });
     return result;
 }
 
@@ -1743,7 +1746,7 @@ function renderQuotationEmails(qt) {
     const resend = qt.status === 'sent'
         ? `<button type="button" onclick="resendQuotation()" class="adm-btn">${lastSent && lastSent.status === 'failed' ? 'Try sending again' : 'Email the customer again'}</button>` : '';
     const body = log === null ? '<p class="text-sm text-mute">The email log isn\'t in the database yet. Re-run supabase/schema.sql.</p>'
-        : !log.length ? `<p class="text-sm text-mute">No emails yet${qt.status === 'sent' ? '. If none appears within a minute, check the quotation-mail function in Supabase.' : '.'}</p>`
+        : !log.length ? `<p class="text-sm text-mute">No emails yet${qt.status === 'sent' ? '. If none appears within a minute, check the email script (its Executions page in Apps Script).' : '.'}</p>`
         : `<div class="admin-table-wrap"><table class="admin-table">
             <thead><tr><th>Email</th><th>To</th><th>When</th><th>Result</th></tr></thead>
             <tbody>${log.map(e => `<tr>
@@ -1773,7 +1776,7 @@ async function previewQuotation() {
     }
 }
 
-// Marking it sent is what emails it: the database tells quotation-mail, which sends the PDF and logs the email
+// Marking it sent is what emails it: the database tells the email script, which sends the PDF and logs the email
 async function sendQuotation() {
     const c = quotationDraft.customer || {};
     if (!confirm(`Email quotation ${quotationDraft.reference} to ${c.email}? It can't be changed after this.`)) return;
