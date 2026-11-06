@@ -576,7 +576,7 @@ const ADMIN_ROLES = {
     // customers, quotes, prices or costs
     marketing: {
         label: 'Marketing',
-        home: 'The catalog as visitors see it: model photos, text and specs, accessory photos and the homepage event.',
+        home: 'The site as visitors see it: model photos, text and specs, accessory photos, the homepage carousel and event.',
         can: ['products.edit', 'content.edit']
     }
 };
@@ -611,7 +611,8 @@ const productFields = p => Object.fromEntries(PRODUCT_EDIT_FIELDS.filter(k => p[
 const ADMIN_ORIGINALS = {
     products: Object.fromEntries(PRODUCTS_DATA.map(p => [p.slug, productFields(p)])),
     accessories: Object.fromEntries(ACCESSORY_CATALOG.flatMap(g => g.items.map(i => [i.id, i.image || '']))),
-    event: { title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text.slice() }
+    event: { title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text.slice() },
+    banners: clone(HOME_BANNERS)
 };
 // From the site_edits table: { 'product:<slug>': { value, updated_by }, 'accessory:<id>': { value: { image } }, event: { ... } }
 let siteEdits = {};
@@ -623,6 +624,8 @@ function applyAdminEdits() {
         i.image = (edit && edit.image) || ADMIN_ORIGINALS.accessories[i.id] || undefined;
     }));
     Object.assign(HOME_EVENT, ADMIN_ORIGINALS.event, (siteEdits.event || {}).value);
+    const banners = ((siteEdits.banners || {}).value || {}).slides;
+    HOME_BANNERS.splice(0, HOME_BANNERS.length, ...clone(banners && banners.length ? banners : ADMIN_ORIGINALS.banners));
 }
 
 // Pre-rendered pages carry the shipped text, so a page with edits is drawn again once they arrive
@@ -737,7 +740,7 @@ function adminHeading(data) {
         golfers: ['Golfers', data ? `${plural((data.golfers || []).length, 'member')}, ${(data.golfers || []).filter(g => g.news).length} want member news` : '', ''],
         bundles: ['Bundles', 'Cost lines for each build, in USD. Quotations are priced from these.', ''],
         products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
-        content: ['Site content', 'The event story on the homepage.', ''],
+        content: ['Site content', 'The homepage carousel and the event story.', ''],
         users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`]
     };
     return headings[adminTab];
@@ -899,7 +902,7 @@ function renderAdminHome(data) {
                 }), 'No model has been edited yet. Every model shows its photos and text as shipped.')}
                 ${homeShortcuts([
                     ['Products', 'Main, build, gallery and accessory photos; text and specifications', tab('products')],
-                    ['Site content', 'The event story on the homepage', tab('content')],
+                    ['Site content', 'The homepage carousel and the event story', tab('content')],
                     ['View the website', 'See your changes as visitors do', 'navigateTo(\'home\')']
                 ])}
                 <section class="adm-panel adm-panel-wide">
@@ -907,6 +910,7 @@ function renderAdminHome(data) {
                     <ul class="adm-tips">
                         <li>Use JPEG or PNG. Large photos are resized to 1920px before they upload, so there is no need to shrink them first.</li>
                         <li>Build photos show on the model page when a visitor picks that build: keep the cart in the same spot and angle as the others.</li>
+                        <li>Homepage banners are 2880 × 864 pixels. Any other shape gets cropped, so check the preview in Site content before you save.</li>
                         <li>An edit goes live for every visitor as soon as you save it. Undo puts the shipped photo or text back.</li>
                     </ul>
                 </section>
@@ -1110,21 +1114,25 @@ function productDirty(slug) {
 }
 
 // Smaller than SITE_PHOTO_MAX, as JPEG (or PNG when it was one, to keep a cut-out's transparent background)
-async function shrinkPhoto(file) {
+// A homepage banner passes its own size, and always becomes a JPEG: it fills the top of the page, so it stays light
+async function shrinkPhoto(file, { max = SITE_PHOTO_MAX, jpeg = false } = {}) {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, SITE_PHOTO_MAX / Math.max(bitmap.width, bitmap.height));
-    const type = file.type === 'image/png' || file.type === 'image/webp' ? 'image/png' : 'image/jpeg';
+    const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height));
+    const type = !jpeg && (file.type === 'image/png' || file.type === 'image/webp') ? 'image/png' : 'image/jpeg';
     if (scale === 1 && file.type === type && file.size < 1.5e6) return file;
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(bitmap.width * scale);
     canvas.height = Math.round(bitmap.height * scale);
-    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const ctx = canvas.getContext('2d');
+    // A JPEG has no transparency: a see-through PNG goes on white, not black
+    if (type === 'image/jpeg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('the photo could not be read'))), type, 0.86));
 }
 
-async function uploadSitePhoto(file, folder) {
+async function uploadSitePhoto(file, folder, options) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error('choose a JPG, PNG or WebP photo');
-    const blob = await shrinkPhoto(file);
+    const blob = await shrinkPhoto(file, options);
     const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${blob.type === 'image/png' ? 'png' : 'jpg'}`;
     const { error } = await sb.storage.from(SITE_PHOTO_BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: '31536000' });
     if (error) throw new Error(/bucket not found/i.test(error.message) ? 'photo storage isn\'t set up yet (re-run supabase/schema.sql)' : error.message);
@@ -1398,9 +1406,130 @@ function renderAdminProducts() {
         <div class="space-y-4">${renderAccessoryPhotos()}${accessories.map(renderProductEditor).join('')}</div>`;
 }
 
+// --- The homepage carousel: edited here, then Save puts all of it on the site at once ---
+const BANNER_PHOTO_MAX = 2880; // the shipped banners' width
+let bannerDraft = null;        // the slides being edited; starts as what the site shows
+
+function bannerSlides() {
+    if (!bannerDraft) bannerDraft = clone(HOME_BANNERS);
+    return bannerDraft;
+}
+
+// Where a banner's button can go: [route, slug, label]
+function bannerDestinations() {
+    return [
+        ['products', '', 'All carts'],
+        ...NAV_SEGMENTS.map(s => ['segment', s.id, s.label]),
+        ['solutions', '', 'Fleet solutions'],
+        ['service', '', 'Service and support'],
+        ['blogs', '', 'Stories and guides'],
+        ['about', '', 'About us'],
+        ['contact', '', 'Contact us'],
+        ...PRODUCTS_DATA.filter(p => p.category !== 'Accessories').map(p => ['product-details', p.slug, `Model: ${p.name}`])
+    ];
+}
+
+function renderBannerEditor() {
+    const edit = siteEdits.banners;
+    const slides = bannerSlides();
+    const destinations = bannerDestinations();
+    return `
+        <form data-no-prefill onsubmit="saveBanners(event)" class="admin-card grid gap-5 max-w-3xl mb-6" novalidate>
+            <div>
+                <h2 class="type-md text-ink">Homepage carousel</h2>
+                <p class="text-sm text-mute mt-1">The banners at the top of the homepage, in the order they play. Use a photo 2880 × 864 pixels: any other shape gets cropped, as the preview shows.${edit && edit.updated_by ? ` Last edited by ${escapeHtml(adminName(edit.updated_by))}.` : ''}</p>
+            </div>
+            <ol class="admin-banners">${slides.map((b, i) => `
+                <li class="admin-banner">
+                    <div class="admin-banner-img">${b.image ? `<img src="${escapeHtml(b.image)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
+                    <div class="admin-banner-bar">
+                        <span class="text-sm font-semibold text-ink">Banner ${i + 1}</span>
+                        <span class="admin-photo-actions">
+                            <label for="ab-photo-${i}" class="link text-xs">${photoBusy === `banner:${i}` ? 'Uploading…' : b.image ? 'Replace photo' : 'Add photo'}</label>
+                            <input id="ab-photo-${i}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseBannerPhoto(${i}, this)">
+                            <button type="button" onclick="moveBanner(${i}, -1)" class="link text-xs"${i === 0 ? ' disabled' : ''}>Move up</button>
+                            <button type="button" onclick="moveBanner(${i}, 1)" class="link text-xs"${i === slides.length - 1 ? ' disabled' : ''}>Move down</button>
+                            <button type="button" onclick="removeBanner(${i})" class="link text-xs"${slides.length === 1 ? ' disabled' : ''}>Remove</button>
+                        </span>
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="field"><label for="ab-cta-${i}">Button text</label><input id="ab-cta-${i}" type="text" value="${escapeHtml(b.cta)}" onchange="setBannerField(${i}, 'cta', this.value)"></div>
+                        <div class="field"><label for="ab-link-${i}">Button goes to</label>
+                            <select id="ab-link-${i}" onchange="setBannerLink(${i}, this.value)">${destinations.map(([route, slug, label]) => `<option value="${route}|${slug}"${route === b.route && slug === (b.slug || '') ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></div>
+                        <div class="field sm:col-span-2"><label for="ab-alt-${i}">What the banner shows or says</label><input id="ab-alt-${i}" type="text" value="${escapeHtml(b.alt)}" onchange="setBannerField(${i}, 'alt', this.value)">
+                            <p class="text-xs text-mute mt-1">For people using screen readers, and for search engines. Type out any words in the photo.</p></div>
+                    </div>
+                </li>`).join('')}</ol>
+            <div class="flex flex-wrap gap-4 items-center">
+                <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm"${photoBusy ? ' disabled' : ''}>Save carousel</button>
+                <button type="button" onclick="addBanner()" class="btn btn-outline min-h-[2.5rem] px-4 text-sm">Add a banner</button>
+                <a href="./" data-route="home" class="link text-sm">See the homepage</a>
+                ${edit ? '<button type="button" onclick="resetBanners()" class="link text-sm">Back to the original banners</button>' : ''}
+            </div>
+        </form>`;
+}
+
+// A later move can't send the photo to the wrong banner: it goes on the slide it was chosen for
+async function chooseBannerPhoto(i, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const slide = bannerSlides()[i];
+    photoBusy = `banner:${i}`;
+    renderApp();
+    try {
+        slide.image = await uploadSitePhoto(file, 'banners', { max: BANNER_PHOTO_MAX, jpeg: true });
+        showToast('Photo uploaded. Save the carousel to put it on the site.');
+    } catch (err) {
+        showToast(`Not uploaded: ${err.message}.`);
+    }
+    photoBusy = '';
+    renderApp();
+}
+
+function setBannerField(i, key, value) {
+    bannerSlides()[i][key] = value.trim();
+}
+
+function setBannerLink(i, value) {
+    const [route, slug] = value.split('|');
+    Object.assign(bannerSlides()[i], { route, slug: slug || null });
+}
+
+function moveBanner(i, by) {
+    const slides = bannerSlides();
+    slides.splice(i + by, 0, slides.splice(i, 1)[0]);
+    renderApp();
+}
+
+function addBanner() {
+    bannerSlides().push({ image: '', alt: '', cta: '', route: 'products', slug: null });
+    renderApp();
+}
+
+function removeBanner(i) {
+    if (!confirm(`Remove banner ${i + 1}? It leaves the site when you save the carousel.`)) return;
+    bannerSlides().splice(i, 1);
+    renderApp();
+}
+
+function saveBanners(e) {
+    e.preventDefault();
+    const slides = bannerSlides();
+    const missing = slides.findIndex(b => !b.image || !b.cta || !b.alt);
+    if (missing >= 0) { showToast(`Banner ${missing + 1} needs a photo, button text and a description.`); return; }
+    saveSiteEdit('banners', { slides: clone(slides) }, 'Carousel saved. It is on the homepage now.');
+}
+
+function resetBanners() {
+    if (!confirm('Go back to the original banners? This removes your edited carousel from the site.')) return;
+    bannerDraft = null;
+    saveSiteEdit('banners', null, 'Back to the original banners.');
+}
+
 function renderAdminContent() {
     const edit = siteEdits.event;
     return `
+        ${renderBannerEditor()}
         <form data-no-prefill onsubmit="saveEventEdit(event)" class="admin-card grid gap-5 max-w-3xl">
             <div>
                 <h2 class="type-md text-ink">Homepage event</h2>

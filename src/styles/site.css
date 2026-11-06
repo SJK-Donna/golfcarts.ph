@@ -1334,6 +1334,89 @@
     .opt-included-item .opt-card-media {
         aspect-ratio: 16 / 9;
     }
+    /* One-card groups side by side (renderTempoSection): each title over its card, four to a row on a wide screen,
+       the same columns as a group's cards */
+    .opt-cells {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.25rem 0.75rem;
+        padding-top: 1.5rem;
+    }
+    @media (min-width: 768px) {
+        .opt-cells { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1024px) {
+        .opt-cells { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    .opt-cell {
+        display: flex;
+        flex-direction: column;
+        gap: 0.625rem;
+    }
+    .opt-cell > .opt-card, .opt-cell > .opt-card-wrap {
+        flex: 1;
+    }
+    .opt-cell-title {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--ink);
+    }
+    /* The eye button that opens an option's photo, in the card's bottom right corner. A selectable card is a button,
+       so the eye sits beside it in a wrapper rather than inside it */
+    .opt-card-wrap {
+        position: relative;
+        display: flex;
+    }
+    /* Tall enough for the tick box at the top and the eye at the bottom, even when the name is short */
+    .opt-card-wrap > .opt-card {
+        flex: 1;
+        min-width: 0;
+        min-height: 5.25rem;
+    }
+    .opt-included-item, .opt-item {
+        position: relative;
+    }
+    .opt-included-item:has(.opt-eye) .opt-card-body {
+        padding-right: 2.75rem;
+    }
+    .opt-eye {
+        position: absolute;
+        right: 0.375rem;
+        bottom: 0.375rem;
+        z-index: 4;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 9999px;
+        color: var(--ink-2);
+        transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+    }
+    .opt-eye:hover, .opt-eye:focus-visible {
+        background: var(--stone);
+        color: var(--ink);
+    }
+    /* In the accessory list the eye takes its place at the end of the row */
+    .opt-eye-static {
+        position: static;
+        flex-shrink: 0;
+    }
+    /* The photo window: the photo on the same light tile as the cards */
+    .opt-photo-frame {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 4 / 3;
+        padding: 1.5rem;
+        background: #EFEFEA;
+    }
+    .opt-photo-frame img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        mix-blend-mode: multiply;
+    }
     /* Sub-choices (fenders and add-ons, flip seat color) in a tinted panel under their parent */
     .opt-subpanel {
         margin-top: 0.75rem;
@@ -2029,6 +2112,15 @@
         background: var(--paper);
         border-bottom: 1px solid var(--line);
     }
+    /* The button text is typed in the admin: a long one wraps instead of pushing the page wider on a phone */
+    #home-banner-ctas {
+        max-width: 100%;
+    }
+    #home-banner-ctas .btn {
+        max-width: 100%;
+        white-space: normal;
+        text-align: center;
+    }
     .banner-slide {
         position: absolute;
         inset: 0;
@@ -2543,6 +2635,14 @@
     .adm-pipeline-n { font-size: 1.75rem; font-weight: 600; line-height: 1; color: var(--ink); }
     .adm-pipeline-label { font-size: 0.8125rem; color: var(--ink-2); }
     .adm-pipeline-note { font-size: 0.75rem; font-weight: 600; color: var(--adm-on-bad); }
+
+    /* Site content: the homepage carousel's banners, each previewed in the shape the homepage shows it */
+    .admin-banners { display: grid; gap: 1.5rem; }
+    .admin-banner { display: grid; gap: 0.75rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
+    .admin-banner-img { display: flex; align-items: center; justify-content: center; aspect-ratio: 2880 / 864; overflow: hidden; border-radius: 6px; background: var(--stone); }
+    .admin-banner-img img { width: 100%; height: 100%; object-fit: cover; }
+    .admin-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
+    .admin-banner-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* Home: each role's start page. Number tiles across the top (each opens what it counts), then panels */
     .adm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }

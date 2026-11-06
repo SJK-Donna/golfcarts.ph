@@ -909,9 +909,10 @@ const TEMPO_MATRIX = {
     mirrors: ['Side mirrors', 'Side mirrors and 5 panel rear mirror'],
     windshield: ['Clear windshield', 'Tinted windshield'],
     // Golfer 2 and 4 golf accessories, on every build: a sand bottle (or two), and on each side a cooler or a ball
-    // and club washer; the bag cover
+    // and club cleaner, never a cleaner on both (golfSides: the visitor's two choices); the bag cover
     sandBottle: ['Sand bottle', 'Two sand bottles (2pcs)'],
-    golfSide: ['Ball and club washer', 'Caddy Master cooler'],
+    golfSide: ['Ball and club cleaner', 'Caddy Master cooler'],
+    golfSides: ['Ball and club cleaner and a cooler', 'Two Caddy Master coolers'],
     bagCover: [['GC Bag Cover, Black'], ['GC Bag Cover, Black', 'GC Bag Cover, Beige', 'GC Bag Cover, White'], ['Magnetic Bag Cover, Black', 'Magnetic Bag Cover, Beige']],
     speaker: 'GC Bluetooth speaker',
     proAddOns: ['Club Car Premium Sound Bar', 'Club Car Overhead Entertainment with Apple CarPlay', 'Select Overhead Storage Console'],
@@ -1194,7 +1195,7 @@ function tempoLevelIncludes(line, i, layout = '2') {
         standard > 1 ? `${wheels.options[0]}, or ${standard - 1} other wheel choices` : wheels.options[0],
         lights ? lights.value : 'No headlights',
         `${m.body[i].length} body colors, ${m.seat[i].length} seat colors`,
-        find('sandBottle') && 'Bag cover, sand bottle, and a cooler or ball and club washer each side',
+        find('sandBottle') && 'Bag cover, sand bottle, a ball and club cleaner and a cooler (or two coolers)',
         find('flipSeat') && find('flipSeat').value,
         find('mirrors') && 'Side mirrors (5 panel rear mirror optional)',
         steering && 'Premium steering wheel'
@@ -1294,7 +1295,7 @@ function getTempoOptionGroups(product, i) {
     add({ id: 'wheels', section: 'Wheels and lighting', title: 'Wheels and tires', type: 'single',
         options: [...standardWheels, ...upgradeWheels], upgradeFrom: upgradeWheels.length ? standardWheels.length : undefined });
 
-    // Golf accessories (Golfer 2 and 4): bag cover, sand bottle, and a cooler or a ball and club washer each side
+    // Golf accessories (Golfer 2 and 4): bag cover, sand bottle, and a cooler or a ball and club cleaner each side
     if (s.golfAccessories) {
         const bags = m.bagCover[i];
         if (bags.length > 1) add({ id: 'bagCover', section: 'Accessories', title: 'Bag cover', type: 'single', options: bags, included: true });
@@ -1302,8 +1303,16 @@ function getTempoOptionGroups(product, i) {
         include('sandBottle', 'Sand bottle', m.sandBottle[0]);
         upgrade('sandBottle', 'Sand bottle upgrade', [m.sandBottle[1]]);
         // The left group also stands for the cooler among the quote accessories
-        add({ id: 'ballWasher', covers: ['cooler'], section: 'Accessories', title: 'Golf accessory, left side', type: 'single', options: m.golfSide, included: true });
-        add({ id: 'ballWasherRight', section: 'Accessories', title: 'Golf accessory, right side', type: 'single', options: m.golfSide, included: true });
+        // One pick, as before: a cleaner and a cooler, or two coolers; never two cleaners. The quote still gets a
+        // row for each side (the bundle's Accessories 2 and 3), from `quoteRows`. Also stands for the cooler among
+        // the quote accessories
+        const [cleaner, cooler] = m.golfSide;
+        add({ id: 'ballWasher', covers: ['cooler'], section: 'Accessories', title: 'Ball and club cleaner or cooler', type: 'single', included: true,
+            hint: 'Included, choose one. One ball and club cleaner per cart', options: m.golfSides,
+            quoteRows: {
+                [m.golfSides[0]]: [['Golf accessory, left side', cleaner], ['Golf accessory, right side', cooler]],
+                [m.golfSides[1]]: [['Golf accessory, left side', cooler], ['Golf accessory, right side', cooler]]
+            } });
         add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
     }
 
@@ -2431,6 +2440,8 @@ function homeSpecLine(p) {
 // The homepage header banners (image/Hero/hero1-6.png, shown from their web-size copies hero1-6.jpg)
 // Order from the website review: private, fleet, custom, (resort, rebuilt: artwork still to come), service.
 // The Red Series promo stays last until its place is decided.
+// These are the shipped banners; Marketing and super admins can replace them in the admin's Site content (the
+// site_edits row "banners", applied by account.js applyAdminEdits), so what they typed is escaped where it's drawn.
 const HOME_BANNERS = [
     { image: 'image/Hero/hero1.jpg', alt: 'Fairway? Covered. Quiet, smooth, and ready to roll. Upgrade your ride with us!', cta: 'Explore Private Carts', route: 'segment', slug: 'private' },
     { image: 'image/Hero/hero6.jpg', alt: 'A fleet of white golf carts lined up at a resort entrance', cta: 'Plan Your Fleet', route: 'solutions', slug: null },
@@ -2449,14 +2460,14 @@ function renderHomeBanners() {
             <div id="home-banners" class="banner-stage">
                 ${HOME_BANNERS.map((b, i) => `
                     <div class="banner-slide ${i === 0 ? 'is-active' : ''}" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${total}" ${i === 0 ? '' : 'aria-hidden="true" inert'}>
-                        <img src="${b.image}" alt="${b.alt}" width="2880" height="864" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">
+                        <img src="${attrText(b.image)}" alt="${attrText(b.alt)}" width="2880" height="864" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">
                     </div>
                 `).join('')}
             </div>
             <div class="banner-bar">
                 <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 py-4 flex flex-wrap items-center justify-between gap-4">
                     <div id="home-banner-ctas">
-                        ${HOME_BANNERS.map((b, i) => `<a href="${routeHref(b.route, b.slug)}" data-route="${b.route}" ${b.slug ? `data-slug="${b.slug}"` : ''} class="btn btn-primary ${i === 0 ? '' : 'hidden'}" data-banner-cta="${i}">${b.cta}</a>`).join('')}
+                        ${HOME_BANNERS.map((b, i) => `<a href="${attrText(routeHref(b.route, b.slug))}" data-route="${attrText(b.route)}" ${b.slug ? `data-slug="${attrText(b.slug)}"` : ''} class="btn btn-primary ${i === 0 ? '' : 'hidden'}" data-banner-cta="${i}">${attrText(b.cta)}</a>`).join('')}
                     </div>
                     <div class="flex items-center gap-4">
                         <p class="text-sm text-mute tabular-nums hidden sm:block"><span id="home-banner-index">1</span> / ${total}</p>
@@ -3998,7 +4009,9 @@ function renderAccessoryPicker() {
             <legend class="text-sm text-ink-2 mb-3">${g.group}${onlyOne(g) ? ' <span class="text-mute">(choose one)</span>' : oneEach(g) ? ' <span class="text-mute">(one of each kind)</span>' : ''}</legend>
             <div class="grid gap-2 ${picker.dataset.cols === '2' ? 'sm:grid-cols-2' : ''}">
             ${g.items.map(item => {
-                const photo = OPTION_CARD_PHOTOS && (item.image || (item.product && (PRODUCTS_DATA.find(p => p.slug === item.product) || {}).image));
+                // Text only; a photo opens from the eye button
+                const image = item.image || (item.product && (PRODUCTS_DATA.find(p => p.slug === item.product) || {}).image);
+                const photo = OPTION_CARD_PHOTOS && image;
                 return `
                     <label class="flex items-center gap-3 p-2.5 bg-paper border ${quoteAccessories.has(item.id) ? 'border-ink' : 'border-line'} hover:border-ink-2 cursor-pointer">
                         <input type="checkbox" data-acc-id="${item.id}" ${quoteAccessories.has(item.id) ? 'checked' : ''} onchange="toggleQuoteAccessory('${item.id}')" class="w-4 h-4 accent-[#151714] flex-shrink-0">
@@ -4007,6 +4020,7 @@ function renderAccessoryPicker() {
                             <span class="block text-ink">${item.name}</span>
                             ${item.sku ? `<span class="block text-xs text-mute">${item.sku}</span>` : ''}
                         </span>
+                        ${photo ? '' : optionEye(image, item.name).replace('class="opt-eye"', 'class="opt-eye opt-eye-static"')}
                     </label>`;
             }).join('')}
             </div>
@@ -4515,8 +4529,9 @@ function getTempoOptionRows(product) {
     const groups = getTempoOptionGroups(product, i);
     // A chosen upgrade is the item: "Battery: Battlite lithium battery", not the lead-acid one and the upgrade both
     const chosen = Object.fromEntries(groups.filter(g => g.replaces).map(g => [g.replaces, describeTempoChoice(product, i, g, o)]).filter(([, v]) => v));
+    // A group with `quoteRows` (the golf accessories) gives its choice as the rows the bundle prices
     return groups.filter(g => !g.replaces)
-        .map(g => [g.title, chosen[g.id] || describeTempoChoice(product, i, g, o)])
+        .flatMap(g => g.quoteRows && g.quoteRows[o[g.id]] ? g.quoteRows[o[g.id]] : [[g.title, chosen[g.id] || describeTempoChoice(product, i, g, o)]])
         .filter(([, v]) => v);
 }
 
@@ -4889,6 +4904,29 @@ const OPTION_PHOTOS = {
     '14" Zeus Gloss Black and Machined, Kraken 23x10-14 tires': 'wheel-14-zeus-kraken',
     '14" Mercury, Kraken 23x10-14 tires': 'wheel-14-mercury-kraken',
     '12" Hela Bright Chrome, 23x10.5-12 tires': 'wheel-12-hela-23105',
+    // The bundle names (TEMPO_MATRIX)
+    '8" steel rims with wheel cover': 'wheel-8-steel',
+    '8" steel rims': 'wheel-8-steel',
+    '14" Aerion Gloss Black, Kraken tires': 'wheel-14-aerion-gloss-kraken',
+    '14" Aerion PVD Black, Kraken tires': 'wheel-14-aerion-chrome-kraken',
+    '14" Zeus Gloss Black, Kraken tires': 'wheel-14-zeus-kraken',
+    '14" Athena Solid Gloss Black, Kraken tires': 'wheel-14-athena-gloss-kraken',
+    'Clear windshield': 'windshield-clear',
+    'Battlite lithium battery': 'battery-battlite',
+    'Side mirrors': 'mirror-side',
+    'Side mirrors and 5 panel rear mirror': 'mirror-5-panel',
+    'Premium steering wheel': 'steering-premium',
+    'Premium steering wheel with scorecard': 'steering-scorecard',
+    'GC Bag Cover, Beige': 'bag-cover-beige',
+    'GC Bag Cover, White': 'bag-cover-white',
+    'Magnetic Bag Cover, Black': 'bag-cover-magnetic-black',
+    'Magnetic Bag Cover, Beige': 'bag-cover-magnetic-beige',
+    'Sand bottle': 'sand-bottle',
+    'Two sand bottles (2pcs)': 'sand-bottle',
+    'GC Bluetooth speaker': 'audio-gc-soundbar-27',
+    'Wireless charging': 'charge-wireless',
+    'GC Premium floor mat': 'floor-mat-gc',
+    'GC Premium lift kit': 'lift-gc-35',
     // Golf accessories
     'GC Bag Cover, Black': 'bag-cover-black',
     'Bag Cover, Beige': 'bag-cover-beige',
@@ -4897,20 +4935,20 @@ const OPTION_PHOTOS = {
     'Club Car Magnetic Bag Cover, Beige': 'bag-cover-magnetic-beige',
     sandBottle: 'sand-bottle',
     'Ball and club cleaner': 'ball-washer',
+    'Ball and club cleaner and a cooler': 'ball-washer',
+    'Two Caddy Master coolers': 'caddy-cooler',
     'Caddy Master cooler': 'caddy-cooler',
     cooler: 'caddy-cooler',
     caddyStand: 'caddy-stand',
     // Lift
     lift: 'lift-gc-35',
     'Tempo Fenders 3"': 'fender-tempo-3',
-    'Tempo Fenders 1.5"': 'fender-tempo-15',
     'GC Brush Guard': 'brush-guard',
     'Nerf Bar': 'nerf-bar',
     // Rear flip seats
     'Genesis Rear Flip Seat': 'flip-genesis',
     'Club Car Premium Flip Seat': 'flip-onward',
     // Audio and charging
-    'Club Car Premium Sound Bar': 'audio-cc-soundbar',
     'GC Sound Bar 27" RGB': 'audio-gc-soundbar-27',
     'GC Bluetooth speakers': 'audio-gc-soundbar-27',
     'Wireless Charging': 'charge-wireless',
@@ -4922,13 +4960,13 @@ const OPTION_PHOTOS = {
     '5 Panel Mirror': 'mirror-5-panel',
     'Convex Inner Mirror (short)': 'mirror-convex-short',
     'Convex Inner Mirror (long)': 'mirror-convex-long',
-    'Overhead Storage Console': 'storage-overhead',
     'Under Seat Storage Tray': 'storage-under-seat',
     // Rain enclosures
     'Three-sided rain enclosure, Beige': 'enclosure-3-beige',
     'Three-sided rain enclosure, White': 'enclosure-3-white',
-    'Three-sided rain enclosure, Black': 'enclosure-3-black',
-    'Two-sided rain enclosure, Black (Club Car)': 'enclosure-2-black'
+    'Three-sided rain enclosure, Black': 'enclosure-3-black'
+    // No photo yet (a name here must have its file in image/Options, or its eye opens a broken image): Club Car
+    // Premium Sound Bar, Overhead Storage Console, Tempo Fenders 1.5", Two-sided rain enclosure (Club Car)
 };
 
 // A photo for an option (by option name, or by the group's id for single-item groups such as the ball washer)
@@ -4947,12 +4985,13 @@ function splitOptionName(text) {
 // covers the glyph, which shows again if the photo fails to load
 const OPTION_PLACEHOLDER = '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.25"><rect x="3.5" y="5" width="17" height="14" rx="1"/><circle cx="9" cy="10" r="1.75"/><path d="M4 17.5l5-4.5 3.5 3 3-2.5 4.5 4"/></svg>';
 
-// The builder's option cards are text only (the user's choice, 2026-11-06): many options had no photo or one that
-// didn't match, so no card shows one. Kept as a function so photos can come back in one place
+// The builder's option cards are text only (the user's choice, 2026-11-06), except wheels and tires, which show
+// their photo on the card. Every other option with a photo gets an eye button that opens it (optionEye)
 const OPTION_CARD_PHOTOS = false;
 
-function optionMedia(photo) {
-    if (!OPTION_CARD_PHOTOS) return '';
+// `inline`: show the photo on the card anyway (wheels and tires)
+function optionMedia(photo, inline = false) {
+    if (!OPTION_CARD_PHOTOS && !inline) return '';
     return `
         <span class="opt-card-media">
             ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async" onerror="this.nextElementSibling.hidden=false;this.remove()">` : ''}
@@ -4960,12 +4999,53 @@ function optionMedia(photo) {
         </span>`;
 }
 
-// One selectable card. `extra` holds attributes such as disabled.
-function optionCard({ key, label, photo, active, onclick, kind, note = '', extra = '' }) {
+// The eye button on a text-only card: opens the option's photo (showOptionPhoto). Nothing when there's no photo
+const OPTION_EYE_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+function optionEye(photo, name) {
+    if (!photo) return '';
+    return `<button type="button" class="opt-eye" onclick="event.preventDefault();event.stopPropagation();showOptionPhoto(this)" data-photo="${attrText(photo)}" data-name="${attrText(name)}" aria-label="See a photo of ${attrText(name)}" title="See photo">${OPTION_EYE_ICON}</button>`;
+}
+
+function showOptionPhoto(button) {
+    let modal = document.getElementById('option-photo-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'option-photo-modal';
+        modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-5 sm:p-6 flex items-center justify-center';
+        modal.onclick = e => { if (e.target === modal) closeOptionPhoto(); };
+        modal.onkeydown = e => { if (e.key === 'Escape') closeOptionPhoto(); };
+        document.body.appendChild(modal);
+    }
+    modal.returnFocus = button;
+    const name = button.dataset.name;
+    modal.innerHTML = `
+        <div role="dialog" aria-modal="true" aria-labelledby="option-photo-title" class="w-full max-w-lg bg-paper border border-line">
+            <div class="opt-photo-frame"><img src="${attrText(button.dataset.photo)}" alt="${attrText(name)}"></div>
+            <div class="p-5 flex items-center justify-between gap-4">
+                <h2 id="option-photo-title" class="text-ink font-medium">${attrText(name)}</h2>
+                <button type="button" onclick="closeOptionPhoto()" class="btn btn-outline">Close</button>
+            </div>
+        </div>`;
+    modal.classList.remove('hidden');
+    modal.querySelector('button').focus();
+}
+
+function closeOptionPhoto() {
+    const modal = document.getElementById('option-photo-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    if (modal.returnFocus && document.contains(modal.returnFocus)) modal.returnFocus.focus();
+}
+
+// One selectable card. `extra` holds attributes such as disabled. `inline`: the photo shows on the card (wheels);
+// otherwise a card with a photo gets the eye button beside it (a button can't hold another button, so both sit in
+// a wrapper)
+function optionCard({ key, label, photo, active, onclick, kind, note = '', extra = '', inline = false }) {
     const [name, detail] = splitOptionName(label);
-    return `
+    const eye = inline || OPTION_CARD_PHOTOS ? '' : optionEye(photo, name);
+    const card = `
         <button type="button" onclick="${onclick}" data-opt-key="${key}" aria-pressed="${active}" class="opt-card ${active ? 'opt-card-active' : ''}" ${extra}>
-            ${optionMedia(photo)}
+            ${optionMedia(photo, inline)}
             <span class="opt-card-check ${kind === 'check' ? 'opt-card-check-check' : 'opt-card-check-radio'}" aria-hidden="true"></span>
             <span class="opt-card-body">
                 <span class="opt-card-name">${name}</span>
@@ -4973,6 +5053,7 @@ function optionCard({ key, label, photo, active, onclick, kind, note = '', extra
                 ${note ? `<span class="opt-card-note">${note}</span>` : ''}
             </span>
         </button>`;
+    return eye ? `<div class="opt-card-wrap">${card}${eye}</div>` : card;
 }
 
 // A small segmented control (1 / 2, or Both / Left / Right) under a single-item card
@@ -4984,6 +5065,7 @@ function optionSegments(items) {
 
 // What the visitor can do in a group, shown under its title
 function optionGroupHint(g) {
+    if (g.hint) return g.hint;
     if (g.included) return g.options.length > 1 ? 'Included, choose one' : 'Included';
     if (g.type === 'single') return g.upgradeFrom ? 'Choose one; 14" wheels are an upgrade' : 'Choose one';
     if (g.type === 'optional') return 'Optional, choose one (tap again to remove)';
@@ -4993,7 +5075,8 @@ function optionGroupHint(g) {
     return '';
 }
 
-function renderTempoGroup(g, o, nested) {
+// `cell`: a one-card group in a row of four (renderTempoSection): its title above the card, no hint
+function renderTempoGroup(g, o, nested, cell = false) {
     let body = '';
     if (g.type === 'single' || g.type === 'optional' || g.type === 'multi') {
         const cards = [];
@@ -5009,11 +5092,12 @@ function renderTempoGroup(g, o, nested) {
             const active = multi ? (o[g.id] || []).includes(opt) : o[g.id] === opt;
             const locked = g.upgradeFrom && k >= g.upgradeFrom && !o.wheelUpgrade;
             cards.push(optionCard({
-                key: `${g.id}:${k}`, label: opt, photo: optionPhoto(opt), active,
+                key: `${g.id}:${k}`, label: opt, photo: optionPhoto(opt) || (g.options.length === 1 ? optionPhoto(g.id) : null), active,
                 onclick: multi ? `toggleTempoOption('${g.id}', ${k})` : `pickTempoOption('${g.id}', ${k})`,
                 kind: multi ? 'check' : 'radio',
                 note: locked ? 'Upgrade' : '',
-                extra: locked ? 'data-locked="true"' : ''
+                extra: locked ? 'data-locked="true"' : '',
+                inline: g.id === 'wheels'
             }));
         });
         // Seat colors read better as swatches than as photo cards
@@ -5030,18 +5114,21 @@ function renderTempoGroup(g, o, nested) {
         body = `
             <div class="opt-item ${o[g.id] > 0 ? 'opt-card-active' : ''}">
                 ${optionMedia(optionPhoto(g.id))}
+                ${optionEye(optionPhoto(g.id), g.title)}
                 <span class="opt-item-body">
                     ${optionSegments(segs)}
                 </span>
             </div>`;
     } else if (g.type === 'flag') {
         const blocked = g.requires && !o[g.requires];
-        body = `<div class="opt-grid">${optionCard({
-            key: `${g.id}:on`, label: g.label, photo: optionPhoto(g.id), active: !!o[g.id],
+        const card = optionCard({
+            key: `${g.id}:on`, label: g.label, photo: optionPhoto(g.id) || optionPhoto(g.label), active: !!o[g.id],
             onclick: `toggleTempoOption('${g.id}')`, kind: 'check',
             note: blocked && g.requiresNote ? g.requiresNote : (o[g.id] ? 'Added' : 'Add to build'),
             extra: blocked ? 'disabled' : ''
-        })}</div>`;
+        });
+        if (cell) return `<div class="opt-cell" role="group" aria-label="${g.title}"><p class="opt-cell-title">${g.title}</p>${card}</div>`;
+        body = `<div class="opt-grid">${card}</div>`;
     }
     const hint = optionGroupHint(g);
     return `
@@ -5063,6 +5150,7 @@ function renderTempoIncluded(groups) {
                 return `
                     <div class="opt-included-item">
                         ${optionMedia(optionPhoto(g.value) || optionPhoto(g.id))}
+                        ${optionEye(optionPhoto(g.value) || optionPhoto(g.id), name)}
                         <span class="opt-card-body">
                             <span class="opt-card-detail">${g.title}</span>
                             <span class="opt-card-name">${name}</span>
@@ -5071,6 +5159,23 @@ function renderTempoIncluded(groups) {
                     </div>`;
             }).join('')}
         </div>`;
+}
+
+// A section's groups in order. One-card groups (an add-on to tick, with no sub-choices) that follow each other sit
+// side by side, four to a row, each under its own title, instead of one card per row
+function renderTempoSection(groups, subs, o) {
+    const html = [];
+    let cells = [];
+    const flush = () => { if (cells.length) html.push(`<div class="opt-cells">${cells.join('')}</div>`); cells = []; };
+    groups.forEach(g => {
+        const children = subs.filter(s => s.parent === g.id);
+        if (g.type === 'flag' && !children.length) { cells.push(renderTempoGroup(g, o, false, true)); return; }
+        flush();
+        html.push(renderTempoGroup(g, o, false)
+            + (children.length ? `<div class="opt-subpanel">${children.map(s => renderTempoGroup(s, o, true)).join('')}</div>` : ''));
+    });
+    flush();
+    return html.join('');
 }
 
 // The build's equipment: what's included first, then each section's choices as photo cards, with
@@ -5093,11 +5198,7 @@ function renderTempoOptions(product) {
                         // What comes as it is, then what comes with a choice (battery, mirrors, windshield)
                         // An included item whose upgrade is chosen shows the upgrade
                         ? renderTempoIncluded(inSection.filter(g => g.type === 'fixed').map(g => { const up = groups.find(u => u.replaces === g.id); const v = up && describeTempoChoice(product, i, up, o); return v ? { ...g, value: v } : g; })) + inSection.filter(g => g.type !== 'fixed').map(g => renderTempoGroup(g, o, false)).join('')
-                        : inSection.map(g => {
-                            const children = subs.filter(s => s.parent === g.id);
-                            return renderTempoGroup(g, o, false)
-                                + (children.length ? `<div class="opt-subpanel">${children.map(s => renderTempoGroup(s, o, true)).join('')}</div>` : '');
-                        }).join('')}
+                        : renderTempoSection(inSection, subs, o)}
                 </div>`;
         }).join('')}`;
 }
