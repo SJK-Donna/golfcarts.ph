@@ -828,6 +828,9 @@
     .colors-fit .lg\:top-36 { top: 8.5rem; }
     .colors-fit-frame { aspect-ratio: 16 / 11; max-height: calc(100vh - 19rem); margin: 0 auto; }
     .colors-fit-frame img { max-height: 100%; }
+    /* Focus (app.js applyColorFocus): a seat or canopy pick eases in on that part, a body pick back out */
+    #detail-color-img { transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
+    @media (prefers-reduced-motion: reduce) { #detail-color-img { transition: none; } }
     /* Magnifier (app.js moveColorLens): the photo multiplied over the stone backdrop, as in the frame */
     .colors-fit-frame { cursor: zoom-in; }
     .colors-fit-frame.color-lens-on { touch-action: none; }
@@ -883,6 +886,8 @@
         .options-fit .opt-included, .options-fit .opt-group-nested .opt-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
     .options-fit .opt-card-body { padding: 0.5rem 0.75rem 0.625rem; }
+    /* Text-only cards (app.js OPTION_CARD_PHOTOS): the tick box sits in the top corner, so the text keeps clear of it */
+    .opt-card:not(:has(.opt-card-media)) .opt-card-body, .opt-item:not(:has(.opt-card-media)) .opt-card-body { padding-right: 2.5rem; }
     .options-fit .opt-card-name { font-size: 0.875rem; }
     .options-fit .opt-card-detail, .options-fit .opt-card-note { font-size: 0.75rem; }
     .options-fit .opt-card-media { padding: 0.5rem; }
@@ -2601,6 +2606,10 @@
     .admin-card summary { cursor: pointer; }
     .admin-badge { display: inline-block; margin-left: 0.5rem; padding: 0.125rem 0.5rem; border-radius: var(--radius); background: var(--green); color: var(--on-green); font-size: 0.75rem; font-weight: 600; }
     .admin-badge-warn { background: var(--ink); color: var(--paper); }
+    /* "Golfer" in the build names Scratch Golfer and Pro Golfer: the display serif's italic, a little smaller */
+    .build-script { font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: 0.8em; letter-spacing: 0; text-transform: none; }
+    /* Beside small sans-serif text the serif italic reads smaller, so it is set a little larger there */
+    :where(.btn, .home-stage-card, .build-mini, .finder-card-title, .build-panel-head) .build-script { font-size: 0.95em; }
     /* Products: photo tiles with Replace / Original, and the spec rows */
     .admin-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, calc(50% - 0.375rem)), 1fr)); gap: 0.75rem; }
     .admin-photo { margin: 0; border: 1px solid var(--line); background: var(--adm-panel); }

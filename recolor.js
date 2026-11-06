@@ -60,14 +60,16 @@ const COLOR_PREVIEW = {
     },
     'golfer-tempo-2': TEMPO_TWO_SEAT_PREVIEW,
     'lifestyle-tempo-2': TEMPO_TWO_SEAT_PREVIEW,
-    // White seats and a tan roof (kept out by bodyBox), so the paint's pale pink reflections can safely count as body
-    'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', bodyMinSat: 0.12, bodyBox: [0.3, 1] },
-    // The red Elite photo, with a paint map (scripts/build-color-masks.mjs): the JPEG's colour noise in the
-    // backdrop, tyres and chrome would otherwise repaint with the body
-    'lifestyle-tempo-4': { base: 'image/Products/builds/lifestyle-4-elite.jpg', mask: 'image/Products/builds/masks/lifestyle-4-elite.png' },
-    // No roof in this photo: the top of the front cowl is the highest paint, so the body can reach the top
-    'transporter-400': { base: 'image/Products/Transporter 4.png', bodyBox: [0, 1] },
-    'carryall-500': { base: 'image/Products/CA500.png' }
+    // A paint map of the red body and the white front and rear-facing seats (scripts/build-color-masks.mjs)
+    'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', mask: 'image/Products/builds/masks/lifestyle-2-2-sangria.png' },
+    // Paint maps (scripts/build-color-masks.mjs) of body, seats and roof, shaded like paint. The Transporter photo has
+    // no roof, so its canopy choice can't be shown; the Villagers' seats aren't offered in other colours
+    'lifestyle-tempo-4-2': { base: 'image/Products/4 plus2 Lifted.png', mask: 'image/Products/builds/masks/lifestyle-4-2.png', shade: true },
+    'villager-6': { base: 'image/Products/Villager 6.png', mask: 'image/Products/builds/masks/villager-6.png', shade: true },
+    'villager-8': { base: 'image/Products/Villager 8.png', mask: 'image/Products/builds/masks/villager-8.png', shade: true },
+    'transporter-400': { base: 'image/Products/Transporter 4.png', mask: 'image/Products/builds/masks/transporter-4.png', shade: true },
+    'carryall-300': { base: 'image/Products/CA300.png', mask: 'image/Products/builds/masks/carryall-300.png', shade: true },
+    'carryall-500': { base: 'image/Products/CA500.png', mask: 'image/Products/builds/masks/carryall-500.png', shade: true }
 };
 
 // The Golfer 2 / 2+2 build photos, one per build level ("<slug>:<level>"). Their paint is white, cream, grey,
@@ -101,6 +103,38 @@ COLOR_PREVIEW['golfer-tempo-2:scratch-plain'] = {
     look: { body: 'White', seat: 'Beige', canopy: '2 Pass Canopy Beige' }
 };
 COLOR_PREVIEW['golfer-tempo-2:scratch'].plainSeatPhoto = 'golfer-tempo-2:scratch-plain';
+// Lifestyle 4: one photo per build, as on Golfer 2+2 (one cart, one camera; paint maps by
+// scripts/build-color-masks.mjs). The Elite photo's seats are two-tone (black bolsters, grey panels, traced in its
+// tone map), like the Scratch 2+2 photo's Tsunami seats: a patterned choice is painted on them tone by tone, and a
+// one-color choice on the Essential photo's real plain seat (`plainSeatFrom`). The Essential and Signature photos'
+// seats are plain beige; a patterned choice there (Signature offers Tsunami) is painted on the Elite seat
+// (`patternSeatFrom`), so it shows its bolsters and panels
+['essential', 'signature', 'elite'].forEach(level => {
+    COLOR_PREVIEW[`lifestyle-tempo-4:${level}`] = {
+        base: `image/Products/builds/lifestyle-4-${level}.jpg`, mask: `image/Products/builds/masks/lifestyle-4-${level}.png`, shade: true
+    };
+});
+Object.assign(COLOR_PREVIEW['lifestyle-tempo-4:elite'], {
+    seatTones: 'image/Products/builds/masks/lifestyle-4-elite-tones.png', stripedSeat: true, plainSeatFrom: 'lifestyle-tempo-4:essential'
+});
+COLOR_PREVIEW['lifestyle-tempo-4:essential'].patternSeatFrom = 'lifestyle-tempo-4:elite';
+COLOR_PREVIEW['lifestyle-tempo-4:signature'].patternSeatFrom = 'lifestyle-tempo-4:elite';
+
+// The Golfer 4 build photos: paint maps of body and seats (scripts/build-color-masks.mjs), shaded like the Golfer 2
+// ones. The Scratch seats are Tsunami striped, with a tone map. Golfer 4 offers one canopy, so the roof isn't mapped
+[['golf', 'golfer-4-golfer'], ['scratch', 'golfer-4-scratch'], ['pro', 'golfer-4-pro']].forEach(([level, photo]) => {
+    COLOR_PREVIEW[`golfer-tempo-4:${level}`] = {
+        base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, shade: true,
+        seatTones: level === 'scratch' ? `image/Products/builds/masks/${photo}-tones.png` : null, stripedSeat: level === 'scratch'
+    };
+});
+// As on Scratch 2+2: a one-color seat on the Scratch Golfer 4 (photographed with Tsunami seats) is painted on a real
+// plain seat, the Pro photo's smooth Camello one, instead of the stripes smoothed away. The Pro photo is the same cart
+// and camera, 6 px off, so a lined-up copy is used (scripts/build-color-masks.mjs ALIGNED)
+COLOR_PREVIEW['golfer-tempo-4:pro-plain'] = {
+    base: 'image/Products/builds/golfer-4-pro-aligned.jpg', mask: 'image/Products/builds/masks/golfer-4-pro-aligned.png', shade: true
+};
+COLOR_PREVIEW['golfer-tempo-4:scratch'].plainSeatFrom = 'golfer-tempo-4:pro-plain';
 
 const recolorCache = {};
 
@@ -209,7 +243,8 @@ function shadeRegion(out, base, region, target, gradient, top) {
 // A one-color seat taken from another photo of the same cart from the same camera (`donor`, its preview key):
 // everywhere either photo has seat, the donor photo's pixels go in (its seat and what is behind it), apart from
 // this photo's body and roof; then the donor's seat is repainted the way its own preview paints it.
-async function paintDonorSeat(out, regions, donor, target) {
+// With `bands` (a patterned choice), the donor seat is painted tone by tone instead (it needs a tone map)
+async function paintDonorSeat(out, regions, donor, target, bands) {
     const dcfg = COLOR_PREVIEW[donor];
     const dbase = await loadRecolorBase(dcfg.base);
     const dseat = (await loadMaskRegions(donor, dcfg, dbase)).seat;
@@ -232,7 +267,8 @@ async function paintDonorSeat(out, regions, donor, target) {
         if (m <= 0) continue;
         for (let c = 0; c < 3; c++) out[i * 4 + c] += (dpx[i * 4 + c] - out[i * 4 + c]) * m;
     }
-    shadeRegion(out, dbase, dseat, target, null);
+    if (bands) paintToneSeat(out, dbase, dseat, target, bands, dcfg.seatShadowDepth);
+    else shadeRegion(out, dbase, dseat, target, null);
     blendRegionEdges(out, dbase, dseat, true);
 }
 
@@ -563,7 +599,9 @@ function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.8
 // brightness shades the color, so folds and shadows carry over but the stripes' light and dark don't.
 // Judging tones pixel by pixel from lightness instead turned whole black panels red, and shifting HSL
 // lightness turned white and grey seats flat and washed out.
-function paintToneSeat(out, base, region, target, bands) {
+// `shadowDepth` (default 0.8): how much of a one-color seat's shadows carry over (lower on seats photographed with
+// deeply shaded black bolsters, the Elite photos, where they showed as grey patches under white)
+function paintToneSeat(out, base, region, target, bands, shadowDepth = 0.8) {
     const px = base.imageData.data;
     if (!region.toneY) {
         region.toneY = [0, 1, 2].map(t => {
@@ -596,7 +634,7 @@ function paintToneSeat(out, base, region, target, bands) {
             // traced to the wrong stripe at a stripe's edge would otherwise light up as a line
             const ref = region.tones[k].reduce((sum, wt, n) => sum + wt * region.toneY[n], 0);
             const r = Math.max(0.2, Math.min(1.6, Y / ref));
-            const shade = r < 1 ? r ** 0.8 : 1 + (r - 1) * 0.1;
+            const shade = r < 1 ? r ** shadowDepth : 1 + (r - 1) * 0.1;
             rgb = colors[1].rgb.map(v => v * shade);
         } else region.tones[k].forEach((w, t) => {
             if (!w) return;
@@ -628,8 +666,8 @@ const recolorRegionCache = {};
 async function loadMaskRegions(slug, cfg, base) {
     if (recolorRegionCache[slug]) return recolorRegionCache[slug];
     const mask = await loadRecolorMask(cfg.mask, base.w, base.h);
-    recolorRegionCache[slug] = { body: maskRegion(base, mask, 0), seat: maskRegion(base, mask, 1), canopy: maskRegion(base, mask, 2) };
-    const seat = recolorRegionCache[slug].seat;
+    const regions = { body: maskRegion(base, mask, 0), seat: maskRegion(base, mask, 1), canopy: maskRegion(base, mask, 2) };
+    const seat = regions.seat;
     if (seat && cfg.seatTones) {
         // Each seat pixel's share of bolster, panel and stripe (the map's red, green and blue)
         const tones = await loadRecolorMask(cfg.seatTones, base.w, base.h);
@@ -638,6 +676,9 @@ async function loadMaskRegions(slug, cfg, base) {
             return sum ? [0, 1, 2].map(c => tones[i * 4 + c] / sum) : [0, 1, 0];
         });
     }
+    // Stored once complete: a second preview started meanwhile (a quick second click) found the seat without its
+    // tone map and failed
+    if (!recolorRegionCache[slug]) recolorRegionCache[slug] = regions;
     return recolorRegionCache[slug];
 }
 
@@ -739,10 +780,11 @@ async function renderCartPreview(slug, choice) {
         // stripes; shading them like paint kept the black-and-grey Tsunami stripes under every color
         const patterned = choice.seatBands && choice.seatBands.length;
         if (cfg.plainSeatFrom && !patterned) await paintDonorSeat(out, regions, cfg.plainSeatFrom, seat.hsl);
-        else if (cfg.seatTones && (cfg.stripedSeat || patterned)) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands);
+        else if (cfg.patternSeatFrom && patterned) await paintDonorSeat(out, regions, cfg.patternSeatFrom, seat.hsl, choice.seatBands);
+        else if (cfg.seatTones && (cfg.stripedSeat || patterned)) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatShadowDepth);
         else if (cfg.shade) shadeRegion(out, base, regions.seat, seat.hsl, null);
         else paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
-        if (cfg.mask && !(cfg.plainSeatFrom && !patterned)) blendRegionEdges(out, base, regions.seat, true);
+        if (cfg.mask && !(cfg.plainSeatFrom && !patterned) && !(cfg.patternSeatFrom && patterned)) blendRegionEdges(out, base, regions.seat, true);
     }
     const body = parseSwatch(choice.body);
     if (body && regions.body) {

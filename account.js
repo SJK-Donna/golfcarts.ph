@@ -1593,7 +1593,20 @@ const BUNDLE_ALWAYS = new Set(['unit', '2+2 kit', 'stretch kit']);
 const BUNDLE_CHOICE_ROWS = { body: 'Body color', seat: 'Seat', canopy: 'Canopy', battery: 'Battery' };
 const MATCH_STOPWORDS = new Set(['with', 'and', 'the', 'for', 'of', 'in', 'on', 'kit', 'unit', 'set', 'gc', 'cc', 'club', 'car']);
 // The builder and the bundles name some things differently
-const MATCH_SYNONYMS = { grey: 'gray', cleaner: 'washer', headlight: 'light', taillight: 'light' };
+// (and the sheet's own spellings: 5 pannel, Chome inserts, Kaken tire)
+const MATCH_SYNONYMS = { grey: 'gray', cleaner: 'washer', headlight: 'light', taillight: 'light', panel: 'pannel', chrome: 'chome', kraken: 'kaken' };
+// Parts matched against their own row of the request (the builder's group of that title, app.js
+// getTempoOptionGroups), not all of it: one best option, and any other the row names in full that isn't part of
+// it (8in rims bring their wheel cover; Side Mirror + 5 pannel doesn't bring Side Mirror too). Choosing Triton wheels must not bring the Hela line too because both say 12in. Multi parts
+// take every option the row names. No row: the part wasn't chosen.
+const BUNDLE_PART_ROWS = {
+    wheel: ['Wheels and tires'], '14in wheel': ['Wheels and tires'], windshield: ['Windshield'], mirror: ['Mirrors'],
+    'steeing wheel': ['Steering wheel'], light: ['Lighting'], 'bag cover': ['Bag cover'], 'accessories 1': ['Sand bottle'],
+    'accessories 2': ['Golf accessory, left side'], 'accessories 3': ['Golf accessory, right side'], 'caddy stand': ['Caddy stand'],
+    'add-on': ['Audio', 'Audio and storage'], charger: ['Charging'], 'speed code': ['Speed code'], floormat: ['Floor mat'],
+    'lift kit upgrade': ['Lift kit']
+};
+const BUNDLE_MULTI_PARTS = new Set(['add-on']);
 // Parts whose option is made of several pieces (front and rear body, seat back and bottom), all of them needed
 const BUNDLE_MULTIPIECE = new Set(['body', 'seat']);
 
@@ -1653,8 +1666,19 @@ function suggestBundleLines(quote, group, bundles) {
     const picked = [], unmatched = [];
     for (const [part, options] of parts) {
         const key = part.toLowerCase();
-        if (BUNDLE_ALWAYS.has(key) || (key === 'canopy' && options.size === 1 && !rowValue(quote.rows, 'Canopy'))) {
+        // A build with one canopy (the 4 and 4+2 canopy set) carries it, whatever the request calls it
+        if (BUNDLE_ALWAYS.has(key) || (key === 'canopy' && options.size === 1)) {
             options.forEach(lines => picked.push(...lines));
+            continue;
+        }
+        if (BUNDLE_PART_ROWS[key]) {
+            const own = BUNDLE_PART_ROWS[key].map(label => rowValue(quote.rows, label)).filter(Boolean).join(' ');
+            if (!own) continue;
+            const scored = [...options].map(([option, lines]) => { const name = matchWords(option).length ? option : lines[0].description; return { option, lines, words: matchWords(name), score: matchScore(name, own) }; });
+            const best = scored.reduce((a, x) => (!a || betterMatch(x.score, a.score) > 0 ? x : a), null);
+            if (!best || best.score.share < 0.5) continue; // e.g. the 14in part when a 12in wheel was chosen
+            const chosen = BUNDLE_MULTI_PARTS.has(key) ? scored.filter(x => x.score.share >= 0.5) : scored.filter(x => x === best || (x.score.share === 1 && !x.words.every(w => best.words.includes(w))));
+            chosen.forEach(x => picked.push(...x.lines));
             continue;
         }
         const target = BUNDLE_CHOICE_ROWS[key] ? rowValue(quote.rows, BUNDLE_CHOICE_ROWS[key]) : otherText;
@@ -1738,7 +1762,8 @@ async function prepareQuotation(quoteId) {
     const draft = repriceQuotation({
         quote_id: quote.id, reference: quote.reference,
         customer: { name: quote.name, email: quote.email, phone: quote.phone, branch: quote.branch },
-        title: [rowValue(quote.rows, 'Model') || quote.model, rowValue(quote.rows, 'Build')].filter(Boolean).join(' · '),
+        // "Golfer 2 · Scratch Golfer": the build as the site names it
+        title: [rowValue(quote.rows, 'Model') || quote.model, (b => { const level = Object.values(TEMPO_LINES).flatMap(l => l.levels).find(l => l.name === b); return level ? buildLabel(level) : b; })(rowValue(quote.rows, 'Build'))].filter(Boolean).join(' · '),
         build_rows: quote.rows || [], build_group: group, units: Math.max(1, parseInt(quote.quantity, 10) || 1), lines: suggested.lines,
         exchange_rate: pricing.exchange_rate, freight_pct: pricing.freight_pct, margin_pct: pricing.margin_pct, terms: QUOTATION_TERMS,
         notes: quote.notes || '', photo: quotationPhoto(quote)

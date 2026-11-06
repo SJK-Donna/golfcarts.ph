@@ -54,6 +54,8 @@ for (const f of ['app.js', 'recolor.js', 'account.js', '.nojekyll', '.htaccess',
 
 const fontFiles = {
     '@fontsource-variable/newsreader/files/newsreader-latin-opsz-normal.woff2': 'newsreader-latin-opsz-normal.woff2',
+    // The italic: the word "Golfer" in the build names Scratch Golfer and Pro Golfer
+    '@fontsource-variable/newsreader/files/newsreader-latin-opsz-italic.woff2': 'newsreader-latin-opsz-italic.woff2',
     '@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2': 'instrument-sans-latin-wght-normal.woff2',
     '@fontsource-variable/instrument-sans/files/instrument-sans-latin-ext-wght-normal.woff2': 'instrument-sans-latin-ext-wght-normal.woff2'
 };
@@ -147,7 +149,9 @@ const BRANCH_ADDRESSES = {
 };
 
 function localBusinessJsonLd(branches) {
-    const org = { '@type': 'Organization', '@id': `${siteUrl}#organization`, name: 'Golfcarts.ph', legalName: 'SJK Guahan Inc.', url: siteUrl, logo: `${siteUrl}image/GCPH_logo.png`, email: 'info@golfcarts.ph' };
+    const org = { '@type': 'Organization', '@id': `${siteUrl}#organization`, name: 'Golfcarts.ph', legalName: 'SJK Guahan Inc.', url: siteUrl, logo: `${siteUrl}image/GCPH_logo.png`, email: 'info@golfcarts.ph',
+        // The social profiles (the same as in the footer), so search engines link them to the business
+        sameAs: ['https://www.facebook.com/golfcartsph', 'https://www.instagram.com/golfcartsph', 'https://www.tiktok.com/@golfcarts.ph', 'https://www.youtube.com/@golfcartsphofficial'] };
     const locations = branches.map(b => ({
         '@type': 'LocalBusiness',
         '@id': `${siteUrl}#${b.name.toLowerCase().replace(/\s+/g, '-')}`,

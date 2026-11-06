@@ -216,9 +216,20 @@ function nextSteps() {
   }).join('') + '</tr></table>';
 }
 
+// The Golfer builds as the site names them: Scratch -> Scratch Golfer, Pro -> Pro Golfer (the request keeps the short
+// name, which the bundles match on)
+function buildName(b) {
+  return /^(Scratch|Pro)$/.test(String(b)) ? b + ' Golfer' : String(b || '');
+}
+
+// The same for the PDF: "Golfer" in italic, a little smaller
+function buildNameHtml(b) {
+  return /^(Scratch|Pro)$/.test(String(b)) ? esc(b) + ' <i style="font-family:Georgia,serif;font-weight:normal;font-size:85%">Golfer</i>' : esc(b);
+}
+
 // The build rows of a request, then quantity, branch and notes
 function requestRows(q) {
-  const rows = (q.rows || []).filter(function (r) { return Array.isArray(r) && r.length === 2; }).map(function (r) { return [String(r[0]), String(r[1])]; });
+  const rows = (q.rows || []).filter(function (r) { return Array.isArray(r) && r.length === 2; }).map(function (r) { return [String(r[0]), r[0] === 'Build' ? buildName(r[1]) : String(r[1])]; });
   if (q.quantity) rows.push(['Quantity', q.quantity]);
   if (q.branch) rows.push(['Nearest branch', q.branch]);
   if (q.notes) rows.push(['Notes', q.notes]);
@@ -277,7 +288,7 @@ function customerLines(qt, model, build) {
   const upgrades = t.lines.filter(function (l) { return l.upgrade; });
   const pkg = t.lines.filter(function (l) { return !l.upgrade; }).reduce(function (s, l) { return s + l.amount; }, 0);
   const rows = t.lines.some(function (l) { return !l.upgrade; })
-    ? [{ item: model + (build ? ' · ' + build : ''), description: 'Complete cart as specified on page 2', qty: 1, unit: pkg, amount: pkg }] : [];
+    ? [{ item: model + (build ? ' · ' + buildName(build) : ''), description: 'Complete cart as specified on page 2', qty: 1, unit: pkg, amount: pkg }] : [];
   return { t: t, rows: rows.concat(upgrades) };
 }
 
@@ -330,7 +341,7 @@ function quotationHtml(qt, logo, photo, offers) {
     block('ISSUED TO:', ['Name: ' + (c.name || ''), 'Mobile: ' + (c.phone || ''), 'Email: ' + (c.email || '')].concat(c.branch ? ['Nearest branch: ' + c.branch] : [])) +
     block('ISSUED BY:', [COMPANY.name + ' (' + COMPANY.legal + ')', 'Phone: ' + COMPANY.phone, 'Email: ' + COMPANY.email, 'Address: ' + COMPANY.address]) + '</tr></table>' +
     '<div style="text-align:center;margin-top:14px"><div style="font-size:21px;font-weight:bold">' + esc(model) + '</div>' +
-    (build ? '<div style="font-size:14px;font-weight:bold;color:' + C.greenText + ';margin-top:2px">' + esc(build) + '</div>' : '') +
+    (build ? '<div style="font-size:14px;font-weight:bold;color:' + C.greenText + ';margin-top:2px">' + buildNameHtml(build) + '</div>' : '') +
     (photo ? '<img src="' + photo + '" alt="" style="height:190px;max-width:100%;margin-top:8px">' : '') + '</div>' +
     heading('Price') +
     '<table style="width:100%;border-collapse:collapse;margin-top:6px"><tr><td style="' + head + '">ITEM</td><td style="' + head + ';text-align:center">QTY</td>' +
@@ -347,7 +358,7 @@ function quotationHtml(qt, logo, photo, offers) {
 
   // ---- Page 2: specifications and warranty
   const page2 = pageBreak + pageHead('SPECIFICATIONS & WARRANTY') +
-    '<div style="font-size:20px;font-weight:bold;margin-top:16px">' + esc(model) + (build ? ' <span style="color:' + C.greenText + '">· ' + esc(build) + '</span>' : '') + '</div>' +
+    '<div style="font-size:20px;font-weight:bold;margin-top:16px">' + esc(model) + (build ? ' <span style="color:' + C.greenText + '">· ' + buildNameHtml(build) + '</span>' : '') + '</div>' +
     heading('Specifications') +
     (modelSpecs.length
       ? '<table style="width:100%;border-collapse:collapse"><tr><td style="width:50%;vertical-align:top;padding-right:8px">' + specTable('YOUR BUILD', spec) + '</td>' +
