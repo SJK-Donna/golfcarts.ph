@@ -2544,6 +2544,40 @@
     .adm-pipeline-label { font-size: 0.8125rem; color: var(--ink-2); }
     .adm-pipeline-note { font-size: 0.75rem; font-weight: 600; color: var(--adm-on-bad); }
 
+    /* Home: each role's start page. Number tiles across the top (each opens what it counts), then panels */
+    .adm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+    .adm-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; width: 100%; height: 100%; padding: 1rem 1.25rem; border: 1px solid var(--line); border-radius: 8px; background: var(--adm-panel); text-align: left; }
+    .adm-tile:hover { background: var(--adm-hover); }
+    .adm-tile-n { font-size: 2rem; font-weight: 600; line-height: 1; color: var(--ink); }
+    .adm-tile-label { font-size: 0.8125rem; color: var(--ink-2); }
+    .adm-tile-note { font-size: 0.75rem; color: var(--mute); }
+    .adm-tile-alert { box-shadow: inset 3px 0 0 var(--green); }
+    .adm-home { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr)); gap: 1rem; align-items: start; }
+    .adm-panel { border: 1px solid var(--line); border-radius: 8px; background: var(--adm-panel); }
+    .adm-panel-wide { grid-column: 1 / -1; }
+    .adm-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--line); }
+    .adm-panel-head h2 { font-size: 0.9375rem; font-weight: 600; color: var(--ink); }
+    .adm-panel-empty, .adm-panel-foot { padding: 1rem 1.25rem; font-size: 0.8125rem; color: var(--mute); }
+    .adm-panel-foot { padding-top: 0.5rem; }
+    .adm-todo li { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 1.25rem; }
+    .adm-todo li + li { border-top: 1px solid var(--line); }
+    .adm-todo li > div { min-width: 0; }
+    .adm-todo .adm-btn { flex: none; }
+    .adm-todo-main { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+    .adm-todo-detail { margin-top: 0.125rem; font-size: 0.8125rem; color: var(--mute); overflow-wrap: anywhere; }
+    .adm-links button { display: flex; flex-direction: column; gap: 0.125rem; width: 100%; padding: 0.75rem 1.25rem; text-align: left; }
+    .adm-links li + li { border-top: 1px solid var(--line); }
+    .adm-links button:hover { background: var(--adm-hover); }
+    .adm-links-label { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+    .adm-links-text { font-size: 0.8125rem; color: var(--mute); }
+    .adm-facts { padding: 0.5rem 1.25rem; }
+    .adm-facts div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.5rem 0; font-size: 0.875rem; }
+    .adm-facts div + div { border-top: 1px solid var(--line); }
+    .adm-facts dt { color: var(--mute); white-space: nowrap; }
+    .adm-facts dd { color: var(--ink); text-align: right; }
+    .adm-tips { padding: 0.75rem 1.25rem 1rem 2.5rem; list-style: disc; font-size: 0.875rem; color: var(--ink-2); }
+    .adm-tips li + li { margin-top: 0.5rem; }
+
     /* The sections' tables, panels and controls, made compact for the workspace */
     .adm .admin-table-wrap { border: 1px solid var(--line); border-radius: 8px; background: var(--adm-panel); }
     .adm .admin-table { font-size: 0.8125rem; }

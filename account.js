@@ -554,18 +554,29 @@ async function handleGolferProfile(e) {
 // ==========================================
 const ADMIN_ROLES = {
     master: {
-        label: 'Master admin',
-        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.prepare', 'quotations.approve', 'pricing.edit', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'bundles.view', 'export.quotes', 'export.all', 'users.manage']
+        label: 'Super admin',
+        home: 'Everything across the business: the pipeline, what is waiting on approval, and the team.',
+        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.view', 'quotations.prepare', 'quotations.approve', 'pricing.edit', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'bundles.view', 'export.quotes', 'export.all', 'users.manage']
     },
-    // Works the leads: quotes and golfers. Prices, site text, a full customer export and staff management stay with master admins
+    // Owns the prices: the bundles, the rate, freight, margin and warranty, and approves or returns the quotations
+    // sales managers submit. Reads the quote requests; doesn't prepare, change or send quotations
+    pricing: {
+        label: 'Price manager',
+        home: 'Quotations waiting for your approval, and the prices every new quotation starts from.',
+        can: ['quotes.view', 'quotations.view', 'quotations.approve', 'pricing.edit', 'bundles.view']
+    },
+    // Works the leads: quotes and golfers, and prepares quotations from them. Prices, site text, a full customer export
+    // and staff management stay with super admins
     sales: {
         label: 'Sales manager',
-        can: ['quotes.view', 'quotes.status', 'quotations.prepare', 'golfers.view', 'golfers.news', 'export.quotes']
+        home: 'New requests to price, quotations to fix, and approved ones ready to send.',
+        can: ['quotes.view', 'quotes.status', 'quotations.view', 'quotations.prepare', 'golfers.view', 'golfers.news', 'export.quotes']
     },
     // Keeps the catalog looking right: product photos, text and specs, accessory photos, the homepage event. No
     // customers, quotes, prices or costs
     marketing: {
         label: 'Marketing',
+        home: 'The catalog as visitors see it: model photos, text and specs, accessory photos and the homepage event.',
         can: ['products.edit', 'content.edit']
     }
 };
@@ -573,12 +584,12 @@ const ADMIN_ROLES = {
 const ADMIN_PERMISSION_LABELS = [
     ['quotes.view', 'See quotes'], ['quotes.status', 'Change quote status'], ['quotes.delete', 'Delete quotes'],
     ['golfers.view', 'See golfers'], ['golfers.news', 'Copy news emails'], ['products.edit', 'Edit product photos, text and specs'],
-    ['quotations.prepare', 'Prepare, submit and send quotations'], ['quotations.approve', 'Approve or return quotations'],
-    ['pricing.edit', 'Set exchange rate, freight and margin'],
+    ['quotations.view', 'See quotations'], ['quotations.prepare', 'Prepare, submit and send quotations'], ['quotations.approve', 'Approve or return quotations'],
+    ['pricing.edit', 'Set exchange rate, freight, margin and warranty'],
     ['content.edit', 'Edit site content'], ['bundles.view', 'See and edit bundles'], ['export.quotes', 'Export quotes'], ['export.all', 'Export all data'], ['users.manage', 'Manage staff']
 ];
 
-let adminTab = 'quotes';
+let adminTab = 'home';
 
 function can(permission) {
     const admin = currentAdmin();
@@ -660,9 +671,11 @@ async function signOutAdmin() {
     await loadAccount(null);
 }
 
-// The admin's sections, grouped as the sidebar shows them: [id, label, permission, page title]
+// The admin's sections, grouped as the sidebar shows them: [id, label, permission]. Home (no permission) is every
+// role's own start page
 const ADMIN_SECTIONS = [
-    ['Work', [['quotes', 'Quote requests', 'quotes.view'], ['quotations', 'Quotations', 'quotations.prepare'], ['golfers', 'Golfers', 'golfers.view']]],
+    ['', [['home', 'Home']]],
+    ['Work', [['quotes', 'Quote requests', 'quotes.view'], ['quotations', 'Quotations', 'quotations.view'], ['golfers', 'Golfers', 'golfers.view']]],
     ['Catalog', [['bundles', 'Bundles', 'bundles.view'], ['products', 'Products', 'products.edit'], ['content', 'Site content', 'content.edit']]],
     ['Team', [['users', 'Staff', 'users.manage']]]
 ];
@@ -685,7 +698,7 @@ function adminPipeline(data) {
 }
 
 function renderAdminPipeline(data) {
-    if (!can('quotations.prepare') || !data.quotations) return '';
+    if (!can('quotations.view') || !data.quotations) return '';
     const active = adminTab === 'quotes' ? quoteFilter : quotationFilter;
     return `<ol class="adm-pipeline" aria-label="Quotation pipeline">${adminPipeline(data).map(s => `
         <li><button type="button" onclick="filterPipeline('${s.tab}', '${s.id}')" aria-pressed="${active === s.id && adminTab === s.tab}">
@@ -714,7 +727,10 @@ function showAdminTab(tab) {
 function adminHeading(data) {
     const quotes = data ? data.quotes || [] : [], quotations = data && data.quotations ? data.quotations : [];
     const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    const admin = currentAdmin();
+    const hour = new Date().getHours();
     const headings = {
+        home: [`Good ${hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'}, ${escapeHtml(adminName(admin.email))}`, ADMIN_ROLES[admin.role].home, ''],
         quotes: ['Quote requests', data ? `${plural(quotes.length, 'request')}, ${quotes.filter(q => q.status === 'New').length} new` : '',
             `${can('export.quotes') ? '<button type="button" onclick="exportAdminQuotes()" class="adm-btn">Export quotes</button>' : ''}`],
         quotations: ['Quotations', data ? `${plural(quotations.length, 'quotation')}, ${quotations.filter(q => q.status === 'submitted').length} waiting for approval` : '', ''],
@@ -750,7 +766,7 @@ function renderAdminPage() {
     const data = pageDataFor('admin', async () => {
         // Bundles are read by everyone who prices quotations; tables not created yet (supabase/schema.sql not re-run)
         // come back as null, and the rest of the admin still loads
-        const costs = can('bundles.view') || can('quotations.prepare');
+        const costs = can('bundles.view') || can('quotations.view');
         const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing] = await Promise.all([
             can('quotes.view') ? rows(sb.from('quotes').select('*').order('created_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('golfers').select('*').order('joined_at', { ascending: false })) : Promise.resolve([]),
@@ -758,19 +774,19 @@ function renderAdminPage() {
             can('users.manage') ? rows(sb.from('staff').select('*').order('added_at')) : Promise.resolve([]),
             costs ? rows(sb.from('bundles').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
             costs ? rows(sb.from('sku_usd').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
-            can('quotations.prepare') ? rows(sb.from('quotations').select('*').order('created_at', { ascending: false })).catch(() => null) : Promise.resolve([]),
-            can('quotations.prepare') ? rows(sb.from('pricing_settings').select('*').eq('id', 1).maybeSingle()).catch(() => null) : Promise.resolve(null)
+            can('quotations.view') ? rows(sb.from('quotations').select('*').order('created_at', { ascending: false })).catch(() => null) : Promise.resolve([]),
+            can('quotations.view') ? rows(sb.from('pricing_settings').select('*').eq('id', 1).maybeSingle()).catch(() => null) : Promise.resolve(null)
         ]);
         return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing };
     });
-    const sections = ADMIN_SECTIONS.map(([group, items]) => [group, items.filter(([, , p]) => can(p))]).filter(([, items]) => items.length);
+    const sections = ADMIN_SECTIONS.map(([group, items]) => [group, items.filter(([, , p]) => !p || can(p))]).filter(([, items]) => items.length);
     const allowed = sections.flatMap(([, items]) => items.map(([id]) => id));
     if (!allowed.includes(adminTab)) adminTab = allowed[0];
-    const needsData = ['quotes', 'quotations', 'golfers', 'bundles', 'users'].includes(adminTab);
+    const needsData = ['home', 'quotes', 'quotations', 'golfers', 'bundles', 'users'].includes(adminTab);
     const ready = data && !data.error;
     const body = data && data.error ? renderLoadError(data.error)
         : needsData && !data ? '<p class="text-mute" role="status">Loading…</p>'
-        : { quotes: renderAdminQuotes, quotations: renderAdminQuotations, golfers: renderAdminGolfers, products: renderAdminProducts,
+        : { home: renderAdminHome, quotes: renderAdminQuotes, quotations: renderAdminQuotations, golfers: renderAdminGolfers, products: renderAdminProducts,
             content: renderAdminContent, bundles: renderAdminBundles, users: renderAdminUsers }[adminTab](data);
     // Counts beside the sidebar items: new requests, and quotations waiting on this person
     const counts = ready ? {
@@ -788,7 +804,7 @@ function renderAdminPage() {
                 </div>
                 <nav class="adm-nav" aria-label="Admin sections">
                     ${sections.map(([group, items]) => `
-                        <p class="adm-nav-group">${group}</p>
+                        ${group ? `<p class="adm-nav-group">${group}</p>` : ''}
                         ${items.map(([id, label]) => `<button type="button" onclick="showAdminTab('${id}')"${adminTab === id ? ' aria-current="page"' : ''}>
                             <span>${label}</span>${counts[id] ? `<span class="adm-count" aria-label="${counts[id]} need attention">${counts[id]}</span>` : ''}
                         </button>`).join('')}`).join('')}
@@ -817,6 +833,161 @@ function renderAdminPage() {
         </div>`;
 }
 
+// --- Home: each role's own start page: what is waiting on them, and the way into their work ---
+// A number tile that opens the section (and pipeline stage) it counts
+function homeTile(n, label, note, onclick, alert) {
+    return `<li><button type="button" onclick="${onclick}" class="adm-tile${alert && n ? ' adm-tile-alert' : ''}">
+        <span class="adm-tile-n">${n}</span><span class="adm-tile-label">${label}</span>${note ? `<span class="adm-tile-note">${note}</span>` : ''}
+    </button></li>`;
+}
+
+// A short list of quotations or requests to act on; `rows` are [main text, detail, button label, onclick]
+function homeList(title, rows, empty, more) {
+    return `<section class="adm-panel">
+        <div class="adm-panel-head"><h2>${title}</h2>${more || ''}</div>
+        ${rows.length ? `<ul class="adm-todo">${rows.slice(0, 6).map(([main, detail, label, onclick]) => `<li>
+            <div><p class="adm-todo-main">${main}</p>${detail ? `<p class="adm-todo-detail">${detail}</p>` : ''}</div>
+            <button type="button" onclick="${onclick}" class="adm-btn">${label}</button>
+        </li>`).join('')}</ul>${rows.length > 6 ? `<p class="adm-panel-foot">and ${rows.length - 6} more</p>` : ''}` : `<p class="adm-panel-empty">${empty}</p>`}
+    </section>`;
+}
+
+// Shortcuts into the role's sections: [label, what it is for, onclick]
+function homeShortcuts(items) {
+    return `<section class="adm-panel">
+        <div class="adm-panel-head"><h2>Go to</h2></div>
+        <ul class="adm-links">${items.map(([label, text, onclick]) => `<li><button type="button" onclick="${onclick}">
+            <span class="adm-links-label">${label}</span><span class="adm-links-text">${text}</span>
+        </button></li>`).join('')}</ul>
+    </section>`;
+}
+
+function renderAdminHome(data) {
+    const me = currentAdmin().email, role = currentAdmin().role;
+    const quotes = data.quotes || [], quotations = data.quotations || [];
+    const priced = new Set(quotations.map(q => q.quote_id));
+    const open = quotes.filter(q => !priced.has(q.id) && q.status !== 'Lost' && q.status !== 'Sold');
+    const at = (...s) => quotations.filter(q => s.includes(q.status));
+    const month = new Date().toISOString().slice(0, 7);
+    const sentThisMonth = at('sent').filter(q => String(q.sent_at || '').startsWith(month));
+    const who = email => escapeHtml(adminName(email));
+    const quotationRow = (qt, detail, label = 'Open') => [`${escapeHtml(qt.reference)} · ${escapeHtml((qt.customer || {}).name)}`,
+        `${escapeHtml(qt.title)} · ${formatPhp(quotationTotals(qt).total)}${detail ? ` · ${detail}` : ''}`, label, `openQuotation(${qt.id})`];
+    const requestRow = q => [`${escapeHtml(q.reference)} · ${escapeHtml(q.name)}`, `${escapeHtml(q.model)} · ${formatShortDate(q.created_at)}`,
+        can('quotations.prepare') ? 'Prepare quotation' : 'See request', can('quotations.prepare') ? `prepareQuotation(${q.id})` : `showAdminTab('quotes')`];
+    const tab = id => `showAdminTab('${id}')`;
+    const stage = (t, id) => `filterPipeline('${t}', '${id}')`;
+    const tiles = list => `<ul class="adm-tiles">${list.join('')}</ul>`;
+    const noTables = data.quotations === null ? '<p class="quotation-note mb-6">Quotations aren\'t in the database yet. Re-run supabase/schema.sql.</p>' : '';
+
+    if (role === 'marketing') {
+        const edits = Object.entries(siteEdits);
+        const productEdits = edits.filter(([k]) => k.startsWith('product:'));
+        const accessoryEdits = edits.filter(([k]) => k.startsWith('accessory:'));
+        const noPhoto = PRODUCTS_DATA.filter(p => !(p.gallery || []).length);
+        return `
+            ${tiles([
+                homeTile(PRODUCTS_DATA.length, 'Models on the site', '', tab('products')),
+                homeTile(productEdits.length, 'Models edited', 'photos, text or specs', tab('products')),
+                homeTile(accessoryEdits.length, 'Accessory photos replaced', '', tab('products')),
+                homeTile(noPhoto.length, 'Models without a gallery', noPhoto.length ? 'worth adding photos' : '', tab('products'), true)
+            ])}
+            <div class="adm-home">
+                ${homeList('Recently edited', productEdits.map(([k, r]) => {
+                    const p = PRODUCTS_DATA.find(x => x.slug === k.slice(8));
+                    return [escapeHtml(p ? p.name : k.slice(8)), `${Object.keys(r.value || {}).join(', ')}${r.updated_by ? ` · by ${who(r.updated_by)}` : ''}`, 'Edit', tab('products')];
+                }), 'No model has been edited yet. Every model shows its photos and text as shipped.')}
+                ${homeShortcuts([
+                    ['Products', 'Main, build, gallery and accessory photos; text and specifications', tab('products')],
+                    ['Site content', 'The event story on the homepage', tab('content')],
+                    ['View the website', 'See your changes as visitors do', 'navigateTo(\'home\')']
+                ])}
+                <section class="adm-panel adm-panel-wide">
+                    <div class="adm-panel-head"><h2>Photo tips</h2></div>
+                    <ul class="adm-tips">
+                        <li>Use JPEG or PNG. Large photos are resized to 1920px before they upload, so there is no need to shrink them first.</li>
+                        <li>Build photos show on the model page when a visitor picks that build: keep the cart in the same spot and angle as the others.</li>
+                        <li>An edit goes live for every visitor as soon as you save it. Undo puts the shipped photo or text back.</li>
+                    </ul>
+                </section>
+            </div>`;
+    }
+
+    if (role === 'pricing') {
+        const p = data.pricing;
+        const waiting = at('submitted');
+        const bundleLines = (data.bundles || []).length;
+        return `${noTables}
+            ${tiles([
+                homeTile(waiting.length, 'Waiting for your approval', '', stage('quotations', 'submitted'), true),
+                homeTile(at('approved').length, 'Approved, not sent yet', '', stage('quotations', 'approved')),
+                homeTile(sentThisMonth.length, 'Sent this month', '', stage('quotations', 'sent')),
+                homeTile(open.length, 'Requests not priced yet', '', stage('quotes', 'open'))
+            ])}
+            <div class="adm-home">
+                ${homeList('Waiting for your approval', waiting.map(qt => quotationRow(qt, `margin ${quotationTotals(qt).margin.toFixed(1)}% · from ${who(qt.submitted_by)}`, 'Review')),
+                    'Nothing to approve. Submitted quotations show here, and you get an email for each.')}
+                <section class="adm-panel">
+                    <div class="adm-panel-head"><h2>Pricing now</h2><button type="button" onclick="${tab('quotations')}" class="link text-sm">Change</button></div>
+                    ${p ? `<dl class="adm-facts">
+                        <div><dt>Exchange rate</dt><dd>₱${Number(p.exchange_rate)} per $1</dd></div>
+                        <div><dt>Freight</dt><dd>${Number(p.freight_pct)}%</dd></div>
+                        <div><dt>Margin</dt><dd>${Number(p.margin_pct)}%</dd></div>
+                        <div><dt>Warranty</dt><dd>${'warranty' in p ? (p.warranty ? 'Set' : '<span class="golfer-error">Not set</span>') : '—'}</dd></div>
+                    </dl>${p.updated_by ? `<p class="adm-panel-foot">Last changed by ${who(p.updated_by)}</p>` : ''}` : '<p class="adm-panel-empty">Pricing isn\'t in the database yet.</p>'}
+                </section>
+                ${homeShortcuts([
+                    ['Bundles', `${bundleLines} cost lines, in USD, that quotations are priced from`, tab('bundles')],
+                    ['Quotations', 'Every quotation and the pricing settings', tab('quotations')],
+                    ['Quote requests', 'What customers asked for', tab('quotes')]
+                ])}
+            </div>`;
+    }
+
+    if (role === 'sales') {
+        const returned = at('returned');
+        const mine = q => q.prepared_by === me;
+        return `${noTables}
+            ${tiles([
+                homeTile(open.length, 'New requests to price', '', stage('quotes', 'open'), true),
+                homeTile(returned.length, 'Returned to fix', returned.filter(mine).length ? `${returned.filter(mine).length} yours` : '', stage('quotations', 'draft'), true),
+                homeTile(at('submitted').length, 'Waiting for approval', '', stage('quotations', 'submitted')),
+                homeTile(at('approved').length, 'Approved, ready to send', '', stage('quotations', 'approved'), true)
+            ])}
+            <div class="adm-home">
+                ${homeList('New requests to price', open.map(requestRow), 'Every open request has a quotation.')}
+                ${homeList('Approved, ready to send', at('approved').map(qt => quotationRow(qt, mine(qt) ? 'yours' : `by ${who(qt.prepared_by)}`, 'Send')), 'Nothing to send right now.')}
+                ${homeList('Returned with a note', returned.map(qt => quotationRow(qt, escapeHtml(qt.review_note), 'Fix')), 'Nothing returned.')}
+                ${homeList('Drafts', at('draft').map(qt => quotationRow(qt, mine(qt) ? 'yours' : `by ${who(qt.prepared_by)}`)), 'No drafts.')}
+            </div>`;
+    }
+
+    // Super admin: the whole pipeline, approvals, and the team
+    const staff = data.staff || [];
+    const team = Object.entries(ADMIN_ROLES).map(([id, r]) => [r.label, staff.filter(s => s.role === id)]).filter(([, list]) => list.length);
+    return `${noTables}
+        ${tiles([
+            homeTile(open.length, 'New requests', '', stage('quotes', 'open'), true),
+            homeTile(at('draft', 'returned').length, 'Being prepared', at('returned').length ? `${at('returned').length} returned` : '', stage('quotations', 'draft')),
+            homeTile(at('submitted').length, 'Waiting for approval', '', stage('quotations', 'submitted'), true),
+            homeTile(at('approved').length, 'Approved, not sent', '', stage('quotations', 'approved')),
+            homeTile(sentThisMonth.length, 'Sent this month', formatPhp(sentThisMonth.reduce((s, q) => s + quotationTotals(q).total, 0)), stage('quotations', 'sent'))
+        ])}
+        <div class="adm-home">
+            ${homeList('Waiting for approval', at('submitted').map(qt => quotationRow(qt, `margin ${quotationTotals(qt).margin.toFixed(1)}% · from ${who(qt.submitted_by)}`, 'Review')), 'Nothing waiting for approval.')}
+            ${homeList('New requests', open.map(requestRow), 'Every open request has a quotation.')}
+            <section class="adm-panel">
+                <div class="adm-panel-head"><h2>Team</h2><button type="button" onclick="${tab('users')}" class="link text-sm">Manage</button></div>
+                <dl class="adm-facts">${team.map(([label, list]) => `<div><dt>${label}</dt><dd>${list.map(s => who(s.email)).join(', ')}</dd></div>`).join('')}</dl>
+            </section>
+            ${homeShortcuts([
+                ['Bundles', 'Cost lines quotations are priced from', tab('bundles')],
+                ['Products', 'Photos, text and specs of each model', tab('products')],
+                ['Golfers', `${(data.golfers || []).length} member${(data.golfers || []).length === 1 ? '' : 's'}`, tab('golfers')]
+            ])}
+        </div>`;
+}
+
 function renderAdminQuotes({ quotes: allQuotes, golfers, quotations }) {
     if (!allQuotes.length) return '<p class="measure">No quote requests yet. Every request sent from the site lands here and in the quotes Google Sheet.</p>';
     // The pipeline's New requests filter: requests that don't have a quotation yet and are still open
@@ -824,12 +995,13 @@ function renderAdminQuotes({ quotes: allQuotes, golfers, quotations }) {
     const quotes = quoteFilter === 'open' ? allQuotes.filter(q => !priced.has(q.id) && q.status !== 'Lost' && q.status !== 'Sold') : allQuotes;
     if (!quotes.length) return '<p class="measure">Every open request has a quotation.</p>';
     const canDelete = can('quotes.delete');
-    const pricing = can('quotations.prepare') && quotations;
+    const pricing = can('quotations.view') && quotations;
     // The quote's quotation: open it, or prepare one from the quote's build
     const quotationCell = q => {
         const qt = quotations.find(x => x.quote_id === q.id);
         return qt ? `<button type="button" onclick="openQuotation(${qt.id})" class="link text-xs">Open</button> <span class="quotation-status quotation-${qt.status}">${QUOTATION_STATUS_LABELS[qt.status]}</span>`
-            : `<button type="button" onclick="prepareQuotation(${q.id})" class="link text-xs">Prepare quotation</button>`;
+            : can('quotations.prepare') ? `<button type="button" onclick="prepareQuotation(${q.id})" class="link text-xs">Prepare quotation</button>`
+            : '<span class="text-xs text-mute">Not priced yet</span>';
     };
     return `<div class="admin-table-wrap"><table class="admin-table">
         <thead><tr><th>Reference</th><th>Date</th><th>Customer</th><th>Model</th><th>Source</th><th>Golfer</th><th>Status</th>${pricing ? '<th>Quotation</th>' : ''}${canDelete ? '<th><span class="sr-only">Delete</span></th>' : ''}</tr></thead>
@@ -1812,7 +1984,7 @@ function renderAdminQuotations(data) {
             ${'warranty' in p ? `<div class="field sm:col-span-4"><label for="ps-warranty">Warranty (page 2 of every quotation PDF)</label>
                 <textarea id="ps-warranty" name="warranty" rows="4" placeholder="e.g. 2 years on the battery, 1 year on the motor and controller…"${can('pricing.edit') ? '' : ' disabled'}>${escapeHtml(p.warranty)}</textarea>
                 <p class="text-xs text-mute mt-1">A quotation picks this up when it's next saved.</p></div>` : ''}
-            ${can('pricing.edit') ? '<button type="submit" class="btn btn-primary min-h-[3rem] px-5 text-sm">Save pricing</button>' : '<p class="text-xs text-mute">Set by a master admin.</p>'}
+            ${can('pricing.edit') ? '<button type="submit" class="btn btn-primary min-h-[3rem] px-5 text-sm">Save pricing</button>' : '<p class="text-xs text-mute">Set by the price manager.</p>'}
             ${Number(p.margin_pct) === 0 ? '<p class="golfer-error sm:col-span-4">The margin is 0%: quotations would be priced at landed cost.</p>' : ''}
         </form>
         <h2 class="type-md text-ink mb-4">Quotations</h2>
@@ -1827,7 +1999,7 @@ function renderAdminQuotations(data) {
                 <td class="text-xs text-mute whitespace-nowrap">${qt.updated_at ? `${formatShortDate(qt.updated_at)} · ${escapeHtml(adminName(qt.updated_by))}` : ''}</td>
                 <td><button type="button" onclick="openQuotation(${qt.id})" class="link text-xs">Open</button></td>
             </tr>`).join('')}</tbody>
-        </table></div>` : (quotationFilter ? '<p class="measure">No quotations at this stage.</p>' : '<p class="measure">No quotations yet. In Quote requests, choose <b>Prepare quotation</b> on a request.</p>')}`;
+        </table></div>` : (quotationFilter ? '<p class="measure">No quotations at this stage.</p>' : `<p class="measure">No quotations yet.${can('quotations.prepare') ? ' In Quote requests, choose <b>Prepare quotation</b> on a request.' : ' Sales managers prepare them from the quote requests.'}</p>`)}`;
 }
 
 async function savePricingSettings(e) {
@@ -1850,7 +2022,9 @@ async function savePricingSettings(e) {
 function renderQuotationEditor(data) {
     const qt = quotationDraft;
     const saved = data.quotations.find(x => x.id === qt.id);
-    const editable = qt.status === 'draft' || qt.status === 'returned';
+    // The price manager reviews a quotation as it was submitted, and doesn't change it
+    const prepares = can('quotations.prepare');
+    const editable = prepares && (qt.status === 'draft' || qt.status === 'returned');
     const t = quotationTotals(qt);
     const c = qt.customer || {};
     const groupLines = qt.build_group && data.bundles ? data.bundles.filter(b => bundleGroupName(b) === qt.build_group) : [];
@@ -1934,9 +2108,11 @@ function renderQuotationEditor(data) {
             ${qt.status === 'submitted' && can('quotations.approve') ? `
                 <button type="button" onclick="reviewQuotation('approved')" class="btn btn-primary min-h-[2.75rem] px-5 text-sm">Approve</button>
                 <button type="button" onclick="reviewQuotation('returned')" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Return with a note</button>` : ''}
-            ${qt.status === 'submitted' && !can('quotations.approve') ? '<p class="text-sm text-mute">Waiting for a master admin to approve it.</p>' : ''}
-            ${qt.status === 'approved' ? `<button type="button" onclick="sendQuotation()" class="btn btn-primary min-h-[2.75rem] px-5 text-sm">Send to ${escapeHtml(c.email || 'the customer')}</button>` : ''}
-            ${qt.status === 'submitted' || qt.status === 'approved' ? `<button type="button" onclick="reopenQuotation()" class="link text-sm">Edit (needs approval again)</button>` : ''}
+            ${qt.status === 'submitted' && !can('quotations.approve') ? '<p class="text-sm text-mute">Waiting for the price manager or a super admin to approve it.</p>' : ''}
+            ${(qt.status === 'draft' || qt.status === 'returned') && !prepares ? '<p class="text-sm text-mute">A sales manager is still preparing it.</p>' : ''}
+            ${qt.status === 'approved' && prepares ? `<button type="button" onclick="sendQuotation()" class="btn btn-primary min-h-[2.75rem] px-5 text-sm">Send to ${escapeHtml(c.email || 'the customer')}</button>` : ''}
+            ${qt.status === 'approved' && !prepares ? '<p class="text-sm text-mute">Approved. The sales manager sends it to the customer.</p>' : ''}
+            ${(qt.status === 'submitted' || qt.status === 'approved') && prepares ? `<button type="button" onclick="reopenQuotation()" class="link text-sm">Edit (needs approval again)</button>` : ''}
             <button type="button" onclick="previewQuotation()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Preview PDF</button>
             ${can('quotes.delete') && qt.status !== 'sent' ? `<button type="button" onclick="deleteQuotation()" class="link text-sm">Delete</button>` : ''}
         </div>
@@ -2106,7 +2282,7 @@ async function deleteQuotation() {
 // quotation with this sign-in, so the database decides whether this person may. Its web app address (ends in /exec),
 // the same as the Vault secret "mail_script_url"; empty until the script is deployed.
 const MAIL_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDiEGgwlisk4dikiTy7svACFWwlowq37yMsBKL39rUACzHPDevVKcVvt_U8REKxOKhfg/exec';
-const EMAIL_KINDS = { quotation_submitted: 'Approval request to master admins', quotation_approved: 'Approved notice to the sales manager',
+const EMAIL_KINDS = { quotation_submitted: 'Approval request to the price manager and super admins', quotation_approved: 'Approved notice to the sales manager',
     quotation_returned: 'Returned notice to the sales manager', quotation_sent: 'Quotation to the customer' };
 const quotationEmails = {}; // quotation id -> its email_log rows
 
@@ -2168,7 +2344,8 @@ async function previewQuotation() {
     // Opened before the wait, so the browser doesn't block it as a pop-up
     const win = window.open('', '_blank');
     try {
-        await refreshQuotationPdfFields();
+        // The price manager previews it as stored (the database lets them approve or return it, nothing else)
+        if (can('quotations.prepare')) await refreshQuotationPdfFields();
         const url = URL.createObjectURL(await quotationMail('preview'));
         if (win) win.location = url; else window.open(url, '_blank');
     } catch (err) {

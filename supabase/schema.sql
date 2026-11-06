@@ -7,31 +7,40 @@
 --   golfer (member)      their own profile, saved builds and quotes
 --   sales manager        read all quotes, golfers and builds; change a quote's status; copy news emails; read the
 --                        bundles and pricing; prepare quotations and submit them for approval, send approved ones
---   master admin         all of the above, plus delete quotes, edit products and site content, manage staff, edit
---                        bundles and pricing settings, approve or return quotations
+--   price manager        read quotes and quotations; edit bundles and pricing settings; approve or return
+--                        submitted quotations (and change nothing else on them)
+--   marketing            edit products (photos, text, specs), accessory photos and site content
+--   super admin          everything: all of the above, plus delete quotes, manage staff ('master' in the database)
 -- Staff are matched by the email they signed in with (see staff below), so the email must be verified: keep
 -- "Confirm email" on in Authentication -> Providers -> Email, and use Google sign-in for staff.
 
 -- ---------- Staff: who can use the admin, and as what ----------
 create table if not exists public.staff (
     email text primary key check (email = lower(email)),
-    role text not null check (role in ('master', 'sales', 'marketing')),
+    role text not null check (role in ('master', 'pricing', 'sales', 'marketing')),
     added_at timestamptz not null default now()
 );
+-- Marketing (2026-11-05) and price manager (2026-11-06): a table made before them allowed fewer roles
+alter table public.staff drop constraint if exists staff_role_check;
+alter table public.staff add constraint staff_role_check check (role in ('master', 'pricing', 'sales', 'marketing'));
 
+-- The first staff. Afterwards, super admins change people in the admin's Staff page; running this file again adds
+-- anyone missing and leaves the others' roles as they are.
 insert into public.staff (email, role) values
     ('donnavalonda@sjkguahan.com', 'master'),
     ('jrowel_algo@sjkguahan.com', 'master'),
     ('jamesugarte@sjkguahan.com', 'master'),
-    ('matthew@sjkguahan.com', 'master'),
+    ('matthew@sjkguahan.com', 'pricing'),
     ('jerusvergara@sjkguahan.com', 'sales'),
-    ('jasperbuiza@sjkguahan.com', 'sales')
+    ('jasperbuiza@sjkguahan.com', 'sales'),
+    ('michael.serna@sjkguahan.com', 'marketing'),
+    ('carlovaldez@sjkguahan.com', 'marketing')
 on conflict (email) do nothing;
--- Marketing (added 2026-11-05): a table made before it allowed only master and sales
-alter table public.staff drop constraint if exists staff_role_check;
-alter table public.staff add constraint staff_role_check check (role in ('master', 'sales', 'marketing'));
+-- 2026-11-06: Matt moves from super admin to price manager. If he is made a super admin again later, delete this
+-- line, or running the file again moves him back.
+update public.staff set role = 'pricing' where email = 'matthew@sjkguahan.com' and role = 'master';
 
--- The signed-in person's staff role ('master', 'sales', 'marketing'), or null for golfers and visitors.
+-- The signed-in person's staff role ('master', 'pricing', 'sales', 'marketing'), or null for golfers and visitors.
 -- security definer: it reads staff without going through staff's own policies (which call this function).
 create or replace function public.staff_role() returns text
 language sql stable security definer set search_path = public as $$
@@ -267,8 +276,9 @@ declare
     role text := public.staff_role();
     changed boolean;
 begin
-    if role is null then raise exception 'Only staff can prepare quotations'; end if;
+    if role is null or role = 'marketing' then raise exception 'Only staff who price quotations can change them'; end if;
     if tg_op = 'INSERT' then
+        if role = 'pricing' then raise exception 'Sales managers prepare quotations'; end if;
         if new.status <> 'draft' then raise exception 'A new quotation starts as a draft'; end if;
         new.prepared_by := who;
         new.updated_by := who; new.updated_at := now();
@@ -286,6 +296,10 @@ begin
                 new.freight_pct, new.margin_pct, new.discount_php, new.notes, new.terms, new.quote_id, new.reference)
         is distinct from (old.customer, old.title, old.build_rows, old.build_group, old.units, old.lines, old.exchange_rate,
                 old.freight_pct, old.margin_pct, old.discount_php, old.notes, old.terms, old.quote_id, old.reference);
+    -- The price manager approves or returns a submitted quotation as it is, and does nothing else to it
+    if role = 'pricing' and (changed or new.status not in ('approved', 'returned') or new.status = old.status) then
+        raise exception 'A price manager can only approve or return a submitted quotation';
+    end if;
     if new.status = old.status then
         if changed and old.status in ('submitted', 'approved') then new.status := 'draft'; end if;
         new.review_note := old.review_note;
@@ -294,7 +308,7 @@ begin
         new.submitted_by := who; new.submitted_at := now();
         new.review_note := old.review_note;
     elsif new.status in ('approved', 'returned') then
-        if role <> 'master' then raise exception 'Only a master admin can approve or return a quotation'; end if;
+        if role not in ('master', 'pricing') then raise exception 'Only the price manager or a super admin can approve or return a quotation'; end if;
         if old.status <> 'submitted' then raise exception 'Only a submitted quotation can be approved or returned'; end if;
         if changed then raise exception 'Approve or return the quotation as it was submitted'; end if;
         new.reviewed_by := who; new.reviewed_at := now();
@@ -366,7 +380,8 @@ begin
         headers := jsonb_build_object('Content-Type', 'application/json'),
         body := jsonb_build_object('secret', secret, 'event', event, 'id', ref_id, 'record', rec,
             'staff', jsonb_build_object(
-                'master', coalesce((select jsonb_agg(email order by email) from public.staff where role = 'master'), '[]'::jsonb),
+                -- "master": who approves (super admins and the price manager), so the script asks them
+                'master', coalesce((select jsonb_agg(email order by email) from public.staff where role in ('master', 'pricing')), '[]'::jsonb),
                 'sales', coalesce((select jsonb_agg(email order by email) from public.staff where role = 'sales'), '[]'::jsonb)))
     );
 exception when others then
@@ -459,7 +474,7 @@ create policy quotes_insert on public.quotes for insert to anon, authenticated
     with check ((golfer_id is null or golfer_id = auth.uid()) and status = 'New' and status_by is null);
 drop policy if exists quotes_read on public.quotes;
 create policy quotes_read on public.quotes for select to authenticated
-    using (golfer_id = auth.uid() or public.staff_role() in ('master', 'sales'));
+    using (golfer_id = auth.uid() or public.staff_role() in ('master', 'pricing', 'sales'));
 drop policy if exists quotes_status on public.quotes;
 create policy quotes_status on public.quotes for update to authenticated
     using (public.staff_role() in ('master', 'sales')) with check (public.staff_role() in ('master', 'sales'));
@@ -497,42 +512,43 @@ drop policy if exists site_photos_delete on storage.objects;
 create policy site_photos_delete on storage.objects for delete to authenticated
     using (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'));
 
--- bundles and sku_usd: read by staff (sales managers price quotations from them); changed by master admins only
+-- bundles and sku_usd: read by staff who price quotations; changed by super admins and the price manager
 drop policy if exists bundles_master on public.bundles;
 drop policy if exists bundles_read on public.bundles;
 create policy bundles_read on public.bundles for select to authenticated
-    using (public.staff_role() in ('master', 'sales'));
+    using (public.staff_role() in ('master', 'pricing', 'sales'));
 drop policy if exists bundles_write on public.bundles;
 create policy bundles_write on public.bundles for all to authenticated
-    using (public.staff_role() = 'master') with check (public.staff_role() = 'master');
+    using (public.staff_role() in ('master', 'pricing')) with check (public.staff_role() in ('master', 'pricing'));
 
 drop policy if exists sku_usd_master on public.sku_usd;
 drop policy if exists sku_usd_read on public.sku_usd;
 create policy sku_usd_read on public.sku_usd for select to authenticated
-    using (public.staff_role() in ('master', 'sales'));
+    using (public.staff_role() in ('master', 'pricing', 'sales'));
 drop policy if exists sku_usd_write on public.sku_usd;
 create policy sku_usd_write on public.sku_usd for all to authenticated
-    using (public.staff_role() = 'master') with check (public.staff_role() = 'master');
+    using (public.staff_role() in ('master', 'pricing')) with check (public.staff_role() in ('master', 'pricing'));
 
--- pricing settings: read by staff, changed by master admins
+-- pricing settings: read by staff who price quotations, changed by super admins and the price manager
 drop policy if exists pricing_read on public.pricing_settings;
 create policy pricing_read on public.pricing_settings for select to authenticated
-    using (public.staff_role() in ('master', 'sales'));
+    using (public.staff_role() in ('master', 'pricing', 'sales'));
 drop policy if exists pricing_write on public.pricing_settings;
 create policy pricing_write on public.pricing_settings for update to authenticated
-    using (public.staff_role() = 'master') with check (public.staff_role() = 'master');
+    using (public.staff_role() in ('master', 'pricing')) with check (public.staff_role() in ('master', 'pricing'));
 
 -- quotations: staff read, prepare and move them along (the workflow trigger decides which moves each role may
--- make); only master admins delete one
+-- make: the price manager only approves or returns); sales managers and super admins create them; only super
+-- admins delete one
 drop policy if exists quotations_read on public.quotations;
 create policy quotations_read on public.quotations for select to authenticated
-    using (public.staff_role() in ('master', 'sales'));
+    using (public.staff_role() in ('master', 'pricing', 'sales'));
 drop policy if exists quotations_insert on public.quotations;
 create policy quotations_insert on public.quotations for insert to authenticated
     with check (public.staff_role() in ('master', 'sales'));
 drop policy if exists quotations_update on public.quotations;
 create policy quotations_update on public.quotations for update to authenticated
-    using (public.staff_role() in ('master', 'sales')) with check (public.staff_role() in ('master', 'sales'));
+    using (public.staff_role() in ('master', 'pricing', 'sales')) with check (public.staff_role() in ('master', 'pricing', 'sales'));
 drop policy if exists quotations_delete on public.quotations;
 create policy quotations_delete on public.quotations for delete to authenticated
     using (public.staff_role() = 'master');
@@ -540,4 +556,4 @@ create policy quotations_delete on public.quotations for delete to authenticated
 -- email log: staff read it (to see whether a quotation reached the customer); only the function writes it
 drop policy if exists email_log_read on public.email_log;
 create policy email_log_read on public.email_log for select to authenticated
-    using (public.staff_role() in ('master', 'sales'));
+    using (public.staff_role() in ('master', 'pricing', 'sales'));
