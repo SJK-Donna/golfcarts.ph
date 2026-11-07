@@ -10,7 +10,8 @@
 --   price manager        read quotes and quotations; edit bundles and pricing settings; approve or return
 --                        submitted quotations (and change nothing else on them)
 --   marketing            edit products (photos, text, specs), accessory photos and site content
---   super admin          everything: all of the above, plus delete quotes, manage staff ('master' in the database)
+--   super admin          everything: all of the above, plus delete quotes, manage staff, read the activity log
+--                        ('master' in the database)
 -- Staff are matched by the email they signed in with (see staff below), so the email must be verified: keep
 -- "Confirm email" on in Authentication -> Providers -> Email, and use Google sign-in for staff.
 
@@ -426,7 +427,91 @@ drop trigger if exists quotations_mail on public.quotations;
 create trigger quotations_mail after update on public.quotations
     for each row execute function public.quotation_status_mail();
 
+-- ---------- Activity log: who changed what, read by super admins in the admin's Activity log ----------
+-- Written here by triggers, not by the page, so a change can't skip it and nobody can edit it from the admin. Records
+-- staff changes to quote statuses, quotations, products and site content, bundles, the USD list, pricing and staff.
+-- Only signed-in people are logged: a customer's new request isn't an edit, and data loaded in the SQL Editor (such
+-- as the private bundles file) has nobody to name.
+create table if not exists public.activity_log (
+    id bigint generated always as identity primary key,
+    created_at timestamptz not null default now(),
+    who text not null,
+    area text not null,          -- the table: quotes, quotations, site_edits, bundles, sku_usd, pricing_settings, staff
+    action text not null check (action in ('insert', 'update', 'delete')),
+    item text not null default '', -- which one: a reference, 'product:<slug>', a sheet row, an email
+    changes jsonb not null default '{}' -- { field: { from, to } }
+);
+create index if not exists activity_log_created_at on public.activity_log (created_at desc);
+
+-- A long value (a quotation's lines, a gallery) is kept short, so the log stays small
+create or replace function public.activity_value(v jsonb) returns jsonb
+language sql immutable as $$
+    select case when length(v::text) > 400 then to_jsonb(left(v::text, 400) || '…') else v end
+$$;
+
+-- tg_argv[0]: the column that names the row. Stamps and fields the admin refreshes by itself aren't changes anyone
+-- made, and a change of nothing else isn't logged. A customer's details stay out, so deleting a request or quotation
+-- doesn't leave them here. If logging fails the person's change still goes through, with a warning.
+create or replace function public.log_activity() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+    actor text := lower(auth.jwt() ->> 'email');
+    before_row jsonb := '{}';
+    after_row jsonb := '{}';
+    item_name text;
+    diff jsonb := '{}';
+    field text;
+    skip text[] := array['id', 'sheet_row', 'created_at', 'added_at', 'updated_at', 'updated_by', 'source', 'extra', 'sku_formula', 'total_formula', 'cost_usd_formula',
+        'customer', 'build_rows', 'quote_id', 'photo', 'warranty', 'pdf_extra', 'prepared_by', 'submitted_by', 'submitted_at', 'reviewed_by', 'reviewed_at', 'sent_by', 'sent_at'];
+begin
+    if actor is null then return null; end if;
+    if tg_op <> 'INSERT' then before_row := to_jsonb(old); end if;
+    if tg_op <> 'DELETE' then after_row := to_jsonb(new); end if;
+    item_name := coalesce(after_row ->> tg_argv[0], before_row ->> tg_argv[0], '');
+    -- A site edit's changes are the fields inside its value
+    if tg_table_name = 'site_edits' then
+        before_row := coalesce(before_row -> 'value', '{}');
+        after_row := coalesce(after_row -> 'value', '{}');
+    end if;
+    for field in select jsonb_object_keys(before_row) union select jsonb_object_keys(after_row) loop
+        -- Staff can only change a request's status; the rest of it is the customer's
+        if field = any(skip) or (tg_table_name = 'quotes' and field <> 'status') then continue; end if;
+        if (before_row -> field) is distinct from (after_row -> field) then
+            diff := diff || jsonb_build_object(field, jsonb_build_object('from', public.activity_value(before_row -> field), 'to', public.activity_value(after_row -> field)));
+        end if;
+    end loop;
+    if tg_op = 'UPDATE' and diff = '{}' then return null; end if;
+    insert into public.activity_log (who, area, action, item, changes) values (actor, tg_table_name, lower(tg_op), item_name, diff);
+    return null;
+exception when others then
+    raise warning 'activity not logged: %', sqlerrm;
+    return null;
+end $$;
+
+drop trigger if exists quotes_activity on public.quotes;
+create trigger quotes_activity after update or delete on public.quotes
+    for each row execute function public.log_activity('reference');
+drop trigger if exists quotations_activity on public.quotations;
+create trigger quotations_activity after insert or update or delete on public.quotations
+    for each row execute function public.log_activity('reference');
+drop trigger if exists site_edits_activity on public.site_edits;
+create trigger site_edits_activity after insert or update or delete on public.site_edits
+    for each row execute function public.log_activity('key');
+drop trigger if exists bundles_activity on public.bundles;
+create trigger bundles_activity after insert or update or delete on public.bundles
+    for each row execute function public.log_activity('sheet_row');
+drop trigger if exists sku_usd_activity on public.sku_usd;
+create trigger sku_usd_activity after insert or update or delete on public.sku_usd
+    for each row execute function public.log_activity('sheet_row');
+drop trigger if exists pricing_settings_activity on public.pricing_settings;
+create trigger pricing_settings_activity after update on public.pricing_settings
+    for each row execute function public.log_activity('id');
+drop trigger if exists staff_activity on public.staff;
+create trigger staff_activity after insert or update or delete on public.staff
+    for each row execute function public.log_activity('email');
+
 -- ---------- Row level security: every table locked, then opened per role ----------
+alter table public.activity_log enable row level security;
 alter table public.staff enable row level security;
 alter table public.golfers enable row level security;
 alter table public.saved_builds enable row level security;
@@ -552,6 +637,12 @@ create policy quotations_update on public.quotations for update to authenticated
 drop policy if exists quotations_delete on public.quotations;
 create policy quotations_delete on public.quotations for delete to authenticated
     using (public.staff_role() = 'master');
+
+-- activity log: super admins read it; only the trigger writes it, and nobody signed in can change or delete it
+drop policy if exists activity_log_read on public.activity_log;
+create policy activity_log_read on public.activity_log for select to authenticated
+    using (public.staff_role() = 'master');
+revoke insert, update, delete, truncate on public.activity_log from anon, authenticated;
 
 -- email log: staff read it (to see whether a quotation reached the customer); only the function writes it
 drop policy if exists email_log_read on public.email_log;

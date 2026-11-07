@@ -556,7 +556,7 @@ const ADMIN_ROLES = {
     master: {
         label: 'Super admin',
         home: 'Everything across the business: the pipeline, what is waiting on approval, and the team.',
-        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.view', 'quotations.prepare', 'quotations.approve', 'pricing.edit', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'bundles.view', 'export.quotes', 'export.all', 'users.manage']
+        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.view', 'quotations.prepare', 'quotations.approve', 'pricing.edit', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'bundles.view', 'export.quotes', 'export.all', 'users.manage', 'log.view']
     },
     // Owns the prices: the bundles, the rate, freight, margin and warranty, and approves or returns the quotations
     // sales managers submit. Reads the quote requests; doesn't prepare, change or send quotations
@@ -586,7 +586,7 @@ const ADMIN_PERMISSION_LABELS = [
     ['golfers.view', 'See golfers'], ['golfers.news', 'Copy news emails'], ['products.edit', 'Edit product photos, text and specs'],
     ['quotations.view', 'See quotations'], ['quotations.prepare', 'Prepare, submit and send quotations'], ['quotations.approve', 'Approve or return quotations'],
     ['pricing.edit', 'Set exchange rate, freight, margin and warranty'],
-    ['content.edit', 'Edit site content'], ['bundles.view', 'See and edit bundles'], ['export.quotes', 'Export quotes'], ['export.all', 'Export all data'], ['users.manage', 'Manage staff']
+    ['content.edit', 'Edit site content'], ['bundles.view', 'See and edit bundles'], ['export.quotes', 'Export quotes'], ['export.all', 'Export all data'], ['users.manage', 'Manage staff'], ['log.view', 'See the activity log']
 ];
 
 let adminTab = 'home';
@@ -680,7 +680,7 @@ const ADMIN_SECTIONS = [
     ['', [['home', 'Home']]],
     ['Work', [['quotes', 'Quote requests', 'quotes.view'], ['quotations', 'Quotations', 'quotations.view'], ['golfers', 'Golfers', 'golfers.view']]],
     ['Catalog', [['bundles', 'Bundles', 'bundles.view'], ['products', 'Products', 'products.edit'], ['content', 'Site content', 'content.edit']]],
-    ['Team', [['users', 'Staff', 'users.manage']]]
+    ['Team', [['users', 'Staff', 'users.manage'], ['activity', 'Activity log', 'log.view']]]
 ];
 
 // The quotation pipeline across the top of Quote requests and Quotations: each stage's count; a click filters to it
@@ -741,7 +741,8 @@ function adminHeading(data) {
         bundles: ['Bundles', 'Cost lines for each build, in USD. Quotations are priced from these.', ''],
         products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
         content: ['Site content', 'The homepage carousel and the event story.', ''],
-        users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`]
+        users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`],
+        activity: ['Activity log', 'Who changed what and when, newest first. Only super admins see this, and nobody can edit it.', '<button type="button" onclick="reloadPageData()" class="adm-btn">Refresh</button>']
     };
     return headings[adminTab];
 }
@@ -770,7 +771,7 @@ function renderAdminPage() {
         // Bundles are read by everyone who prices quotations; tables not created yet (supabase/schema.sql not re-run)
         // come back as null, and the rest of the admin still loads
         const costs = can('bundles.view') || can('quotations.view');
-        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing] = await Promise.all([
+        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity] = await Promise.all([
             can('quotes.view') ? rows(sb.from('quotes').select('*').order('created_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('golfers').select('*').order('joined_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('saved_builds').select('golfer_id')) : Promise.resolve([]),
@@ -778,19 +779,20 @@ function renderAdminPage() {
             costs ? rows(sb.from('bundles').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
             costs ? rows(sb.from('sku_usd').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
             can('quotations.view') ? rows(sb.from('quotations').select('*').order('created_at', { ascending: false })).catch(() => null) : Promise.resolve([]),
-            can('quotations.view') ? rows(sb.from('pricing_settings').select('*').eq('id', 1).maybeSingle()).catch(() => null) : Promise.resolve(null)
+            can('quotations.view') ? rows(sb.from('pricing_settings').select('*').eq('id', 1).maybeSingle()).catch(() => null) : Promise.resolve(null),
+            can('log.view') ? rows(sb.from('activity_log').select('*').order('created_at', { ascending: false }).limit(ACTIVITY_LIMIT)).catch(() => null) : Promise.resolve([])
         ]);
-        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing };
+        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity };
     });
     const sections = ADMIN_SECTIONS.map(([group, items]) => [group, items.filter(([, , p]) => !p || can(p))]).filter(([, items]) => items.length);
     const allowed = sections.flatMap(([, items]) => items.map(([id]) => id));
     if (!allowed.includes(adminTab)) adminTab = allowed[0];
-    const needsData = ['home', 'quotes', 'quotations', 'golfers', 'bundles', 'users'].includes(adminTab);
+    const needsData = ['home', 'quotes', 'quotations', 'golfers', 'bundles', 'users', 'activity'].includes(adminTab);
     const ready = data && !data.error;
     const body = data && data.error ? renderLoadError(data.error)
         : needsData && !data ? '<p class="text-mute" role="status">Loading…</p>'
         : { home: renderAdminHome, quotes: renderAdminQuotes, quotations: renderAdminQuotations, golfers: renderAdminGolfers, products: renderAdminProducts,
-            content: renderAdminContent, bundles: renderAdminBundles, users: renderAdminUsers }[adminTab](data);
+            content: renderAdminContent, bundles: renderAdminBundles, users: renderAdminUsers, activity: renderAdminActivity }[adminTab](data);
     // Counts beside the sidebar items: new requests, and quotations waiting on this person
     const counts = ready ? {
         quotes: data.quotes.filter(q => q.status === 'New').length,
@@ -983,6 +985,13 @@ function renderAdminHome(data) {
             <section class="adm-panel">
                 <div class="adm-panel-head"><h2>Team</h2><button type="button" onclick="${tab('users')}" class="link text-sm">Manage</button></div>
                 <dl class="adm-facts">${team.map(([label, list]) => `<div><dt>${label}</dt><dd>${list.map(s => who(s.email)).join(', ')}</dd></div>`).join('')}</dl>
+            </section>
+            <section class="adm-panel">
+                <div class="adm-panel-head"><h2>Recent activity</h2><button type="button" onclick="${tab('activity')}" class="link text-sm">See the log</button></div>
+                ${(data.activity || []).length ? `<ul class="adm-todo">${data.activity.slice(0, 5).map(e => `<li><div>
+                    <p class="adm-todo-main">${escapeHtml(activitySentence(e))}</p>
+                    <p class="adm-todo-detail">${who(e.who)} · ${formatActivityTime(e.created_at)}</p>
+                </div></li>`).join('')}</ul>` : `<p class="adm-panel-empty">${data.activity === null ? 'The log isn\'t in the database yet. Re-run supabase/schema.sql.' : 'Nothing logged yet.'}</p>`}
             </section>
             ${homeShortcuts([
                 ['Bundles', 'Cost lines quotations are priced from', tab('bundles')],
@@ -2506,6 +2515,109 @@ async function resendQuotation() {
         showToast(`Not sent: ${err.message}`);
     }
     loadQuotationEmails(quotationOpen);
+}
+
+// --- Activity log (super admins only): who changed what. The database writes it (log_activity in supabase/schema.sql);
+// the admin only reads it, the newest ACTIVITY_LIMIT entries. Filtering redraws the results only, so the search box
+// keeps its focus ---
+const ACTIVITY_LIMIT = 1000;
+const ACTIVITY_SHOWN = 200; // rows drawn at once
+let activityFilter = { who: '', area: '', q: '' };
+
+function formatActivityTime(iso) {
+    return new Date(iso).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function activityArea(e) {
+    if (e.area === 'site_edits') return e.item.startsWith('product:') || e.item.startsWith('accessory:') ? 'Products' : 'Homepage';
+    return { quotes: 'Quote requests', quotations: 'Quotations', bundles: 'Bundles', sku_usd: 'USD list', pricing_settings: 'Pricing', staff: 'Staff' }[e.area] || e.area;
+}
+
+// One line in plain words: "Approved quotation GC-123"
+function activitySentence(e) {
+    const del = e.action === 'delete', add = e.action === 'insert';
+    const verb = del ? 'Deleted' : add ? 'Added' : 'Edited';
+    const change = (e.changes || {}).status;
+    if (e.area === 'quotes') return del ? `Deleted request ${e.item}` : `Changed request ${e.item} to ${change ? change.to : 'a new status'}`;
+    if (e.area === 'quotations') {
+        if (add) return `Prepared quotation ${e.item}`;
+        if (del) return `Deleted quotation ${e.item}`;
+        const steps = { submitted: 'Submitted', approved: 'Approved', returned: 'Returned', sent: 'Sent to the customer:', draft: 'Reopened' };
+        return change && steps[change.to] ? `${steps[change.to]} quotation ${e.item}` : `Edited quotation ${e.item}`;
+    }
+    if (e.area === 'site_edits') {
+        const [kind, id] = e.item.split(':');
+        const product = kind === 'product' && PRODUCTS_DATA.find(p => p.slug === id);
+        const accessory = kind === 'accessory' && ACCESSORY_CATALOG.flatMap(g => g.items).find(i => i.id === id);
+        const name = kind === 'product' ? (product ? product.name : id) : kind === 'accessory' ? `${accessory ? accessory.name : id} photo`
+            : e.item === 'banners' ? 'the homepage carousel' : e.item === 'event' ? 'the homepage event' : e.item;
+        return del ? `Put back the original of ${name}` : `Edited ${name}`;
+    }
+    if (e.area === 'bundles') return `${verb} bundle line ${e.item}`;
+    if (e.area === 'sku_usd') return `${verb} USD list line ${e.item}`;
+    if (e.area === 'pricing_settings') return 'Changed the pricing settings';
+    if (e.area === 'staff') {
+        if (add) return `Added ${e.item} to staff`;
+        if (del) return `Removed ${e.item} from staff`;
+        return `Changed the role of ${e.item}`;
+    }
+    return `${verb} ${e.area} ${e.item}`;
+}
+
+function activityValue(field, v) {
+    if (v === null || v === undefined || v === '') return '(empty)';
+    if (field === 'role' && ADMIN_ROLES[v]) return ADMIN_ROLES[v].label;
+    return typeof v === 'string' ? v : JSON.stringify(v);
+}
+
+function activityDetails(e) {
+    const fields = Object.entries(e.changes || {});
+    if (!fields.length) return '';
+    return `<details><summary class="text-xs">${fields.length} change${fields.length === 1 ? '' : 's'}</summary>
+        <dl class="activity-changes">${fields.map(([field, c]) => `<div>
+            <dt>${escapeHtml(field.replace(/_/g, ' '))}</dt>
+            <dd><span class="text-mute">${escapeHtml(activityValue(field, c.from))}</span> → ${escapeHtml(activityValue(field, c.to))}</dd>
+        </div>`).join('')}</dl>
+    </details>`;
+}
+
+function renderActivityResults(list) {
+    const { who, area, q } = activityFilter;
+    const text = q.trim().toLowerCase();
+    const found = list.filter(e => (!who || e.who === who) && (!area || activityArea(e) === area)
+        && (!text || `${activitySentence(e)} ${e.who} ${JSON.stringify(e.changes)}`.toLowerCase().includes(text)));
+    if (!found.length) return '<p class="measure">Nothing matches.</p>';
+    return `<div class="admin-table-wrap"><table class="admin-table">
+        <thead><tr><th>When</th><th>Who</th><th>Area</th><th>What</th></tr></thead>
+        <tbody>${found.slice(0, ACTIVITY_SHOWN).map(e => `<tr>
+            <td class="whitespace-nowrap">${formatActivityTime(e.created_at)}</td>
+            <td>${escapeHtml(adminName(e.who))}</td>
+            <td class="whitespace-nowrap">${escapeHtml(activityArea(e))}</td>
+            <td>${escapeHtml(activitySentence(e))}${activityDetails(e)}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>
+    ${found.length > ACTIVITY_SHOWN ? `<p class="text-sm text-mute mt-3">Showing the newest ${ACTIVITY_SHOWN} of ${found.length}. Filter to narrow it down.</p>` : ''}`;
+}
+
+function setActivityFilter(key, value) {
+    activityFilter[key] = value;
+    const box = document.getElementById('activity-results');
+    if (box) box.innerHTML = renderActivityResults(pageData.activity || []);
+}
+
+function renderAdminActivity({ activity }) {
+    if (activity === null) return '<p class="measure">The log isn\'t in the database yet. Re-run supabase/schema.sql in the Supabase SQL Editor.</p>';
+    if (!activity.length) return '<p class="measure">Nothing logged yet. Changes made from now on show here.</p>';
+    const people = [...new Set(activity.map(e => e.who))].sort();
+    const areas = [...new Set(activity.map(activityArea))].sort();
+    const options = (list, chosen, label = x => x) => list.map(x => `<option value="${escapeHtml(x)}"${x === chosen ? ' selected' : ''}>${escapeHtml(label(x))}</option>`).join('');
+    return `
+        <div class="grid sm:grid-cols-3 gap-4 max-w-3xl mb-5">
+            <div class="field"><label for="al-who">Person</label><select id="al-who" onchange="setActivityFilter('who', this.value)"><option value="">Everyone</option>${options(people, activityFilter.who, adminName)}</select></div>
+            <div class="field"><label for="al-area">Area</label><select id="al-area" onchange="setActivityFilter('area', this.value)"><option value="">All areas</option>${options(areas, activityFilter.area)}</select></div>
+            <div class="field"><label for="al-q">Search</label><input id="al-q" type="search" value="${escapeHtml(activityFilter.q)}" oninput="setActivityFilter('q', this.value)" placeholder="A reference, a model, a price…"></div>
+        </div>
+        <div id="activity-results">${renderActivityResults(activity)}</div>`;
 }
 
 // --- Staff: who gets the admin, and as what (master admins only). Each person still signs up once with their

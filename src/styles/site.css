@@ -1771,8 +1771,13 @@
         left: 1.5rem;
         width: 3rem;
     }
-    .promo-back[hidden] {
+    .promo-back[hidden], .promo-quote[hidden] {
         display: none;
+    }
+    /* Get a quote, beside the back arrow once the carts show */
+    .promo-quote {
+        left: 5.25rem;
+        padding: 0 1.5rem;
     }
     @media (max-width: 639px) {
         /* The section is taller than the banner on phones (the carts sit in a grid), so the whole banner is shown
@@ -1785,6 +1790,10 @@
             bottom: 0.75rem;
             min-height: 2.5rem;
             font-size: 0.875rem;
+        }
+        .promo-quote {
+            left: 3.75rem;
+            padding: 0 1rem;
         }
         .promo-back {
             left: 0.75rem;
@@ -1892,7 +1901,11 @@
         .lineup-promo {
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.75rem;
-            padding: 4.5rem 0.75rem 1rem; /* room for the background's "Red Series" title */
+            padding: 4.5rem 0.75rem 4rem; /* room for the background's "Red Series" title, and the buttons below */
+        }
+        /* Names sit under their carts here, so the desktop's centering shift would push them off the left edge */
+        .lineup.lineup-promo .lineup-label {
+            transform: none;
         }
         .lineup-promo .lineup-cart img {
             padding: 0;
@@ -2643,6 +2656,12 @@
     .admin-banner-img img { width: 100%; height: 100%; object-fit: cover; }
     .admin-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
     .admin-banner-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Activity log: each change's field, and its old and new value */
+    .activity-changes { display: grid; gap: 0.375rem; margin-top: 0.5rem; }
+    .activity-changes div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 0.75rem; font-size: 0.75rem; }
+    .activity-changes dt { color: var(--mute); }
+    .activity-changes dd { min-width: 16rem; overflow-wrap: anywhere; color: var(--ink); }
 
     /* Home: each role's start page. Number tiles across the top (each opens what it counts), then panels */
     .adm-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }

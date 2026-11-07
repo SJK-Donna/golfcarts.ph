@@ -2650,6 +2650,7 @@ function renderHomePromo() {
                 <button type="button" class="promo-arrow promo-back" onclick="togglePromoCover(false)" aria-label="Back to the Red Series banner" hidden>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
                 </button>
+                <button type="button" class="promo-arrow promo-quote" onclick="openQuoteModal('', 'Interested in the Red Series.')" hidden>Get a quote</button>
                 <ul class="lineup lineup-promo" aria-label="Red Series carts" inert>
                     ${HOME_PROMO.map((c, i) => `
                         <li class="lineup-item" style="--left:${c.left}%; --width:${c.width}%; --height:${c.height}%; z-index:${i + 1}">
@@ -2677,6 +2678,7 @@ function togglePromoCover(open) {
     stage.querySelector('.promo-cover').inert = open;
     stage.querySelector('.lineup-promo').inert = !open;
     back.hidden = !open;
+    stage.querySelector('.promo-quote').hidden = !open;
     (open ? back : stage.querySelector('.promo-open')).focus();
 }
 
