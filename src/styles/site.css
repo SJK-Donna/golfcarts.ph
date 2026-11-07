@@ -2723,6 +2723,10 @@
     .admin-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
     .admin-banner-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* Until the saved banners are known, the built-in ones stay hidden so they don't flash */
+    .edits-pending .banner-slide img { visibility: hidden; }
+    .edits-pending .home-banners .banner-stage { background: var(--stone); }
+
     /* Stories and Guides page: a lead story, more stories, then the guides in their own band */
     #stories-news, #guides { scroll-margin-top: 5rem; }
     .story-jump { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2rem; }

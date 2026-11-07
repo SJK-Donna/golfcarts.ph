@@ -637,13 +637,36 @@ function applyAdminEdits() {
     BLOGS_DATA.splice(0, BLOGS_DATA.length, ...stories.values());
 }
 
-// Pre-rendered pages carry the shipped text, so a page with edits is drawn again once they arrive
+function siteEditsReady() {
+    document.documentElement.classList.remove('edits-pending');
+}
+
+// The edits from this browser's last visit, used for the page's first draw so repeat visits show them straight away.
+// Runs before app.js draws the page (on DOMContentLoaded); the hidden banners show once that's done.
+const SITE_EDITS_KEY = 'gc-site-edits';
+function restoreSiteEdits() {
+    try {
+        const saved = localStorage.getItem(SITE_EDITS_KEY);
+        if (!saved) return '';
+        siteEdits = Object.fromEntries(JSON.parse(saved).map(r => [r.key, r]));
+        applyAdminEdits();
+        window.addEventListener('DOMContentLoaded', siteEditsReady);
+        return saved;
+    } catch (err) { return ''; }
+}
+let drawnEdits = restoreSiteEdits(); // the edits on the page now, as JSON
+
+// Pre-rendered pages carry the shipped text, so a page is drawn again if the edits differ from what it was drawn with
 async function loadSiteEdits({ rerender = true } = {}) {
-    if (!sb) return;
+    if (!sb) { siteEditsReady(); return; }
     try {
         const list = await rows(sb.from('site_edits').select('key, value, updated_by'));
         siteEdits = Object.fromEntries(list.map(r => [r.key, r]));
         applyAdminEdits();
+        const json = JSON.stringify(list);
+        const changed = json !== (drawnEdits || '[]');
+        drawnEdits = json;
+        try { localStorage.setItem(SITE_EDITS_KEY, json); } catch (err) { /* private mode or full: the next visit just waits for the edits */ }
         // A story added in the admin has no pre-rendered page: its address opens as "not found" until the stories arrive
         if (currentPage === 'not-found') {
             const route = pathToRoute(location.pathname, location.search);
@@ -651,11 +674,15 @@ async function loadSiteEdits({ rerender = true } = {}) {
             currentSlug = route.slug;
             updateNavState();
         }
-        if (rerender && list.length && currentPage !== 'admin' && currentPage !== 'golfer') {
+        if (rerender && changed && currentPage !== 'admin' && currentPage !== 'golfer') {
             applyPageMeta(currentPage, currentSlug);
             renderApp();
         }
-    } catch (err) { console.warn('Site edits not loaded:', err); }
+    } catch (err) {
+        console.warn('Site edits not loaded:', err);
+    } finally {
+        siteEditsReady();
+    }
 }
 loadSiteEdits();
 
