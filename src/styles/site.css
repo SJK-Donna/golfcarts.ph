@@ -1771,13 +1771,72 @@
         left: 1.5rem;
         width: 3rem;
     }
-    .promo-back[hidden], .promo-quote[hidden] {
+    .promo-back[hidden], .promo-hint[hidden] {
         display: none;
     }
-    /* Get a quote, beside the back arrow once the carts show */
-    .promo-quote {
+    /* Beside the back arrow once the carts show, in the space left of the first cart: each cart opens its own card */
+    .promo-hint {
+        position: absolute;
+        z-index: 11;
         left: 5.25rem;
-        padding: 0 1.5rem;
+        bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        min-height: 3rem;
+        max-width: calc(28.5% - 6rem);
+        font-size: 0.875rem;
+        line-height: 1.3;
+        color: #fff;
+        text-shadow: 0 1px 6px rgba(60, 0, 0, 0.6);
+        pointer-events: none;
+    }
+    /* A Red Series cart's card (openRedSeries in app.js): the cut-out on the Red Series background, then its spec.
+       Never taller than the screen: the spec scrolls, and Get a quote stays in view */
+    .red-series-card {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100dvh - 2.5rem);
+    }
+    .red-series-scroll {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+    }
+    .red-series-actions {
+        display: flex;
+        gap: 0.75rem;
+        padding: 1rem 1.25rem;
+        border-top: 1px solid var(--line);
+    }
+    .red-series-photo {
+        display: flex;
+        justify-content: center;
+        padding: 1.25rem 1.5rem 1rem;
+        /* The background's right side: its left has the "Red Series" title */
+        background: #B30F12 url('../image/Promo/red-series-stage.jpg') right center / cover no-repeat;
+    }
+    .red-series-photo img {
+        height: 13rem;
+        max-width: 100%;
+        object-fit: contain;
+    }
+    .red-series-list {
+        margin: 1rem 0 0.5rem;
+        border-top: 1px solid var(--line);
+        font-size: 0.875rem;
+    }
+    .red-series-list div {
+        display: grid;
+        grid-template-columns: 8.5rem minmax(0, 1fr);
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--line);
+    }
+    .red-series-list dt {
+        color: var(--mute);
+    }
+    .red-series-list dd {
+        color: var(--ink);
     }
     @media (max-width: 639px) {
         /* The section is taller than the banner on phones (the carts sit in a grid), so the whole banner is shown
@@ -1791,9 +1850,12 @@
             min-height: 2.5rem;
             font-size: 0.875rem;
         }
-        .promo-quote {
+        .promo-hint {
             left: 3.75rem;
-            padding: 0 1rem;
+            bottom: 0.75rem;
+            min-height: 2.5rem;
+            max-width: calc(100% - 4.5rem);
+            font-size: 0.8125rem;
         }
         .promo-back {
             left: 0.75rem;
@@ -1906,6 +1968,10 @@
         /* Names sit under their carts here, so the desktop's centering shift would push them off the left edge */
         .lineup.lineup-promo .lineup-label {
             transform: none;
+        }
+        .lineup-promo .lineup-cart {
+            height: auto;
+            text-align: left;
         }
         .lineup-promo .lineup-cart img {
             padding: 0;
@@ -2656,6 +2722,66 @@
     .admin-banner-img img { width: 100%; height: 100%; object-fit: cover; }
     .admin-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
     .admin-banner-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Stories and Guides page: a lead story, more stories, then the guides in their own band */
+    #stories-news, #guides { scroll-margin-top: 5rem; }
+    .story-jump { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2rem; }
+    .story-jump a { padding: 0.5rem 0.875rem; border: 1px solid var(--line); border-radius: var(--radius); font-size: 0.875rem; color: var(--ink-2); transition: border-color 0.2s, color 0.2s; }
+    .story-jump a:hover { border-color: var(--green); color: var(--ink); }
+    .story-feature { display: grid; gap: 1.5rem; }
+    .story-more { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+    .story-arrow { display: inline-block; transition: transform 0.25s; }
+    a:hover .story-arrow, a:focus-visible .story-arrow { transform: translateX(0.3rem); }
+    .story-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 32rem), 1fr)); gap: 2.5rem 2rem; margin-top: 3rem; padding-top: 3rem; border-top: 1px solid var(--line); }
+    .story-rows-plain { margin-top: 0; padding-top: 2rem; }
+    .story-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 1.25rem; align-items: center; }
+    @media (max-width: 479px) { .story-row { grid-template-columns: minmax(0, 1fr); } }
+    @media (min-width: 1024px) {
+        .story-feature { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 3rem; align-items: center; }
+    }
+
+    .guide-band { padding: 4rem 0; background: var(--stone); }
+    .guide-explorer { display: grid; gap: 1.5rem; margin-top: 2.5rem; }
+    .guide-tabs { display: grid; align-content: start; border-top: 1px solid var(--line); }
+    .guide-tab { position: relative; display: flex; gap: 1rem; width: 100%; padding: 1.25rem 1rem; border-bottom: 1px solid var(--line); text-align: left; cursor: pointer; transition: background-color 0.2s, padding-left 0.2s; }
+    .guide-tab::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--green); transform: scaleY(0); transform-origin: bottom; transition: transform 0.25s; }
+    .guide-tab[aria-selected="true"] { padding-left: 1.25rem; background: var(--paper); }
+    .guide-tab[aria-selected="true"]::before { transform: scaleY(1); }
+    .guide-tab:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+    .guide-num { padding-top: 0.125rem; font-size: 0.875rem; font-variant-numeric: tabular-nums; color: var(--mute); }
+    .guide-panel { overflow: hidden; border: 1px solid var(--line); background: var(--paper); animation: guide-in 0.35s ease-out; }
+    .guide-panel[hidden] { display: none; }
+    @keyframes guide-in { from { opacity: 0; transform: translateY(0.5rem); } }
+    @media (min-width: 1024px) {
+        .guide-band { padding: 6rem 0; }
+        .guide-explorer { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 3rem; }
+    }
+
+    /* A story's page: reading progress, a stronger first paragraph, photos that open larger */
+    .story-progress { display: none; position: fixed; inset: 0 0 auto 0; z-index: 60; height: 3px; background: var(--green); transform: scaleX(0); transform-origin: left; pointer-events: none; }
+    @supports (animation-timeline: scroll()) {
+        .story-progress { display: block; animation: story-progress linear both; animation-timeline: scroll(root); }
+    }
+    @keyframes story-progress { to { transform: scaleX(1); } }
+    .story-body p:first-child { font-size: 1.25rem; line-height: 1.6; color: var(--ink); }
+    .story-photo { position: relative; display: block; width: 100%; overflow: hidden; cursor: zoom-in; }
+    .story-photo img { display: block; transition: transform 0.4s ease-out; }
+    .story-photo:hover img { transform: scale(1.02); }
+    .story-photo:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    .story-photo-modal .opt-photo-frame { aspect-ratio: auto; padding: 0; background: var(--stone); }
+    .story-photo-modal .opt-photo-frame img { width: 100%; max-height: 75vh; mix-blend-mode: normal; }
+    @media (prefers-reduced-motion: reduce) {
+        .guide-panel { animation: none; }
+        .guide-tab, .guide-tab::before, .story-arrow, .story-photo img { transition: none; }
+        a:hover .story-arrow, .story-photo:hover img { transform: none; }
+    }
+
+    /* Stories and guides editor: a small whole photo beside its details */
+    .admin-stories { display: grid; gap: 1rem; }
+    .admin-story, .admin-story-photo { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+    .admin-story { padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+    .admin-story-img { display: flex; align-items: center; justify-content: center; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 6px; background: var(--stone); text-align: center; }
+    .admin-story-img img { width: 100%; height: 100%; object-fit: contain; }
 
     /* Activity log: each change's field, and its old and new value */
     .activity-changes { display: grid; gap: 0.375rem; margin-top: 0.5rem; }

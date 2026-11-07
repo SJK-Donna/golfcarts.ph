@@ -612,7 +612,8 @@ const ADMIN_ORIGINALS = {
     products: Object.fromEntries(PRODUCTS_DATA.map(p => [p.slug, productFields(p)])),
     accessories: Object.fromEntries(ACCESSORY_CATALOG.flatMap(g => g.items.map(i => [i.id, i.image || '']))),
     event: { title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text.slice() },
-    banners: clone(HOME_BANNERS)
+    banners: clone(HOME_BANNERS),
+    blogs: clone(BLOGS_DATA)
 };
 // From the site_edits table: { 'product:<slug>': { value, updated_by }, 'accessory:<id>': { value: { image } }, event: { ... } }
 let siteEdits = {};
@@ -626,6 +627,14 @@ function applyAdminEdits() {
     Object.assign(HOME_EVENT, ADMIN_ORIGINALS.event, (siteEdits.event || {}).value);
     const banners = ((siteEdits.banners || {}).value || {}).slides;
     HOME_BANNERS.splice(0, HOME_BANNERS.length, ...clone(banners && banners.length ? banners : ADMIN_ORIGINALS.banners));
+    // Each story is its own row: 'story:<slug>' holds the whole story, or { removed: true } for a shipped one taken down
+    const stories = new Map(ADMIN_ORIGINALS.blogs.map(p => [p.slug, clone(p)]));
+    Object.entries(siteEdits).filter(([key]) => key.startsWith('story:')).forEach(([key, row]) => {
+        const slug = key.slice(6);
+        if (row.value.removed) stories.delete(slug);
+        else stories.set(slug, { ...clone(row.value), slug });
+    });
+    BLOGS_DATA.splice(0, BLOGS_DATA.length, ...stories.values());
 }
 
 // Pre-rendered pages carry the shipped text, so a page with edits is drawn again once they arrive
@@ -635,17 +644,28 @@ async function loadSiteEdits({ rerender = true } = {}) {
         const list = await rows(sb.from('site_edits').select('key, value, updated_by'));
         siteEdits = Object.fromEntries(list.map(r => [r.key, r]));
         applyAdminEdits();
-        if (rerender && list.length && currentPage !== 'admin' && currentPage !== 'golfer') renderApp();
+        // A story added in the admin has no pre-rendered page: its address opens as "not found" until the stories arrive
+        if (currentPage === 'not-found') {
+            const route = pathToRoute(location.pathname, location.search);
+            currentPage = route.page;
+            currentSlug = route.slug;
+            updateNavState();
+        }
+        if (rerender && list.length && currentPage !== 'admin' && currentPage !== 'golfer') {
+            applyPageMeta(currentPage, currentSlug);
+            renderApp();
+        }
     } catch (err) { console.warn('Site edits not loaded:', err); }
 }
 loadSiteEdits();
 
 async function saveSiteEdit(key, value, message) {
     const { error } = value ? await sb.from('site_edits').upsert({ key, value }) : await sb.from('site_edits').delete().eq('key', key);
-    if (error) { showToast(`Not saved: ${error.message}`); return; }
+    if (error) { showToast(`Not saved: ${error.message}`); return false; }
     await loadSiteEdits({ rerender: false });
     renderApp();
     showToast(message);
+    return true;
 }
 
 // --- Admin sign in ---
@@ -679,7 +699,7 @@ async function signOutAdmin() {
 const ADMIN_SECTIONS = [
     ['', [['home', 'Home']]],
     ['Work', [['quotes', 'Quote requests', 'quotes.view'], ['quotations', 'Quotations', 'quotations.view'], ['golfers', 'Golfers', 'golfers.view']]],
-    ['Catalog', [['bundles', 'Bundles', 'bundles.view'], ['products', 'Products', 'products.edit'], ['content', 'Site content', 'content.edit']]],
+    ['Catalog', [['bundles', 'Bundles', 'bundles.view'], ['products', 'Products', 'products.edit'], ['content', 'Site content', 'content.edit'], ['stories', 'Stories and guides', 'content.edit']]],
     ['Team', [['users', 'Staff', 'users.manage'], ['activity', 'Activity log', 'log.view']]]
 ];
 
@@ -741,6 +761,7 @@ function adminHeading(data) {
         bundles: ['Bundles', 'Cost lines for each build, in USD. Quotations are priced from these.', ''],
         products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
         content: ['Site content', 'The homepage carousel and the event story.', ''],
+        stories: ['Stories and guides', 'Add, edit or remove the stories on the Stories and Guides page.', ''],
         users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`],
         activity: ['Activity log', 'Who changed what and when, newest first. Only super admins see this, and nobody can edit it.', '<button type="button" onclick="reloadPageData()" class="adm-btn">Refresh</button>']
     };
@@ -792,7 +813,7 @@ function renderAdminPage() {
     const body = data && data.error ? renderLoadError(data.error)
         : needsData && !data ? '<p class="text-mute" role="status">Loading…</p>'
         : { home: renderAdminHome, quotes: renderAdminQuotes, quotations: renderAdminQuotations, golfers: renderAdminGolfers, products: renderAdminProducts,
-            content: renderAdminContent, bundles: renderAdminBundles, users: renderAdminUsers, activity: renderAdminActivity }[adminTab](data);
+            content: renderAdminContent, stories: renderAdminStories, bundles: renderAdminBundles, users: renderAdminUsers, activity: renderAdminActivity }[adminTab](data);
     // Counts beside the sidebar items: new requests, and quotations waiting on this person
     const counts = ready ? {
         quotes: data.quotes.filter(q => q.status === 'New').length,
@@ -905,6 +926,7 @@ function renderAdminHome(data) {
                 ${homeShortcuts([
                     ['Products', 'Main, build, gallery and accessory photos; text and specifications', tab('products')],
                     ['Site content', 'The homepage carousel and the event story', tab('content')],
+                    ['Stories and guides', 'Add, edit or remove stories and their photos', tab('stories')],
                     ['View the website', 'See your changes as visitors do', 'navigateTo(\'home\')']
                 ])}
                 <section class="adm-panel adm-panel-wide">
@@ -1533,6 +1555,232 @@ function resetBanners() {
     if (!confirm('Go back to the original banners? This removes your edited carousel from the site.')) return;
     bannerDraft = null;
     saveSiteEdit('banners', null, 'Back to the original banners.');
+}
+
+// --- Stories and guides: each story saves on its own, so two people can work on different stories ---
+let storyDraft = null; // the story being edited or added; null shows the list
+
+function renderAdminStories() {
+    return storyDraft ? renderStoryEditor() : renderStoryList();
+}
+
+function isShippedStory(slug) {
+    return ADMIN_ORIGINALS.blogs.some(p => p.slug === slug);
+}
+
+function renderStoryList() {
+    const removed = ADMIN_ORIGINALS.blogs.filter(p => (siteEdits[`story:${p.slug}`] || { value: {} }).value.removed);
+    return `
+        <div class="admin-card grid gap-5 max-w-3xl">
+            <div class="flex flex-wrap gap-4 items-center justify-between">
+                <p class="text-sm text-mute">Newest date first, as the site shows them. A saved change is on the site right away.</p>
+                <button type="button" onclick="addStory()" class="btn btn-primary min-h-[2.5rem] px-4 text-sm">Add a story</button>
+            </div>
+            <ul class="admin-stories">${newestBlogs().map(p => {
+                const edit = siteEdits[`story:${p.slug}`], shipped = isShippedStory(p.slug);
+                return `<li class="admin-story">
+                    <div class="admin-story-img"><img src="${escapeHtml(p.image)}" alt="" loading="lazy"></div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-ink">${escapeHtml(p.title)}</p>
+                        <p class="text-xs text-mute mt-1">${p.kind === 'guide' ? 'Guides' : 'News and events'} · ${escapeHtml(p.category)} · ${escapeHtml(formatBlogDate(p.date))}${edit && edit.updated_by ? ` · last edited by ${escapeHtml(adminName(edit.updated_by))}` : ''}</p>
+                        <span class="admin-photo-actions mt-2">
+                            <button type="button" data-slug="${escapeHtml(p.slug)}" onclick="editStory(this.dataset.slug)" class="link text-xs">Edit</button>
+                            <a href="${escapeHtml(routeHref('blog-details', p.slug))}" data-route="blog-details" data-slug="${escapeHtml(p.slug)}" class="link text-xs">View</a>
+                            ${edit && shipped ? `<button type="button" data-slug="${escapeHtml(p.slug)}" onclick="undoStory(this.dataset.slug)" class="link text-xs">Undo edits</button>` : ''}
+                            <button type="button" data-slug="${escapeHtml(p.slug)}" onclick="removeStory(this.dataset.slug)" class="link text-xs">Remove</button>
+                        </span>
+                    </div>
+                </li>`;
+            }).join('')}</ul>
+            ${removed.length ? `<div>
+                <h2 class="text-sm font-semibold text-ink">Removed from the site</h2>
+                <ul class="mt-2 grid gap-2">${removed.map(p => `<li class="text-sm flex flex-wrap gap-3 items-center">${escapeHtml(p.title)}
+                    <button type="button" data-slug="${escapeHtml(p.slug)}" onclick="undoStory(this.dataset.slug)" class="link text-xs">Put back</button></li>`).join('')}</ul>
+            </div>` : ''}
+        </div>`;
+}
+
+function renderStoryEditor() {
+    const d = storyDraft;
+    const categories = [...new Set(newestBlogs().map(p => p.category))];
+    return `
+        <form data-no-prefill onsubmit="saveStory(event)" class="admin-card grid gap-5 max-w-3xl" novalidate>
+            <div>
+                <h2 class="type-md text-ink">${d.slug ? 'Edit story' : 'New story'}</h2>
+                <p class="text-sm text-mute mt-1">Choose photos straight from the camera or Drive: large ones are made smaller before they upload.</p>
+            </div>
+            <div class="field"><label for="as-title">Title</label><input id="as-title" type="text" required value="${escapeHtml(d.title)}" onchange="setStoryField('title', this.value)"></div>
+            <div class="field"><label for="as-kind">Shows under</label><select id="as-kind" onchange="setStoryField('kind', this.value)"><option value="">News and events</option><option value="guide"${d.kind === 'guide' ? ' selected' : ''}>Guides</option></select></div>
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div class="field"><label for="as-category">Category</label><input id="as-category" type="text" required list="as-categories" value="${escapeHtml(d.category)}" onchange="setStoryField('category', this.value)">
+                    <datalist id="as-categories">${categories.map(c => `<option value="${escapeHtml(c)}"></option>`).join('')}</datalist></div>
+                <div class="field"><label for="as-date">Date</label><input id="as-date" type="date" required value="${escapeHtml(d.date)}" onchange="setStoryField('date', this.value)"></div>
+            </div>
+            <div class="field"><label for="as-excerpt">Short summary</label><textarea id="as-excerpt" rows="2" required onchange="setStoryField('excerpt', this.value)">${escapeHtml(d.excerpt)}</textarea>
+                <p class="text-xs text-mute mt-1">One or two sentences, shown under the title on the Stories and Guides page.</p></div>
+            <div class="field"><label for="as-text">Story (a blank line between paragraphs)</label><textarea id="as-text" rows="10" required onchange="setStoryText(this.value)">${escapeHtml(d.content.join('\n\n'))}</textarea></div>
+
+            <div class="admin-story-photo">
+                <div class="admin-story-img">${d.image ? `<img src="${escapeHtml(d.image)}" alt="">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
+                <div class="grid gap-2 min-w-0">
+                    <div class="admin-banner-bar">
+                        <span class="text-sm font-semibold text-ink">Main photo</span>
+                        <span class="admin-photo-actions">
+                            <label for="as-photo" class="link text-xs">${photoBusy === 'story:image' ? 'Uploading…' : d.image ? 'Replace photo' : 'Add photo'}</label>
+                            <input id="as-photo" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseStoryPhoto(this)">
+                        </span>
+                    </div>
+                    <div class="field"><label for="as-alt">What the photo shows</label><input id="as-alt" type="text" required value="${escapeHtml(d.imageAlt || '')}" onchange="setStoryField('imageAlt', this.value)"></div>
+                </div>
+            </div>
+
+            <div class="grid gap-3">
+                <div class="admin-banner-bar">
+                    <span class="text-sm font-semibold text-ink">More photos</span>
+                    <span class="admin-photo-actions">
+                        <label for="as-gallery" class="link text-xs">${photoBusy === 'story:gallery' ? 'Uploading…' : 'Add photos'}</label>
+                        <input id="as-gallery" type="file" multiple accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="addStoryPhotos(this)">
+                    </span>
+                </div>
+                ${(d.gallery || []).map((g, i) => `<div class="admin-story-photo">
+                    <div class="admin-story-img"><img src="${escapeHtml(g.src)}" alt="" loading="lazy"></div>
+                    <div class="grid gap-2 min-w-0">
+                        <div class="field"><label for="as-g-${i}">What photo ${i + 1} shows</label><input id="as-g-${i}" type="text" value="${escapeHtml(g.alt || '')}" onchange="setStoryPhotoAlt(${i}, this.value)"></div>
+                        <span class="admin-photo-actions">
+                            <button type="button" onclick="moveStoryPhoto(${i}, -1)" class="link text-xs"${i === 0 ? ' disabled' : ''}>Move up</button>
+                            <button type="button" onclick="moveStoryPhoto(${i}, 1)" class="link text-xs"${i === d.gallery.length - 1 ? ' disabled' : ''}>Move down</button>
+                            <button type="button" onclick="removeStoryPhoto(${i})" class="link text-xs">Remove</button>
+                        </span>
+                    </div>
+                </div>`).join('')}
+            </div>
+
+            <div class="flex flex-wrap gap-4 items-center">
+                <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm"${photoBusy ? ' disabled' : ''}>Save story</button>
+                <button type="button" onclick="cancelStory()" class="link text-sm">Cancel</button>
+            </div>
+        </form>`;
+}
+
+function addStory() {
+    storyDraft = { slug: null, kind: '', title: '', category: '', date: new Date().toLocaleDateString('en-CA'), excerpt: '', content: [], image: '', imageAlt: '', isPhoto: true, gallery: [] };
+    renderApp();
+}
+
+function editStory(slug) {
+    const post = BLOGS_DATA.find(p => p.slug === slug);
+    if (!post) return;
+    storyDraft = { gallery: [], ...clone(post) };
+    renderApp();
+}
+
+function cancelStory() {
+    storyDraft = null;
+    renderApp();
+}
+
+function setStoryField(key, value) {
+    storyDraft[key] = value.trim();
+}
+
+function setStoryText(value) {
+    storyDraft.content = value.split(/\n\s*\n/).map(t => t.trim()).filter(Boolean);
+}
+
+function setStoryPhotoAlt(i, value) {
+    storyDraft.gallery[i].alt = value.trim();
+}
+
+// The photos go on the story they were chosen for, even if another story is opened during the upload
+async function chooseStoryPhoto(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const draft = storyDraft;
+    photoBusy = 'story:image';
+    renderApp();
+    try {
+        draft.image = await uploadSitePhoto(file, 'stories', { jpeg: true });
+        draft.isPhoto = true; // a real photo fills its frame; the shipped guides show a cut-out cart
+        showToast('Photo uploaded. Save the story to put it on the site.');
+    } catch (err) {
+        showToast(`Not uploaded: ${err.message}.`);
+    }
+    photoBusy = '';
+    renderApp();
+}
+
+async function addStoryPhotos(input) {
+    const files = [...(input.files || [])];
+    if (!files.length) return;
+    const draft = storyDraft;
+    photoBusy = 'story:gallery';
+    renderApp();
+    let failed = 0;
+    for (const file of files) {
+        try {
+            const src = await uploadSitePhoto(file, 'stories', { jpeg: true });
+            draft.gallery.push({ src, alt: '' });
+            delete draft.galleryGrid;
+        } catch (err) {
+            failed++;
+            console.warn('Photo not uploaded:', err);
+        }
+        renderApp();
+    }
+    photoBusy = '';
+    showToast(failed ? `${failed} of ${files.length} photos didn't upload. Please try those again.` : 'Photos uploaded. Save the story to put them on the site.');
+    renderApp();
+}
+
+function moveStoryPhoto(i, by) {
+    const list = storyDraft.gallery;
+    list.splice(i + by, 0, list.splice(i, 1)[0]);
+    delete storyDraft.galleryGrid;
+    renderApp();
+}
+
+function removeStoryPhoto(i) {
+    storyDraft.gallery.splice(i, 1);
+    delete storyDraft.galleryGrid;
+    renderApp();
+}
+
+// A story's address comes from its first title and stays the same, so links to it keep working
+function newStorySlug(title) {
+    const base = title.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70).replace(/-+$/, '') || 'story';
+    const taken = new Set([...ADMIN_ORIGINALS.blogs, ...BLOGS_DATA].map(p => p.slug));
+    let slug = base;
+    for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
+    return slug;
+}
+
+async function saveStory(e) {
+    e.preventDefault();
+    const d = storyDraft;
+    const missing = [[d.title, 'a title'], [d.category, 'a category'], [d.date, 'a date'], [d.excerpt, 'a short summary'], [d.content.length, 'the story text'], [d.image, 'a main photo'], [d.imageAlt || !d.isPhoto, 'a description of the main photo']].find(([value]) => !value);
+    if (missing) { showToast(`The story needs ${missing[1]}.`); return; }
+    const slug = d.slug || newStorySlug(d.title);
+    const { slug: _slug, ...value } = clone(d);
+    if (await saveSiteEdit(`story:${slug}`, value, 'Story saved. It is on the site now.')) {
+        storyDraft = null;
+        renderApp();
+    }
+}
+
+function removeStory(slug) {
+    const post = BLOGS_DATA.find(p => p.slug === slug);
+    if (!post) return;
+    if (isShippedStory(slug)) {
+        if (confirm(`Remove "${post.title}" from the site? You can put it back later.`)) saveSiteEdit(`story:${slug}`, { removed: true }, 'Story removed from the site.');
+    } else if (confirm(`Delete "${post.title}"? This can't be undone.`)) {
+        saveSiteEdit(`story:${slug}`, null, 'Story deleted.');
+    }
+}
+
+function undoStory(slug) {
+    const edit = (siteEdits[`story:${slug}`] || {}).value;
+    if (edit && !edit.removed && !confirm('Undo your edits and go back to the original of this story?')) return;
+    saveSiteEdit(`story:${slug}`, null, 'The original story is back.');
 }
 
 function renderAdminContent() {
@@ -2529,6 +2777,7 @@ function formatActivityTime(iso) {
 }
 
 function activityArea(e) {
+    if (e.area === 'site_edits' && e.item.startsWith('story:')) return 'Stories';
     if (e.area === 'site_edits') return e.item.startsWith('product:') || e.item.startsWith('accessory:') ? 'Products' : 'Homepage';
     return { quotes: 'Quote requests', quotations: 'Quotations', bundles: 'Bundles', sku_usd: 'USD list', pricing_settings: 'Pricing', staff: 'Staff' }[e.area] || e.area;
 }
@@ -2547,6 +2796,12 @@ function activitySentence(e) {
     }
     if (e.area === 'site_edits') {
         const [kind, id] = e.item.split(':');
+        if (kind === 'story') {
+            const title = (((e.changes || {}).title || {}).to) || ((BLOGS_DATA.find(p => p.slug === id) || {}).title) || id;
+            if (del) return `Deleted story or undid its edits: ${title}`;
+            if ((e.changes || {}).removed) return `Removed story: ${title}`;
+            return `${add && !isShippedStory(id) ? 'Added' : 'Edited'} story: ${title}`;
+        }
         const product = kind === 'product' && PRODUCTS_DATA.find(p => p.slug === id);
         const accessory = kind === 'accessory' && ACCESSORY_CATALOG.flatMap(g => g.items).find(i => i.id === id);
         const name = kind === 'product' ? (product ? product.name : id) : kind === 'accessory' ? `${accessory ? accessory.name : id} photo`

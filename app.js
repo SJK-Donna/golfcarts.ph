@@ -1626,9 +1626,115 @@ const TESTIMONIALS_DATA = [
 // Blog Articles Data
 const BLOGS_DATA = [
     {
+        slug: 'club-car-asia-awards-2024',
+        title: 'Two 2024 Club Car Asia Awards for SJK Guahan',
+        category: 'Company News',
+        date: '2026-11-07',
+        image: 'image/Stories/club-car-asia-best-marketing-2024.jpg',
+        imageAlt: 'The SJK Guahan team on stage under the 2024 Club Car Asia Best Marketing Award screen, holding the trophy.',
+        isPhoto: true,
+        excerpt: 'SJK Guahan, doing business as Golf Cart PH, received the Best Marketing Award and an Excellent Performance Award from Club Car Asia.',
+        content: [
+            'SJK Guahan Inc, doing business as Golf Cart PH, was recognized twice at the 2024 Club Car Asia awards.',
+            'The company received the 2024 Club Car Asia Best Marketing Award. It also received the 2024 Club Car Asia Excellent Performance Award for UV, shared with E-Plus Co Ltd and Trans-Pacific Links Japan Co., Ltd.',
+            'These sit alongside two earlier recognitions from Club Car: the 2022 Breakthrough Award and the 2023 Black & Gold Partner plaque.'
+        ],
+        galleryGrid: 'sm:grid-cols-[3fr_2fr]',
+        gallery: [
+            { src: 'image/Stories/club-car-asia-excellent-performance-2024.jpg', alt: 'Representatives of E-Plus, SJK Guahan and Trans-Pacific Links Japan on stage with their 2024 Club Car Asia Excellent Performance Award trophies.' },
+            { src: 'image/Stories/sjk-guahan-club-car-awards.jpg', alt: 'SJK Guahan\'s four Club Car awards on a wooden table: Best Marketing, Excellent Performance, the 2022 Breakthrough Award and the 2023 Black and Gold Partner plaque.' }
+        ]
+    },
+    {
+        slug: 'philippine-hospitality-summit-2026',
+        title: 'Golfcarts.ph at the 9th Philippine Hospitality Summit',
+        category: 'Events',
+        date: '2026-02-12',
+        image: 'image/Stories/hospitality-summit-2026-stand.jpg',
+        imageAlt: 'The Golfcarts.ph stand at the summit: a cream Club Car Villager on a blue carpet with Club Car flags, brochures and a putting mat.',
+        isPhoto: true,
+        excerpt: 'We joined the summit at City of Dreams Manila as an exhibitor sponsor, with a Club Car Villager and a putting challenge at our stand.',
+        content: [
+            'Golfcarts.ph was an exhibitor sponsor at the 9th Philippine Hospitality Summit, held on February 11 and 12, 2026 at City of Dreams Manila. The theme was Hospitality Forward: Embracing Innovation, AI, and Sustainability in a Competitive Era.',
+            'Our stand featured a Club Car Villager, with brochures and our team on hand to talk with visitors.',
+            'Visitors could also try our One Putt Challenge: register, take one putt, and sink it to win a prize.'
+        ],
+        gallery: [
+            { src: 'image/Stories/hospitality-summit-2026-putting.jpg', alt: 'A visitor takes a putt on the mat beside the Villager while others watch.' },
+            { src: 'image/Stories/hospitality-summit-2026-welcome.jpg', alt: 'A handshake beside the Villager at the Golfcarts.ph and Club Car stand.' },
+            { src: 'image/Stories/hospitality-summit-2026-cart-front.jpg', alt: 'The front of the Club Car Villager with the Golfcarts.ph name on its cowl.' },
+            { src: 'image/Stories/hospitality-summit-2026-session.jpg', alt: 'A speaker presents on stage to a seated audience at the summit.' },
+            { src: 'image/Stories/hospitality-summit-2026-entrance.jpg', alt: 'The Grand Ballroom entrance with the 9th Philippine Hospitality Summit banner and sponsor boards.' }
+        ]
+    },
+    {
+        slug: 'club-car-service-training-2026',
+        title: 'Club Car Service Training for Our Team',
+        category: 'Company News',
+        date: '2026-05-20',
+        image: 'image/Stories/service-training-2026-team.jpg',
+        imageAlt: 'The Golfcarts.ph service team in uniform, standing with a blue and a white Club Car cart between two Club Car flags.',
+        isPhoto: true,
+        excerpt: 'Our service team spent the day on new products, battery diagnostics and hands-on work around the carts.',
+        content: [
+            'Our service team sat down for a Club Car service training on May 20, 2026.',
+            'The agenda covered new products and service guidance, including wiring diagrams, battery diagnostic tools, common faults and the warranty process.',
+            'The team then gathered around the carts for hands-on work, looking closely at the battery compartment and going over a new cart together.'
+        ],
+        gallery: [
+            { src: 'image/Stories/service-training-2026-class.jpg', alt: 'The service team, seen from behind in yellow Service shirts, listening to a trainer beside a screen showing the training agenda.' },
+            { src: 'image/Stories/service-training-2026-battery.jpg', alt: 'The trainer points out parts in the open battery compartment of a cart.' },
+            { src: 'image/Stories/service-training-2026-wiring.jpg', alt: 'The trainer looks over the battery wiring of a cart, with the team gathered close.' },
+            { src: 'image/Stories/service-training-2026-cart.jpg', alt: 'The team gathered around a new blue Club Car cart in the workshop.' },
+            { src: 'image/Stories/service-training-2026-group.jpg', alt: 'Six people from the training together in front of the SJK Guahan sign.' }
+        ]
+    },
+    {
+        slug: 'philippine-golfcon-2026',
+        title: 'Golfcarts.ph at Philippine GolfCon 2026',
+        category: 'Events',
+        date: '2026-03-14',
+        image: 'image/Stories/golfcon-2026-stand.jpg',
+        imageAlt: 'The Golfcarts.ph and Club Car stand at GolfCon 2026, with colored cart bodies, wheels and tires, seats and a branded counter.',
+        isPhoto: true,
+        excerpt: 'We brought Club Car carts and custom options to the golf convention at the Manila Marriott Hotel.',
+        content: [
+            'Golfcarts.ph exhibited at Philippine GolfCon 2026, which opened on March 14 at the Manila Marriott Hotel.',
+            'Our stand showed Club Car golf carts alongside custom options: colored body panels, wheels and tires, and seats.',
+            'Visitors could talk with our team and sign up with a QR code at the counter.'
+        ],
+        gallery: [
+            { src: 'image/Stories/golfcon-2026-sign.jpg', alt: 'Large lit letters spelling GolfCon 2026 in the hotel hallway.' },
+            { src: 'image/Stories/golfcon-2026-carts.jpg', alt: 'A blue-gray Club Car cart with tan seats beside a white lifted cart at the stand.' },
+            { src: 'image/Stories/golfcon-2026-cart.jpg', alt: 'A blue-gray Club Car cart with black wheels on green turf at the stand.' },
+            { src: 'image/Stories/golfcon-2026-team.jpg', alt: 'Four members of the team behind the Golfcarts.ph counter with its QR sign-up card.' }
+        ]
+    },
+    {
+        slug: 'ateneo-arthaland-minibus',
+        title: 'Two Club Car Minibuses for Ateneo, a Donation from Arthaland',
+        category: 'Company News',
+        date: '2026-02-06',
+        image: 'image/Stories/ateneo-minibus-pair.jpg',
+        imageAlt: 'Two blue and white Club Car Minibuses with Ateneo and Arthaland on their windshields.',
+        isPhoto: true,
+        excerpt: 'Two blue and white Club Car Minibuses carry the Ateneo and Arthaland names, marked as a donation from Arthaland.',
+        content: [
+            'Two Club Car Minibuses in blue and white carry the Ateneo and Arthaland names on their windshields. Along the side, each is marked as a donation from Arthaland.',
+            'The open-sided Minibus seats its passengers in rows, and it is part of the Club Car range we offer.'
+        ],
+        gallery: [
+            { src: 'image/Stories/ateneo-minibus-road.jpg', alt: 'A blue and white Minibus with passengers on board, driving past parked cars under the trees.' },
+            { src: 'image/Stories/ateneo-minibus-side.jpg', alt: 'A close view of a Minibus wheel and the Club Car Minibus badge on its side.' },
+            { src: 'image/Stories/ateneo-minibus-parked.jpg', alt: 'The two Minibuses parked side by side under a covered stop.' },
+            { src: 'image/Stories/ateneo-minibus-team.jpg', alt: 'Five people standing together in front of the two Minibuses.' }
+        ]
+    },
+    {
         slug: 'choosing-the-right-golf-cart',
         title: 'How to Choose the Right Golf Cart for Your Needs',
         category: 'Buying Guide',
+        kind: 'guide',
         date: '2026-09-15',
         image: 'image/Products/Tempo 2+2 - Family - Sangria Red.png',
         excerpt: 'Personal, resort, commercial or golf course use? Here is what to consider before you pick a model.',
@@ -1642,6 +1748,7 @@ const BLOGS_DATA = [
         slug: 'electric-cart-battery-care',
         title: 'Battery Care Tips to Keep Your Electric Cart Running Longer',
         category: 'Maintenance',
+        kind: 'guide',
         date: '2026-08-28',
         image: 'image/Products/Villager 6.png',
         excerpt: 'Simple charging and storage habits that protect your battery and keep your fleet on the road.',
@@ -1655,6 +1762,7 @@ const BLOGS_DATA = [
         slug: 'resort-guest-mobility',
         title: 'Elevating the Guest Experience with Resort Shuttles',
         category: 'Resort',
+        kind: 'guide',
         date: '2026-08-10',
         image: 'image/Products/Villager 8.png',
         excerpt: 'Quiet, eco-friendly shuttles help resorts move guests comfortably between villas, pools and restaurants.',
@@ -1665,6 +1773,12 @@ const BLOGS_DATA = [
         ]
     }
 ];
+
+// Stories and Guides are edited in the admin (site_edits rows "story:<slug>", applied by account.js applyAdminEdits),
+// so what staff typed is escaped where it's drawn
+function newestBlogs() {
+    return [...BLOGS_DATA].sort((a, b) => new Date(b.date) - new Date(a.date));
+}
 
 function formatBlogDate(dateStr) {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -2607,10 +2721,75 @@ function renderHomeRange() {
 // height in the photo. Positions are percentages of the 3.33 : 1 background, which runs the full page width; the
 // carts stand right of its title, side by side without covering each other.
 const HOME_PROMO = [
-    { name: 'Golfer 4', seats: '4 seats in two forward rows', image: 'image/Promo/cutouts/red-series-tempo-4.png', slug: 'golfer-tempo-4', left: 28.5, width: 28.5, height: 70 },
-    { name: 'Golfer 2+2', seats: '2 forward and 2 rear seats', image: 'image/Promo/cutouts/red-series-tempo-2-2.png', slug: 'golfer-tempo-2-2', left: 58, width: 20.7, height: 66.2 },
-    { name: 'Golfer 2', seats: '2 seats', image: 'image/Promo/cutouts/red-series-tempo-2.png', slug: 'golfer-tempo-2', left: 79.5, width: 19.6, height: 66.1 }
+    { name: 'Golfer 4', seats: '4 seats in two forward rows', image: 'image/Promo/cutouts/red-series-tempo-4.png', slug: 'golfer-tempo-4', left: 28.5, width: 28.5, height: 70, seat: 'Beige', canopy: '88" Canopy Black' },
+    { name: 'Golfer 2+2', seats: '2 forward and 2 rear seats', image: 'image/Promo/cutouts/red-series-tempo-2-2.png', slug: 'golfer-tempo-2-2', left: 58, width: 20.7, height: 66.2, seat: 'Beige', canopy: '2+2 Canopy Black' },
+    { name: 'Golfer 2', seats: '2 seats', image: 'image/Promo/cutouts/red-series-tempo-2.png', slug: 'golfer-tempo-2', left: 79.5, width: 19.6, height: 66.1, seat: 'White', canopy: '2 Pass Canopy White' }
 ];
+
+// A Red Series cart is one fixed cart, nothing to choose (the user's choice, 2026-11-07): the Scratch build in Sangria,
+// with the seats and canopy in its photo and the build's standard equipment. Its quote carries all of that, so the
+// admin prices it from the Scratch bundle like any other build.
+const RED_SERIES_LEVEL = 1; // Scratch
+const RED_SERIES_BODY = 'Sangria';
+
+function redSeriesDetails(cart) {
+    const product = PRODUCTS_DATA.find(p => p.slug === cart.slug);
+    const level = getProductBuildSet(product).builds[RED_SERIES_LEVEL];
+    const equipment = [['Body color', RED_SERIES_BODY], ['Seat', cart.seat], ['Canopy', cart.canopy],
+        ...tempoOptionRows(product, RED_SERIES_LEVEL, defaultTempoOptions(product, RED_SERIES_LEVEL))];
+    return { equipment, build: { slug: product.slug, lifted: false,
+        rows: [['Model', `${product.layout} Seater Club Car`], ['Build', level.name], ...equipment],
+        covered: getTempoOptionGroups(product, RED_SERIES_LEVEL).flatMap(g => [g.id, ...(g.covers || [])]) } };
+}
+
+function openRedSeries(index) {
+    const cart = HOME_PROMO[index];
+    let modal = document.getElementById('red-series-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'red-series-modal';
+        modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-5 sm:p-6 flex';
+        modal.onclick = e => { if (e.target === modal) closeRedSeries(); };
+        modal.onkeydown = e => { if (e.key === 'Escape') closeRedSeries(); };
+        document.body.appendChild(modal);
+    }
+    modal.returnFocus = document.activeElement;
+    modal.innerHTML = `
+        <div role="dialog" aria-modal="true" aria-labelledby="red-series-title" class="red-series-card m-auto w-full max-w-xl bg-paper border border-line">
+            <div class="red-series-scroll">
+                <div class="red-series-photo"><img src="${cart.image}" alt="${attrText(cart.name)} in the Red Series"></div>
+                <div class="px-5 sm:px-6 pt-5">
+                    <h2 id="red-series-title" class="type-md text-ink">${cart.name} · Red Series</h2>
+                    <p class="text-sm text-mute mt-1">${cart.seats}</p>
+                    <dl class="red-series-list">${redSeriesDetails(cart).equipment.map(([label, value]) => `<div><dt>${attrText(label)}</dt><dd>${attrText(value)}</dd></div>`).join('')}</dl>
+                </div>
+            </div>
+            <div class="red-series-actions">
+                <button type="button" onclick="quoteRedSeries(${index})" class="btn btn-primary flex-1">Get a quote</button>
+                <button type="button" onclick="closeRedSeries()" class="btn btn-outline">Close</button>
+            </div>
+        </div>`;
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    modal.querySelector('.btn-primary').focus();
+}
+
+function closeRedSeries() {
+    const modal = document.getElementById('red-series-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+    if (modal.returnFocus && document.contains(modal.returnFocus)) modal.returnFocus.focus();
+}
+
+// The quote form opens on this cart: its model chosen and its whole spec as the request's rows
+function quoteRedSeries(index) {
+    const cart = HOME_PROMO[index];
+    closeRedSeries();
+    openQuoteModal(cart.slug, `${cart.name} Red Series`);
+    quoteBuild = redSeriesDetails(cart).build;
+    renderQuoteSummary();
+}
 
 // Festive effects behind the carts: snowflakes and holly leaves drifting down, and sparkles twinkling. Spread by a
 // fixed pattern (not random) so the pre-rendered page and the live page match.
@@ -2650,17 +2829,17 @@ function renderHomePromo() {
                 <button type="button" class="promo-arrow promo-back" onclick="togglePromoCover(false)" aria-label="Back to the Red Series banner" hidden>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
                 </button>
-                <button type="button" class="promo-arrow promo-quote" onclick="openQuoteModal('', 'Interested in the Red Series.')" hidden>Get a quote</button>
+                <p class="promo-hint" hidden>Choose a cart to see it and get a quote</p>
                 <ul class="lineup lineup-promo" aria-label="Red Series carts" inert>
                     ${HOME_PROMO.map((c, i) => `
                         <li class="lineup-item" style="--left:${c.left}%; --width:${c.width}%; --height:${c.height}%; z-index:${i + 1}">
-                            <a href="${routeHref('product-details', c.slug)}" data-route="product-details" data-slug="${c.slug}" class="lineup-cart">
+                            <button type="button" onclick="openRedSeries(${i})" class="lineup-cart">
                                 <img src="${c.image}" alt="" loading="lazy" decoding="async">
                                 <span class="lineup-label">
                                     <span class="lineup-name">${c.name}</span>
                                     <span class="lineup-seats">${c.seats}</span>
                                 </span>
-                            </a>
+                            </button>
                         </li>
                     `).join('')}
                 </ul>
@@ -2678,7 +2857,7 @@ function togglePromoCover(open) {
     stage.querySelector('.promo-cover').inert = open;
     stage.querySelector('.lineup-promo').inert = !open;
     back.hidden = !open;
-    stage.querySelector('.promo-quote').hidden = !open;
+    stage.querySelector('.promo-hint').hidden = !open;
     (open ? back : stage.querySelector('.promo-open')).focus();
 }
 
@@ -4526,8 +4705,10 @@ function describeTempoChoice(product, i, group, o) {
 
 // Every Tempo equipment choice as quote rows ("Ball washer: 2", "Lift kit: Lifted 3.5" GC lift kit (...)")
 function getTempoOptionRows(product) {
-    const i = detailLevelIndex(product);
-    const o = detailBuild.options || {};
+    return tempoOptionRows(product, detailLevelIndex(product), detailBuild.options || {});
+}
+
+function tempoOptionRows(product, i, o) {
     const groups = getTempoOptionGroups(product, i);
     // A chosen upgrade is the item: "Battery: Battlite lithium battery", not the lead-acid one and the upgrade both
     const chosen = Object.fromEntries(groups.filter(g => g.replaces).map(g => [g.replaces, describeTempoChoice(product, i, g, o)]).filter(([, v]) => v));
@@ -5021,7 +5202,7 @@ function showOptionPhoto(button) {
     modal.returnFocus = button;
     const name = button.dataset.name;
     modal.innerHTML = `
-        <div role="dialog" aria-modal="true" aria-labelledby="option-photo-title" class="w-full max-w-lg bg-paper border border-line">
+        <div role="dialog" aria-modal="true" aria-labelledby="option-photo-title" class="w-full ${button.dataset.wide ? 'max-w-5xl story-photo-modal' : 'max-w-lg'} bg-paper border border-line">
             <div class="opt-photo-frame"><img src="${attrText(button.dataset.photo)}" alt="${attrText(name)}"></div>
             <div class="p-5 flex items-center justify-between gap-4">
                 <h2 id="option-photo-title" class="text-ink font-medium">${attrText(name)}</h2>
@@ -6038,8 +6219,31 @@ function renderServicePage() {
     `;
 }
 
+// A story's photo or cut-out cart, in its frame
+function blogMedia(post, frame) {
+    return post.isPhoto
+        ? `<div class="media-zoom bg-stone overflow-hidden ${frame}"><img src="${attrText(post.image)}" alt="" loading="lazy" decoding="async" class="w-full h-full object-cover"></div>`
+        : `<div class="media-zoom edge-light bg-stone flex items-center justify-center p-6 ${frame}"><img src="${attrText(post.image)}" alt="" loading="lazy" decoding="async" class="max-h-full w-auto object-contain mix-blend-multiply"></div>`;
+}
+
+function blogReadTime(post) {
+    const words = post.content.join(' ').split(/\s+/).length;
+    return `${Math.max(1, Math.round(words / 200))} min read`;
+}
+
+function blogMeta(post, withDate = true) {
+    const date = withDate ? ` · <time datetime="${attrText(post.date)}">${formatBlogDate(post.date)}</time>` : '';
+    return `${attrText(post.category)}${date} · ${blogReadTime(post)}`;
+}
+
+let guideActive = 0; // the guide open in the Guides section
+
 function renderBlogsPage() {
-    const posts = [...BLOGS_DATA].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const posts = newestBlogs();
+    const [lead, ...rest] = posts.filter(p => p.kind !== 'guide');
+    const guides = posts.filter(p => p.kind === 'guide');
+    guideActive = Math.min(guideActive, Math.max(guides.length - 1, 0));
+    const postLink = (post, cls, inner) => `<a href="${routeHref('blog-details', post.slug)}" data-route="blog-details" data-slug="${attrText(post.slug)}" class="group ${cls}">${inner}</a>`;
     return `
         <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-16 lg:pt-24">
             <p class="text-sm text-mute">Stories and Guides</p>
@@ -6047,45 +6251,139 @@ function renderBlogsPage() {
                 <h1 class="type-xl text-ink lg:col-span-7">Notes from the fairway.</h1>
                 <p class="measure lg:col-span-5">Buying guides, maintenance tips and stories about low-speed electric vehicles.</p>
             </div>
+            ${lead && guides.length ? `<nav class="story-jump" aria-label="On this page">
+                <a href="blog/#stories-news">News and events</a>
+                <a href="blog/#guides">Guides</a>
+            </nav>` : ''}
         </section>
 
-        <section class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12">
-            <ul class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
-                ${posts.map(post => `
-                    <li>
-                        <a href="${routeHref('blog-details', post.slug)}" data-route="blog-details" data-slug="${post.slug}" class="group block">
-                            <div class="media-zoom edge-light bg-stone aspect-[4/3] flex items-center justify-center p-6">
-                                <img src="${post.image}" alt="" loading="lazy" decoding="async" class="max-h-full w-auto object-contain mix-blend-multiply">
-                            </div>
-                            <p class="text-sm text-mute mt-5">${post.category} · <time datetime="${post.date}">${formatBlogDate(post.date)}</time></p>
-                            <h2 class="type-md text-ink mt-2 group-hover:underline decoration-1 underline-offset-4">${post.title}</h2>
-                            <p class="mt-3 measure">${post.excerpt}</p>
-                        </a>
-                    </li>
-                `).join('')}
-            </ul>
-        </section>
+        ${lead ? `
+            <section id="stories-news" class="rise home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12" aria-labelledby="stories-news-title">
+                <h2 id="stories-news-title" class="type-lg text-ink mb-10">News and events.</h2>
+                ${postLink(lead, 'story-feature', `
+                    ${blogMedia(lead, 'aspect-[3/2]')}
+                    <div>
+                        <p class="text-sm text-mute">${blogMeta(lead)}</p>
+                        <h3 class="type-lg text-ink mt-3 group-hover:underline decoration-1 underline-offset-4 [overflow-wrap:anywhere]">${attrText(lead.title)}</h3>
+                        <p class="mt-4 measure">${attrText(lead.excerpt)}</p>
+                        <p class="story-more mt-6">Read the story <span class="story-arrow" aria-hidden="true">→</span></p>
+                    </div>
+                `)}
+                ${rest.length ? `<ul class="story-rows">${rest.map(post => `<li>${postLink(post, 'story-row', `
+                    ${blogMedia(post, 'aspect-[4/3]')}
+                    <div>
+                        <p class="text-sm text-mute">${blogMeta(post)}</p>
+                        <h3 class="type-md text-ink mt-2 group-hover:underline decoration-1 underline-offset-4 [overflow-wrap:anywhere]">${attrText(post.title)}</h3>
+                        <p class="mt-3">${attrText(post.excerpt)}</p>
+                        <p class="story-more mt-4">Read the story <span class="story-arrow" aria-hidden="true">→</span></p>
+                    </div>
+                `)}</li>`).join('')}</ul>` : ''}
+            </section>
+        ` : ''}
+
+        ${guides.length ? `
+            <section id="guides" class="rise guide-band" aria-labelledby="guides-title">
+                <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
+                    <h2 id="guides-title" class="type-lg text-ink">Guides.</h2>
+                    <p class="measure mt-3">Pick a topic to preview it, then read the whole guide.</p>
+                    <div class="guide-explorer">
+                        <div role="tablist" aria-orientation="vertical" aria-labelledby="guides-title" class="guide-tabs" onkeydown="guideKeys(event)">
+                            ${guides.map((g, i) => `
+                                <button type="button" role="tab" id="guide-tab-${i}" aria-controls="guide-panel-${i}" aria-selected="${i === guideActive}" tabindex="${i === guideActive ? 0 : -1}" class="guide-tab" onclick="selectGuide(${i})" onmouseenter="hoverGuide(${i})" onmouseleave="clearTimeout(guideHoverTimer)">
+                                    <span class="guide-num" aria-hidden="true">${String(i + 1).padStart(2, '0')}</span>
+                                    <span class="min-w-0">
+                                        <span class="block text-sm text-mute">${attrText(g.category)}</span>
+                                        <span class="block type-md text-ink mt-1 [overflow-wrap:anywhere]">${attrText(g.title)}</span>
+                                    </span>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div class="min-w-0">
+                            ${guides.map((g, i) => `
+                                <div role="tabpanel" id="guide-panel-${i}" aria-labelledby="guide-tab-${i}" class="guide-panel"${i === guideActive ? '' : ' hidden'}>
+                                    ${postLink(g, 'block', `
+                                        ${blogMedia(g, 'aspect-[16/9]')}
+                                        <div class="p-6 lg:p-8">
+                                            <p class="text-sm text-mute">${blogReadTime(g)}</p>
+                                            <p class="mt-3 measure">${attrText(g.excerpt)}</p>
+                                            <p class="story-more mt-5">Read the guide <span class="story-arrow" aria-hidden="true">→</span></p>
+                                        </div>
+                                    `)}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </section>
+        ` : ''}
     `;
+}
+
+// Hovering waits a moment, so crossing the list on the way to the preview doesn't change the guide
+let guideHoverTimer;
+function hoverGuide(index) {
+    clearTimeout(guideHoverTimer);
+    guideHoverTimer = setTimeout(() => selectGuide(index), 150);
+}
+
+// Shows a guide's preview in place, without redrawing the page
+function selectGuide(index) {
+    clearTimeout(guideHoverTimer);
+    guideActive = index;
+    document.querySelectorAll('.guide-tab').forEach((tab, i) => {
+        tab.setAttribute('aria-selected', String(i === index));
+        tab.tabIndex = i === index ? 0 : -1;
+    });
+    document.querySelectorAll('.guide-panel').forEach((panel, i) => { panel.hidden = i !== index; });
+}
+
+function guideKeys(e) {
+    const tabs = [...document.querySelectorAll('.guide-tab')];
+    const moves = { ArrowDown: guideActive + 1, ArrowRight: guideActive + 1, ArrowUp: guideActive - 1, ArrowLeft: guideActive - 1, Home: 0, End: tabs.length - 1 };
+    if (!(e.key in moves)) return;
+    e.preventDefault();
+    const next = (moves[e.key] + tabs.length) % tabs.length;
+    selectGuide(next);
+    tabs[next].focus();
+}
+
+// A photo that opens larger when clicked
+function storyPhoto(src, alt, buttonClass, imgClass, attrs = 'loading="lazy" decoding="async"') {
+    return `<button type="button" class="story-photo ${buttonClass}" onclick="showOptionPhoto(this)" data-wide="1" data-photo="${attrText(src)}" data-name="${attrText(alt || 'Photo')}" aria-label="See this photo larger"><img src="${attrText(src)}" alt="${attrText(alt || '')}" ${attrs} class="${imgClass}"></button>`;
 }
 
 function renderBlogDetailsPage() {
     const post = BLOGS_DATA.find(p => p.slug === currentSlug);
     if (!post) return renderBlogsPage();
-    const more = BLOGS_DATA.filter(p => p.slug !== post.slug).slice(0, 2);
+    const others = newestBlogs().filter(p => p.slug !== post.slug);
+    const sameKind = p => (p.kind === 'guide') === (post.kind === 'guide');
+    const more = [...others.filter(sameKind), ...others.filter(p => !sameKind(p))].slice(0, 2);
 
     return `
+        <div class="story-progress" aria-hidden="true"></div>
         <article class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-12 lg:pt-20">
             <a href="${routeHref('blogs')}" data-route="blogs" class="text-sm text-ink-2 hover:text-ink">Stories and Guides</a>
             <header class="mt-8 max-w-4xl">
-                <p class="text-sm text-mute">${post.category} · <time datetime="${post.date}">${formatBlogDate(post.date)}</time></p>
-                <h1 class="type-xl text-ink mt-4">${post.title}</h1>
+                <p class="text-sm text-mute">${blogMeta(post)}</p>
+                <h1 class="type-xl text-ink mt-4 [overflow-wrap:anywhere]">${attrText(post.title)}</h1>
             </header>
-            <div class="mt-12 bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8">
-                <img src="${post.image}" alt="" fetchpriority="high" class="max-h-full w-auto object-contain mix-blend-multiply">
+            ${post.isPhoto ? storyPhoto(post.image, post.imageAlt, 'mt-12 max-w-5xl mx-auto', 'w-full max-h-[85vh] h-auto object-contain bg-stone', 'fetchpriority="high"') : `
+                <div class="mt-12 bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8">
+                    <img src="${attrText(post.image)}" alt="${attrText(post.imageAlt || '')}" fetchpriority="high" class="max-h-full w-auto object-contain mix-blend-multiply">
+                </div>
+            `}
+            <div class="story-body measure mx-auto mt-16 space-y-6 text-lg leading-[1.7]">
+                ${post.content.map(p => `<p>${attrText(p)}</p>`).join('')}
             </div>
-            <div class="measure mx-auto mt-16 space-y-6 text-lg leading-[1.7]">
-                ${post.content.map(p => `<p>${p}</p>`).join('')}
-            </div>
+            ${post.gallery && post.gallery.length ? `
+                <div class="grid ${attrText(post.galleryGrid || 'sm:grid-cols-2')} gap-4 max-w-5xl mx-auto mt-16">
+                    ${post.gallery.map((g, i) => {
+                        // Nothing is cropped, so words in a photo stay readable; an odd last photo takes the whole row
+                        const last = !post.galleryGrid && post.gallery.length % 2 && i === post.gallery.length - 1;
+                        return storyPhoto(g.src, g.alt, last ? 'sm:col-span-2' : '', `w-full bg-stone ${post.galleryGrid ? 'h-auto' : 'aspect-[4/3] object-contain'}`);
+                    }).join('')}
+                </div>
+            ` : ''}
             <div class="measure mx-auto mt-16 border-t border-line pt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <p class="type-md text-ink">Looking for the right cart?</p>
                 <button type="button" onclick="openQuoteModal()" class="btn btn-primary">Get a quote</button>
@@ -6095,12 +6393,15 @@ function renderBlogDetailsPage() {
         ${more.length ? `
             <section class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12">
                 <h2 class="type-lg text-ink mb-10">Keep reading.</h2>
-                <ul class="grid md:grid-cols-2 gap-x-8 gap-y-12 border-t border-line">
+                <ul class="story-rows story-rows-plain">
                     ${more.map(p => `
-                        <li class="pt-6">
-                            <a href="${routeHref('blog-details', p.slug)}" data-route="blog-details" data-slug="${p.slug}" class="group block">
-                                <p class="text-sm text-mute">${p.category}</p>
-                                <p class="type-md text-ink mt-2 group-hover:underline decoration-1 underline-offset-4">${p.title}</p>
+                        <li>
+                            <a href="${routeHref('blog-details', p.slug)}" data-route="blog-details" data-slug="${attrText(p.slug)}" class="group story-row">
+                                ${blogMedia(p, 'aspect-[4/3]')}
+                                <div>
+                                    <p class="text-sm text-mute">${attrText(p.category)}</p>
+                                    <p class="type-md text-ink mt-2 group-hover:underline decoration-1 underline-offset-4 [overflow-wrap:anywhere]">${attrText(p.title)}</p>
+                                </div>
                             </a>
                         </li>
                     `).join('')}
