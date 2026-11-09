@@ -2653,7 +2653,8 @@
     .golfer-rows dd { color: var(--ink); }
 
     /* ---- Admin (account.js) ---- */
-    .admin-table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+    /* position: relative keeps hidden screen-reader labels inside the scrolling box, so a wide table can't widen the page */
+    .admin-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); }
     .admin-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
     .admin-table th { text-align: left; font-weight: 600; color: var(--ink); background: var(--stone); padding: 0.75rem 1rem; white-space: nowrap; }
     .admin-table td { padding: 0.75rem 1rem; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
@@ -2722,6 +2723,20 @@
     .admin-banner-img img { width: 100%; height: 100%; object-fit: cover; }
     .admin-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
     .admin-banner-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Admin, Zoho leads: a filter row and a status per lead */
+    .zoho-filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
+    .zoho-filter button { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.8rem; border: 1px solid var(--line); border-radius: 999px; font-size: 0.8125rem; color: var(--ink-2); background: var(--paper); cursor: pointer; }
+    .zoho-filter button span { font-variant-numeric: tabular-nums; color: var(--mute); }
+    .zoho-filter button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+    .zoho-state { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+    .zoho-sent { background: #E6EEDA; color: #3F5A1A; }
+    .zoho-failed, .zoho-stuck { background: #F6E0DC; color: #8A2A1C; }
+    .zoho-pending { background: var(--stone); color: var(--ink-2); }
+    :root[data-theme="dark"] .zoho-sent { background: #24301A; color: #B9D58E; }
+    :root[data-theme="dark"] .zoho-failed, :root[data-theme="dark"] .zoho-stuck { background: #3A1E19; color: #F0A898; }
+    .zoho-detail { min-width: 14rem; max-width: 28rem; overflow-wrap: break-word; }
+    .zoho-name { min-width: 9rem; overflow-wrap: break-word; }
 
     /* Until the saved banners are known, the built-in ones stay hidden so they don't flash */
     .edits-pending .banner-slide img { visibility: hidden; }

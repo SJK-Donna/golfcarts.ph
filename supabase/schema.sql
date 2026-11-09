@@ -371,7 +371,7 @@ begin
     select decrypted_secret into secret from vault.decrypted_secrets where name = 'notify_secret' limit 1;
     select decrypted_secret into script_url from vault.decrypted_secrets where name = 'mail_script_url' limit 1;
     if secret is null or script_url is null then return; end if;
-    if event = 'quote_created' then
+    if event in ('quote_created', 'quote_zoho') then
         select to_jsonb(q) into rec from public.quotes q where q.id = ref_id;
     else
         select to_jsonb(q) into rec from public.quotations q where q.id = ref_id;
@@ -406,6 +406,13 @@ grant execute on function public.log_mail(text, text, text, bigint, text, text, 
 create or replace function public.quote_created_mail() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
+    -- Waits for the script to send it to Zoho CRM (zoho_leads below); never stops the request itself
+    begin
+        insert into public.zoho_leads (quote_id, reference, name, model) values (new.id, new.reference, new.name, new.model)
+        on conflict (quote_id) do nothing;
+    exception when others then
+        raise warning 'zoho lead not queued: %', sqlerrm;
+    end;
     perform public.notify_mail('quote_created', new.id);
     return new;
 end $$;
@@ -426,6 +433,60 @@ end $$;
 drop trigger if exists quotations_mail on public.quotations;
 create trigger quotations_mail after update on public.quotations
     for each row execute function public.quotation_status_mail();
+
+-- ---------- Zoho CRM Leads: each quote request becomes a Lead, sent by the same Apps Script ----------
+-- A row per request: waiting ('pending') when it arrives, then 'sent' with the Zoho lead's id, or 'failed' with Zoho's
+-- reason. The script reports through log_zoho with the shared secret. Marketing and super admins see the list and can
+-- send a failed one again (retry_zoho_lead), so they need no access to the requests themselves: the row keeps only
+-- the reference, name and cart.
+create table if not exists public.zoho_leads (
+    quote_id bigint primary key references public.quotes (id) on delete cascade,
+    reference text not null default '',
+    name text not null default '',
+    model text not null default '',
+    status text not null default 'pending' check (status in ('pending', 'sent', 'failed')),
+    zoho_id text not null default '',
+    error text not null default '',
+    attempts int not null default 0,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+create index if not exists zoho_leads_created_at on public.zoho_leads (created_at desc);
+
+-- Callable without a sign-in, so the secret is required
+create or replace function public.log_zoho(secret text, ref_id bigint, result text, lead_id text default '', error_text text default '')
+returns void language plpgsql security definer set search_path = public as $$
+begin
+    if secret is null or secret is distinct from (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret' limit 1) then
+        raise exception 'Not allowed';
+    end if;
+    if result not in ('sent', 'failed') then raise exception 'result must be sent or failed'; end if;
+    insert into public.zoho_leads (quote_id, reference, name, model, status, zoho_id, error, attempts)
+    select q.id, q.reference, q.name, q.model, result, left(coalesce(lead_id, ''), 60), left(coalesce(error_text, ''), 1000), 1
+    from public.quotes q where q.id = ref_id
+    on conflict (quote_id) do update set status = excluded.status, zoho_id = excluded.zoho_id, error = excluded.error,
+        attempts = public.zoho_leads.attempts + 1, updated_at = now();
+end $$;
+revoke execute on function public.log_zoho(text, bigint, text, text, text) from public;
+grant execute on function public.log_zoho(text, bigint, text, text, text) to anon, authenticated;
+
+-- Sends a lead again: one that failed, or one still waiting after 10 minutes (the script never answered)
+create or replace function public.retry_zoho_lead(ref_id bigint) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+    if coalesce(public.staff_role(), '') not in ('master', 'marketing') then raise exception 'Not allowed'; end if;
+    update public.zoho_leads set status = 'pending', error = '', updated_at = now()
+    where quote_id = ref_id and (status = 'failed' or (status = 'pending' and updated_at < now() - interval '10 minutes'));
+    if not found then raise exception 'Only a lead that failed can be sent again'; end if;
+    perform public.notify_mail('quote_zoho', ref_id);
+end $$;
+revoke execute on function public.retry_zoho_lead(bigint) from public, anon;
+grant execute on function public.retry_zoho_lead(bigint) to authenticated;
+
+alter table public.zoho_leads enable row level security;
+drop policy if exists zoho_leads_read on public.zoho_leads;
+create policy zoho_leads_read on public.zoho_leads for select to authenticated
+    using (public.staff_role() in ('master', 'marketing'));
 
 -- ---------- Activity log: who changed what, read by super admins in the admin's Activity log ----------
 -- Written here by triggers, not by the page, so a change can't skip it and nobody can edit it from the admin. Records

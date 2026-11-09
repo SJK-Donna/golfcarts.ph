@@ -556,7 +556,7 @@ const ADMIN_ROLES = {
     master: {
         label: 'Super admin',
         home: 'Everything across the business: the pipeline, what is waiting on approval, and the team.',
-        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.view', 'quotations.prepare', 'quotations.approve', 'pricing.edit', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'bundles.view', 'export.quotes', 'export.all', 'users.manage', 'log.view']
+        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.view', 'quotations.prepare', 'quotations.approve', 'pricing.edit', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'leads.zoho', 'bundles.view', 'export.quotes', 'export.all', 'users.manage', 'log.view']
     },
     // Owns the prices: the bundles, the rate, freight, margin and warranty, and approves or returns the quotations
     // sales managers submit. Reads the quote requests; doesn't prepare, change or send quotations
@@ -577,7 +577,7 @@ const ADMIN_ROLES = {
     marketing: {
         label: 'Marketing',
         home: 'The site as visitors see it: model photos, text and specs, accessory photos, the homepage carousel and event.',
-        can: ['products.edit', 'content.edit']
+        can: ['products.edit', 'content.edit', 'leads.zoho']
     }
 };
 
@@ -586,7 +586,7 @@ const ADMIN_PERMISSION_LABELS = [
     ['golfers.view', 'See golfers'], ['golfers.news', 'Copy news emails'], ['products.edit', 'Edit product photos, text and specs'],
     ['quotations.view', 'See quotations'], ['quotations.prepare', 'Prepare, submit and send quotations'], ['quotations.approve', 'Approve or return quotations'],
     ['pricing.edit', 'Set exchange rate, freight, margin and warranty'],
-    ['content.edit', 'Edit site content'], ['bundles.view', 'See and edit bundles'], ['export.quotes', 'Export quotes'], ['export.all', 'Export all data'], ['users.manage', 'Manage staff'], ['log.view', 'See the activity log']
+    ['content.edit', 'Edit site content'], ['bundles.view', 'See and edit bundles'], ['export.quotes', 'Export quotes'], ['export.all', 'Export all data'], ['users.manage', 'Manage staff'], ['log.view', 'See the activity log'], ['leads.zoho', 'See and resend Zoho CRM leads']
 ];
 
 let adminTab = 'home';
@@ -725,7 +725,7 @@ async function signOutAdmin() {
 // role's own start page
 const ADMIN_SECTIONS = [
     ['', [['home', 'Home']]],
-    ['Work', [['quotes', 'Quote requests', 'quotes.view'], ['quotations', 'Quotations', 'quotations.view'], ['golfers', 'Golfers', 'golfers.view']]],
+    ['Work', [['quotes', 'Quote requests', 'quotes.view'], ['quotations', 'Quotations', 'quotations.view'], ['golfers', 'Golfers', 'golfers.view'], ['zoho', 'Zoho leads', 'leads.zoho']]],
     ['Catalog', [['bundles', 'Bundles', 'bundles.view'], ['products', 'Products', 'products.edit'], ['content', 'Site content', 'content.edit'], ['stories', 'Stories and guides', 'content.edit']]],
     ['Team', [['users', 'Staff', 'users.manage'], ['activity', 'Activity log', 'log.view']]]
 ];
@@ -789,6 +789,7 @@ function adminHeading(data) {
         products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
         content: ['Site content', 'The homepage carousel and the event story.', ''],
         stories: ['Stories and guides', 'Add, edit or remove the stories on the Stories and Guides page.', ''],
+        zoho: ['Zoho leads', 'Each quote request from the website, and whether it reached Zoho CRM Leads. Newest first.', '<button type="button" onclick="reloadPageData()" class="adm-btn">Refresh</button>'],
         users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`],
         activity: ['Activity log', 'Who changed what and when, newest first. Only super admins see this, and nobody can edit it.', '<button type="button" onclick="reloadPageData()" class="adm-btn">Refresh</button>']
     };
@@ -819,7 +820,7 @@ function renderAdminPage() {
         // Bundles are read by everyone who prices quotations; tables not created yet (supabase/schema.sql not re-run)
         // come back as null, and the rest of the admin still loads
         const costs = can('bundles.view') || can('quotations.view');
-        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity] = await Promise.all([
+        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads] = await Promise.all([
             can('quotes.view') ? rows(sb.from('quotes').select('*').order('created_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('golfers').select('*').order('joined_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('saved_builds').select('golfer_id')) : Promise.resolve([]),
@@ -828,23 +829,25 @@ function renderAdminPage() {
             costs ? rows(sb.from('sku_usd').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
             can('quotations.view') ? rows(sb.from('quotations').select('*').order('created_at', { ascending: false })).catch(() => null) : Promise.resolve([]),
             can('quotations.view') ? rows(sb.from('pricing_settings').select('*').eq('id', 1).maybeSingle()).catch(() => null) : Promise.resolve(null),
-            can('log.view') ? rows(sb.from('activity_log').select('*').order('created_at', { ascending: false }).limit(ACTIVITY_LIMIT)).catch(() => null) : Promise.resolve([])
+            can('log.view') ? rows(sb.from('activity_log').select('*').order('created_at', { ascending: false }).limit(ACTIVITY_LIMIT)).catch(() => null) : Promise.resolve([]),
+            can('leads.zoho') ? rows(sb.from('zoho_leads').select('*').order('created_at', { ascending: false }).limit(ZOHO_LIMIT)).catch(() => null) : Promise.resolve([])
         ]);
-        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity };
+        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads };
     });
     const sections = ADMIN_SECTIONS.map(([group, items]) => [group, items.filter(([, , p]) => !p || can(p))]).filter(([, items]) => items.length);
     const allowed = sections.flatMap(([, items]) => items.map(([id]) => id));
     if (!allowed.includes(adminTab)) adminTab = allowed[0];
-    const needsData = ['home', 'quotes', 'quotations', 'golfers', 'bundles', 'users', 'activity'].includes(adminTab);
+    const needsData = ['home', 'quotes', 'quotations', 'golfers', 'bundles', 'users', 'activity', 'zoho'].includes(adminTab);
     const ready = data && !data.error;
     const body = data && data.error ? renderLoadError(data.error)
         : needsData && !data ? '<p class="text-mute" role="status">Loading…</p>'
         : { home: renderAdminHome, quotes: renderAdminQuotes, quotations: renderAdminQuotations, golfers: renderAdminGolfers, products: renderAdminProducts,
-            content: renderAdminContent, stories: renderAdminStories, bundles: renderAdminBundles, users: renderAdminUsers, activity: renderAdminActivity }[adminTab](data);
+            content: renderAdminContent, stories: renderAdminStories, bundles: renderAdminBundles, users: renderAdminUsers, activity: renderAdminActivity, zoho: renderAdminZoho }[adminTab](data);
     // Counts beside the sidebar items: new requests, and quotations waiting on this person
     const counts = ready ? {
         quotes: data.quotes.filter(q => q.status === 'New').length,
-        quotations: (data.quotations || []).filter(q => can('quotations.approve') ? q.status === 'submitted' : q.status === 'returned').length
+        quotations: (data.quotations || []).filter(q => can('quotations.approve') ? q.status === 'submitted' : q.status === 'returned').length,
+        zoho: (data.zohoLeads || []).filter(zohoNeedsSending).length
     } : {};
     const [title, summary, actions] = adminHeading(ready ? data : null);
     const editing = adminTab === 'quotations' && quotationOpen;
@@ -954,6 +957,7 @@ function renderAdminHome(data) {
                     ['Products', 'Main, build, gallery and accessory photos; text and specifications', tab('products')],
                     ['Site content', 'The homepage carousel and the event story', tab('content')],
                     ['Stories and guides', 'Add, edit or remove stories and their photos', tab('stories')],
+                    ['Zoho leads', zohoHomeNote(data.zohoLeads), tab('zoho')],
                     ['View the website', 'See your changes as visitors do', 'navigateTo(\'home\')']
                 ])}
                 <section class="adm-panel adm-panel-wide">
@@ -2900,6 +2904,71 @@ function renderAdminActivity({ activity }) {
             <div class="field"><label for="al-q">Search</label><input id="al-q" type="search" value="${escapeHtml(activityFilter.q)}" oninput="setActivityFilter('q', this.value)" placeholder="A reference, a model, a price…"></div>
         </div>
         <div id="activity-results">${renderActivityResults(activity)}</div>`;
+}
+
+// --- Zoho leads: each quote request and whether the email script got it into Zoho CRM (table zoho_leads) ---
+const ZOHO_LIMIT = 500;
+let zohoFilter = '';
+const ZOHO_STALE_MS = 10 * 60 * 1000; // a lead still waiting this long never got an answer, and can be sent again
+
+function zohoState(lead) {
+  if (lead.status === 'pending' && Date.now() - new Date(lead.updated_at).getTime() > ZOHO_STALE_MS) return 'stuck';
+  return lead.status;
+}
+const zohoNeedsSending = lead => ['failed', 'stuck'].includes(zohoState(lead));
+// [label, classes]: the classes are written out in full so the style build keeps them
+const ZOHO_STATES = { sent: ['In Zoho', 'zoho-state zoho-sent'], failed: ['Failed', 'zoho-state zoho-failed'], pending: ['Sending…', 'zoho-state zoho-pending'], stuck: ['No answer', 'zoho-state zoho-stuck'] };
+
+function zohoHomeNote(list) {
+  if (!list) return 'Whether each quote request reached Zoho CRM';
+  const failed = list.filter(zohoNeedsSending).length;
+  return failed ? `${failed} not in Zoho yet: send again` : 'Every quote request reached Zoho CRM';
+}
+
+function renderAdminZoho({ zohoLeads }) {
+  if (zohoLeads === null) return '<p class="measure">The Zoho list isn\'t in the database yet. Re-run supabase/schema.sql in the Supabase SQL Editor.</p>';
+  const count = s => zohoLeads.filter(l => (s === 'failed' ? zohoNeedsSending(l) : zohoState(l) === s)).length;
+  const chips = [['', 'All', zohoLeads.length], ['sent', 'In Zoho', count('sent')], ['failed', 'Not in Zoho', count('failed')], ['pending', 'Sending', count('pending')]];
+  const shown = zohoLeads.filter(l => !zohoFilter || (zohoFilter === 'failed' ? zohoNeedsSending(l) : zohoState(l) === zohoFilter));
+  return `
+    <div class="zoho-filter" role="group" aria-label="Show">${chips.map(([id, label, n]) => `<button type="button" aria-pressed="${zohoFilter === id}" onclick="setZohoFilter('${id}')">${label} <span>${n}</span></button>`).join('')}</div>
+    ${!zohoLeads.length ? '<p class="measure">No quote requests yet. Each new request shows here once it arrives.</p>'
+      : !shown.length ? '<p class="measure">None.</p>'
+      : `<div class="admin-table-wrap"><table class="admin-table">
+        <thead><tr><th>Received</th><th>Request</th><th>Name</th><th>Cart</th><th>Zoho</th><th>Details</th><th><span class="sr-only">Actions</span></th></tr></thead>
+        <tbody>${shown.map(l => {
+          const state = zohoState(l);
+          const detail = state === 'sent' ? `Lead ${escapeHtml(l.zoho_id)}`
+            : state === 'failed' ? escapeHtml(l.error || 'No reason given')
+            : state === 'stuck' ? 'The email script didn\'t answer. Send it again.'
+            : 'Waiting for Zoho';
+          return `<tr>
+            <td class="whitespace-nowrap">${formatActivityTime(l.created_at)}</td>
+            <td class="whitespace-nowrap">${escapeHtml(l.reference)}</td>
+            <td class="zoho-name">${escapeHtml(l.name)}</td>
+            <td>${escapeHtml(l.model)}</td>
+            <td><span class="${ZOHO_STATES[state][1]}">${ZOHO_STATES[state][0]}</span></td>
+            <td class="zoho-detail">${detail}${l.attempts > 1 ? ` <span class="text-xs text-mute">· ${l.attempts} tries</span>` : ''}</td>
+            <td>${zohoNeedsSending(l) ? `<button type="button" onclick="retryZohoLead(${Number(l.quote_id)})" class="link text-xs whitespace-nowrap">Send again</button>` : ''}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`}`;
+}
+
+function setZohoFilter(id) {
+  zohoFilter = id;
+  renderApp();
+}
+
+// The database marks it as sending and asks the email script again; the list refreshes once Zoho has had time to answer
+async function retryZohoLead(id) {
+  const { error } = await sb.rpc('retry_zoho_lead', { ref_id: id });
+  if (error) { showToast(`Not sent: ${error.message}`); return; }
+  const lead = pageData && (pageData.zohoLeads || []).find(l => Number(l.quote_id) === id);
+  if (lead) Object.assign(lead, { status: 'pending', error: '', updated_at: new Date().toISOString() });
+  renderApp();
+  showToast('Sending it to Zoho again. The list refreshes in a few seconds.');
+  setTimeout(() => { if (currentPage === 'admin' && adminTab === 'zoho') reloadPageData(); }, 8000);
 }
 
 // --- Staff: who gets the admin, and as what (master admins only). Each person still signs up once with their

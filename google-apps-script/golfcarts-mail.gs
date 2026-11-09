@@ -7,6 +7,8 @@
 //   quotation_approved     the person who submitted it can now send it
 //   quotation_returned     the person who submitted it gets the master admin's note
 //   quotation_sent         the customer gets the quotation PDF
+//   quote_zoho             a lead that failed to reach Zoho CRM is sent again (Marketing's Send again in the admin)
+// Each new quote request also becomes a Lead in Zoho CRM (sendLead), and the result is logged through log_zoho.
 // Called from the admin with the staff member's own sign-in (their Supabase access token):
 //   preview                the quotation's PDF, to look at before sending
 //   resend                 emails a sent quotation to the customer again (when the first email failed)
@@ -20,6 +22,15 @@
 //   4. Deploy > New deployment > Web app. Execute as: Me. Who has access: Anyone. Copy the web app URL (ends in /exec)
 //      into the Vault secret "mail_script_url" and into MAIL_SCRIPT_URL in account.js.
 //   After editing this file: Deploy > Manage deployments > Edit > Version: New version (the URL stays the same).
+//
+// Zoho CRM (the Leads), once:
+//   a. api-console.zoho.com > Add Client > Self Client. Copy its Client ID and Client Secret into Script Properties as
+//      ZOHO_CLIENT_ID and ZOHO_CLIENT_SECRET.
+//   b. In the Self Client: Generate Code, scope ZohoCRM.modules.leads.CREATE, 10 minutes. Paste the code into Script
+//      Properties as ZOHO_GRANT_CODE, then Run > connectZoho within those 10 minutes. It saves ZOHO_REFRESH_TOKEN
+//      and removes the code. The refresh token is like a password: it stays in Script Properties, nowhere else.
+//   If your Zoho account isn't on zoho.com (the address bar shows zoho.eu, zoho.in, zoho.com.au...), also add
+//   ZOHO_ACCOUNTS_URL, for example https://accounts.zoho.eu.
 
 const OWNER_EMAIL = 'donnavalonda@sjkguahan.com';
 // The site's Supabase project and its publishable key (the same as in account.js; safe to share)
@@ -51,6 +62,7 @@ function doPost(e) {
       if (!secret() || body.secret !== secret()) return json({ ok: false, error: 'Not allowed' });
       const staff = body.staff || {};
       if (body.event === 'quote_created') quoteCreated(body.record, staff);
+      else if (body.event === 'quote_zoho') sendLead(body.record);
       else if (/^quotation_(submitted|approved|returned|sent)$/.test(body.event)) quotationEvent(body.record, body.event.slice(10), staff);
       else return json({ ok: false, error: 'Unknown event' });
       return json({ ok: true });
@@ -137,6 +149,7 @@ function quoteCreated(q, staff) {
     html: emailPage('New quotation request', 'From the website (' + esc(q.source) + '). Reply to this email to answer ' + esc(q.name) + ' directly, or prepare the quotation in the admin.',
       rowsTable([['Name', q.name], ['Email', q.email], ['Mobile', q.phone], ['Model', q.model]].concat(rows.filter(function (r) { return r[0] !== 'Model'; }))) + adminLink('Open the admin'))
   });
+  sendLead(q);
 }
 
 function quotationEvent(qt, status, staff) {
@@ -389,6 +402,86 @@ function quotationHtml(qt, logo, photo, offers) {
     footer;
 
   return '<html><body style="font-family:Arial,Helvetica,sans-serif;color:' + C.ink + ';margin:22px 32px">' + page1 + page2 + page3 + '</body></html>';
+}
+
+// ---------- Zoho CRM ----------
+
+function zohoSettings() {
+  const p = PropertiesService.getScriptProperties();
+  return { id: p.getProperty('ZOHO_CLIENT_ID'), secret: p.getProperty('ZOHO_CLIENT_SECRET'), refresh: p.getProperty('ZOHO_REFRESH_TOKEN'),
+    accounts: String(p.getProperty('ZOHO_ACCOUNTS_URL') || 'https://accounts.zoho.com').replace(/\/+$/, '') };
+}
+
+// A short-lived access token from the refresh token, kept for just under an hour
+function zohoAccess() {
+  const cache = CacheService.getScriptCache();
+  const kept = cache.get('zoho_access');
+  if (kept) return JSON.parse(kept);
+  const z = zohoSettings();
+  if (!z.id || !z.secret || !z.refresh) throw new Error('Zoho CRM isn\'t connected yet: see "Zoho CRM" in the email script\'s setup notes');
+  const res = UrlFetchApp.fetch(z.accounts + '/oauth/v2/token', { method: 'post', muteHttpExceptions: true,
+    payload: { refresh_token: z.refresh, client_id: z.id, client_secret: z.secret, grant_type: 'refresh_token' } });
+  const data = JSON.parse(res.getContentText() || '{}');
+  if (!data.access_token) throw new Error('Zoho sign-in failed: ' + (data.error || ('HTTP ' + res.getResponseCode())));
+  const access = { token: data.access_token, api: data.api_domain || 'https://www.zohoapis.com' };
+  cache.put('zoho_access', JSON.stringify(access), Math.max(60, (data.expires_in || 3600) - 300));
+  return access;
+}
+
+// The request as a Zoho Lead: the last word of the name is the last name (the only field Zoho requires)
+function zohoLead(q) {
+  const parts = String(q.name || '').trim().split(/\s+/).filter(Boolean);
+  const last = parts.length ? parts.pop() : 'Website request';
+  const lines = ['Quote request ' + q.reference + ' from the website (' + (q.source || 'website') + ')', 'Model: ' + (q.model || '')]
+    .concat(requestRows(q).filter(function (r) { return r[0] !== 'Model'; }).map(function (r) { return r[0] + ': ' + r[1]; }));
+  const lead = { Last_Name: last.slice(0, 80), Lead_Source: 'Website', Description: lines.join('\n').slice(0, 32000) };
+  if (parts.length) lead.First_Name = parts.join(' ').slice(0, 40);
+  if (VALID_EMAIL.test(String(q.email || ''))) lead.Email = String(q.email);
+  if (q.phone) lead.Mobile = String(q.phone).slice(0, 30);
+  return lead;
+}
+
+// Creates the Lead and logs the result, whether it worked or not
+function sendLead(q) {
+  if (!q || !q.id) return;
+  let result = 'sent', leadId = '', error = '';
+  try {
+    const access = zohoAccess();
+    const res = UrlFetchApp.fetch(access.api + '/crm/v8/Leads', { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+      headers: { Authorization: 'Zoho-oauthtoken ' + access.token },
+      payload: JSON.stringify({ data: [zohoLead(q)], trigger: ['workflow'] }) });
+    const body = JSON.parse(res.getContentText() || '{}');
+    const one = body.data && body.data[0];
+    if (one && one.code === 'SUCCESS') leadId = String(one.details.id);
+    else {
+      if (res.getResponseCode() === 401) CacheService.getScriptCache().remove('zoho_access');
+      const field = one && one.details && one.details.api_name ? ' (' + one.details.api_name + ')' : '';
+      throw new Error(one ? one.message + field : (body.message || ('Zoho replied HTTP ' + res.getResponseCode())));
+    }
+  } catch (err) {
+    result = 'failed';
+    error = String(err && err.message || err);
+  }
+  try {
+    supabase('/rest/v1/rpc/log_zoho', null, 'post', { secret: secret(), ref_id: q.id, result: result, lead_id: leadId, error_text: error });
+  } catch (err) {
+    console.error('Zoho result not logged: ' + err);
+  }
+}
+
+// Run once (Run > connectZoho) after putting ZOHO_GRANT_CODE in Script Properties: saves the refresh token
+function connectZoho() {
+  const p = PropertiesService.getScriptProperties(), z = zohoSettings(), code = p.getProperty('ZOHO_GRANT_CODE');
+  if (!z.id || !z.secret || !code) throw new Error('Add ZOHO_CLIENT_ID, ZOHO_CLIENT_SECRET and ZOHO_GRANT_CODE to Script Properties first');
+  const res = UrlFetchApp.fetch(z.accounts + '/oauth/v2/token', { method: 'post', muteHttpExceptions: true,
+    payload: { code: code, client_id: z.id, client_secret: z.secret, grant_type: 'authorization_code' } });
+  const data = JSON.parse(res.getContentText() || '{}');
+  if (!data.refresh_token) throw new Error('Zoho did not connect: ' + (data.error || res.getContentText().slice(0, 200)) + '. Generate a new code and try again.');
+  p.setProperty('ZOHO_REFRESH_TOKEN', data.refresh_token);
+  p.deleteProperty('ZOHO_GRANT_CODE');
+  CacheService.getScriptCache().remove('zoho_access');
+  zohoAccess();
+  console.log('Zoho CRM is connected. New quote requests will become Leads.');
 }
 
 function json(obj) {
