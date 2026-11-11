@@ -1900,6 +1900,130 @@ function setTheme(theme) {
     syncThemeToggles();
 }
 
+// Holiday theme: a seasonal photo behind the whole site, and something falling: snow at Christmas, spiders and cobwebs
+// at Halloween, hearts on Hearts Day. Off as shipped; Marketing turns it on and picks the theme and photos in the admin
+// (site_edits row "holiday", applied by account.js). The photo shows in light mode only and never in the admin
+// (site.css, html.holiday); the falling effect skips the admin and anyone who asked for less motion.
+//
+// Each photo is placed by where its decoration is, so the decoration always shows and the photo is never enlarged
+// more than it has to be:
+//   anchor   the side or corner the decoration is on; the photo is pinned there
+//   ratio    the photo's width / height (below 1: a tall photo)
+//   fill     the photo's own plain background colour, filling the rest of the screen around it
+// The photo's shape against the screen's decides its size (holidaySize): a photo the same shape as the screen covers
+// it, pinned to the decoration so any cropping is on the plain side; a photo the other shape is shown whole, as tall
+// or as wide as the screen, on its decorated side, never enlarged to fill (which would cut the decoration off)
+//   veil     how much of the page colour lies over it, so the site's text stays readable (most on dark or red photos)
+const HOLIDAY_DESIGNS = {
+    'cream-corners': { theme: 'christmas', label: 'Cream, decorations in the corners', image: 'image/Holiday/holiday-cream-corners.jpg', ratio: 1024 / 672, anchor: 'center', fill: '#FEF9F3', veil: 0.3 },
+    'white-greenery': { theme: 'christmas', label: 'White, greenery on the left', image: 'image/Holiday/holiday-white-greenery.jpg', ratio: 1024 / 434, anchor: 'left center', fill: '#FEFEFE', veil: 0.35 },
+    'white-portrait': { theme: 'christmas', label: 'White, decorations down the right (tall)', image: 'image/Holiday/holiday-white-portrait.jpg', ratio: 682 / 1024, anchor: 'right center', fill: '#EEEEEE', veil: 0.3 },
+    'red-ornaments': { theme: 'christmas', label: 'Red, ornaments along the bottom', image: 'image/Holiday/holiday-red-ornaments.jpg', ratio: 1024 / 687, anchor: 'center bottom', fill: '#BE212A', veil: 0.78 },
+    'halloween-pumpkins': { theme: 'halloween', label: 'Pumpkins and a cart, bottom right (tall)', image: 'image/Holiday/holiday-halloween-pumpkins.jpg', ratio: 683 / 1024, anchor: 'right bottom', fill: '#D6E0E1', veil: 0.3 },
+    'halloween-dark': { theme: 'halloween', label: 'Glowing cart in the dark', image: 'image/Holiday/holiday-halloween-dark.jpg', ratio: 1024 / 765, anchor: 'center', fill: '#000000', veil: 0.82 },
+    'hearts-white': { theme: 'hearts', label: 'Hearts and carts, left and bottom', image: 'image/Holiday/holiday-hearts-white.jpg', ratio: 1024 / 681, anchor: 'left bottom', fill: '#F0EAEA', veil: 0.3 },
+    'hearts-pink': { theme: 'hearts', label: 'Pink, gift box on the left (tall)', image: 'image/Holiday/holiday-hearts-pink.jpg', ratio: 683 / 1024, anchor: 'left center', fill: '#FEC5CC', veil: 0.4 }
+};
+// Each theme: its name, what falls, and the photos it starts with on computers and on phones
+const HOLIDAY_THEMES = {
+    christmas: { label: 'Christmas', effect: 'Falling snow', design: 'cream-corners', phone: 'white-portrait' },
+    halloween: { label: 'Halloween', effect: 'A spider on its thread and a cobweb', design: 'halloween-pumpkins', phone: 'halloween-pumpkins' },
+    hearts: { label: 'Hearts Day', effect: 'Falling hearts', design: 'hearts-white', phone: 'hearts-pink' }
+};
+const HOLIDAY = { on: false, theme: 'christmas', design: 'cream-corners', phone: 'white-portrait', effects: true };
+
+const HOLIDAY_SHAPES = {
+    flake: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M12 2l-2 2.5M12 2l2 2.5M12 22l-2-2.5M12 22l2-2.5"/></svg>',
+    spider: '<svg viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M9 10L4 7M9 12H3.5M9 14l-5 3M10 15.5L7 20M15 10l5-3M15 12h5.5M15 14l5 3M14 15.5l3 4.5"/></g><ellipse cx="12" cy="13" rx="3.2" ry="4" fill="currentColor"/><circle cx="12" cy="8.2" r="2.1" fill="currentColor"/></svg>',
+    web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.9"><path d="M12 1v22M1 12h22M4.2 4.2l15.6 15.6M19.8 4.2L4.2 19.8"/><path d="M12 5.5l4.6 1.9 1.9 4.6-1.9 4.6-4.6 1.9-4.6-1.9-1.9-4.6 1.9-4.6zM12 9l2.1.9.9 2.1-.9 2.1-2.1.9-2.1-.9-.9-2.1.9-2.1z"/></svg>',
+    heart: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.3C.8 8.2 2.9 4 6.8 4c2.1 0 3.6 1.2 5.2 3 1.6-1.8 3.1-3 5.2-3 3.9 0 6 4.2 4.4 7.7C19.5 16.4 12 21 12 21z"/></svg>'
+};
+const HEART_COLORS = ['#D7262C', '#E8476A', '#F28FA6', '#B3122B', '#FF6B8A'];
+// Each piece's class, written out in full so the style build keeps it
+const HOLIDAY_PIECE_CLASS = { dot: 'holiday-dot', flake: 'holiday-shape', heart: 'holiday-heart' };
+
+// The falling pieces, spread by a fixed pattern (not random) so they look the same on every page.
+// Halloween is just one cobweb, still in the bottom corner, and one spider that drops on its thread from the top and
+// climbs back (many of them crowded the page)
+function holidayFlakes(theme) {
+    if (theme === 'halloween') {
+        return `<span class="holiday-corner-web holiday-web">${HOLIDAY_SHAPES.web}</span>`
+            + `<span class="holiday-dangle"><span class="holiday-spider">${HOLIDAY_SHAPES.spider}</span></span>`;
+    }
+    const at = (i, n, spread) => ((i * spread) % n) / n;
+    return Array.from({ length: 36 }, (_, i) => {
+        let kind, size, spin = (i % 2 ? 1 : -1) * 260, color = '';
+        if (theme === 'hearts') {
+            kind = 'heart';
+            size = 10 + (i % 5) * 4;
+            spin = (i % 2 ? 1 : -1) * (20 + (i % 3) * 15);
+            color = `;color:${HEART_COLORS[i % HEART_COLORS.length]}`;
+        } else {
+            kind = i % 3 === 0 ? 'flake' : 'dot';
+            size = kind === 'flake' ? 14 + (i % 4) * 4 : 4 + (i % 5) * 2;
+        }
+        const style = `--x:${(at(i, 36, 13) * 100).toFixed(1)}%;--s:${size}px;--d:${(10 + (i % 7) * 2.2).toFixed(1)}s;--delay:-${(at(i, 36, 7) * 22).toFixed(1)}s;--sway:${(i % 2 ? 1 : -1) * (20 + (i % 5) * 12)}px;--spin:${spin}deg;--o:${(0.65 + (i % 4) * 0.1).toFixed(2)}${color}`;
+        return `<span class="holiday-flake ${HOLIDAY_PIECE_CLASS[kind]}" style="${style}">${HOLIDAY_SHAPES[kind] || ''}</span>`;
+    }).join('');
+}
+
+// The whole background for one screen shape, as CSS: the veil, a soft fade from the photo's edge into its plain colour
+// (so there's no visible join), and the photo on its colour
+function holidayBackground(design, uprightScreen) {
+    const tall = design.ratio < 1;
+    const [x, y = 'center'] = design.anchor.split(' ');
+    const rgb = [1, 3, 5].map(i => parseInt(design.fill.slice(i, i + 2), 16)).join(', ');
+    const veil = `linear-gradient(rgba(246, 246, 242, ${design.veil}), rgba(246, 246, 242, ${design.veil}))`;
+    const fade = to => `linear-gradient(to ${to}, rgba(${rgb}, 1), rgba(${rgb}, 0))`;
+    const url = `url(${JSON.stringify(new URL(design.image, document.baseURI).href)})`;
+    const layers = [veil];
+    let size;
+    if (tall === uprightScreen) {
+        size = 'cover'; // the same shape as the screen: it fills it, pinned to its decoration
+    } else if (tall) {
+        // A tall photo on a wide screen: as tall as the screen, on its decorated side; its inner edge fades into the colour
+        size = 'auto 100%';
+        const w = `calc(100vh * ${design.ratio.toFixed(4)})`;
+        if (x !== 'center') layers.push(`${fade(x === 'right' ? 'right' : 'left')} ${x} calc(${w} - 120px) top / 120px 100% no-repeat`);
+    } else {
+        // A wide photo on an upright screen: shown whole, as wide as the screen, where its decoration is; its open edges fade
+        size = '100% auto';
+        const h = `calc(100vw / ${design.ratio.toFixed(4)})`;
+        // A thin fade: just enough to hide the join, since a wide photo's decoration can run right up to its edge
+        if (y !== 'top') layers.push(`${fade('bottom')} left ${y === 'bottom' ? `bottom calc(${h} - 24px)` : `top calc(50vh - ${h} / 2)`} / 100% 24px no-repeat`);
+        if (y !== 'bottom') layers.push(`${fade('top')} left ${y === 'top' ? `top calc(${h} - 24px)` : `top calc(50vh + ${h} / 2 - 24px)`} / 100% 24px no-repeat`);
+    }
+    layers.push(`${url} ${design.anchor} / ${size} no-repeat ${design.fill}`);
+    return layers.join(', ');
+}
+
+function applyHoliday() {
+    const root = document.documentElement;
+    if (!document.body) return;
+    const theme = HOLIDAY_THEMES[HOLIDAY.theme] ? HOLIDAY.theme : 'christmas';
+    const on = !!HOLIDAY.on, falling = on && (HOLIDAY.effects !== undefined ? HOLIDAY.effects : HOLIDAY.snow) !== false;
+    root.classList.toggle('holiday', on);
+    if (on) {
+        const design = id => HOLIDAY_DESIGNS[id] || HOLIDAY_DESIGNS[HOLIDAY_THEMES[theme].design];
+        const computer = design(HOLIDAY.design), phone = design(HOLIDAY.phone || HOLIDAY.design);
+        // A wide screen, a tablet held upright (the computer photo), and a phone (upright, its own photo)
+        root.style.setProperty('--holiday-bg', holidayBackground(computer, false));
+        root.style.setProperty('--holiday-bg-tall', holidayBackground(computer, true));
+        root.style.setProperty('--holiday-bg-phone', holidayBackground(phone, true));
+    }
+    let el = document.getElementById('holiday-snow');
+    if (el && (!falling || el.dataset.theme !== theme)) { el.remove(); el = null; }
+    if (falling && !el) {
+        el = document.createElement('div');
+        el.id = 'holiday-snow';
+        el.className = 'holiday-snow';
+        el.dataset.theme = theme;
+        el.setAttribute('aria-hidden', 'true');
+        el.innerHTML = holidayFlakes(theme);
+        document.body.appendChild(el);
+    }
+}
+
 function syncThemeToggles() {
     const dark = currentTheme() === 'dark';
     document.querySelectorAll('.theme-toggle').forEach(btn => btn.setAttribute('aria-pressed', String(dark)));
@@ -2394,6 +2518,7 @@ function renderApp() {
     if (branchMap) { branchMap.stop(); branchMap = null; }
     if (homeBanners) { homeBanners.stop(); homeBanners = null; }
     if (homeStage) { homeStage.stop(); homeStage = null; }
+    if (detailDepth) { detailDepth.stop(); detailDepth = null; }
 
     if (currentPage === 'home') {
         viewport.innerHTML = renderHomePage();
@@ -2403,6 +2528,7 @@ function renderApp() {
         bindProductsFilterEvents();
     } else if (currentPage === 'product-details') {
         viewport.innerHTML = renderProductDetailsPage();
+        initDetailDepth();
         // Name a Tempo's page after the build it opens on
         const opened = currentDetailProduct();
         if (opened && detailBuild.level) updateDetailBuildText(opened);
@@ -2519,7 +2645,7 @@ function renderHomeBatteryCompare() {
             </div>
 
             <div class="max-w-5xl mx-auto grid md:grid-cols-2 gap-px bg-line border-y border-line mt-16">
-                <div class="bg-paper py-8 md:pr-10 space-y-4">
+                <div class="bg-paper py-8 px-6 md:px-10 space-y-4">
                     <h3 class="type-md text-ink">Lead-acid suits you if you</h3>
                     <ul class="home-list">
                         <li>are working with a tight upfront budget</li>
@@ -2528,7 +2654,7 @@ function renderHomeBatteryCompare() {
                     </ul>
                     <button type="button" onclick="openQuoteModal('', 'Battery preference: Lead-Acid')" class="btn btn-outline">Quote with lead-acid</button>
                 </div>
-                <div class="bg-paper py-8 md:pl-10 space-y-4">
+                <div class="bg-paper py-8 px-6 md:px-10 space-y-4">
                     <h3 class="type-md text-ink">Lithium suits you if you</h3>
                     <ul class="home-list">
                         <li>keep the cart long-term, or run a resort, golf or village fleet</li>
@@ -2622,7 +2748,8 @@ function applyPreviewDraft(draft) {
 
 function applyPreviewNow() {
     if (!previewDraft || currentPage !== 'home') return;
-    const { banners, event, promo, focus } = previewDraft;
+    const { banners, event, promo, holiday, focus } = previewDraft;
+    if (holiday) { Object.assign(HOLIDAY, holiday); applyHoliday(); }
     if (banners) HOME_BANNERS.splice(0, HOME_BANNERS.length, ...banners);
     if (event) Object.assign(HOME_EVENT, event);
     if (promo) {
@@ -3817,15 +3944,55 @@ function renderNotFoundPage() {
     `;
 }
 
+// Of the "Parts & Accessories", the parts are fitted to the cart itself; the rest are add-on accessories (the user's
+// split, 2026-11-09). A new item is an accessory unless it's added here.
+const PART_SLUGS = new Set(['acc-lux-seat-brown', 'acc-lux-seat-white', 'acc-premium-seat-black', 'acc-premium-seat-grey', 'acc-rear-flip-seat',
+    'acc-rear-armrest', 'acc-seat-belt', 'acc-deluxe-lights', 'acc-side-mirror', 'acc-5-panel-mirror', 'acc-dashboard', 'acc-brush-guard']);
+const PRODUCT_KINDS = [['', 'All'], ['carts', 'Carts'], ['parts', 'Parts'], ['accessories', 'Accessories']];
+let productKindFilter = ''; // the All carts page's filter: '', 'carts', 'parts' or 'accessories'
+
+function productKind(p) {
+    if (p.category !== 'Accessories') return 'carts';
+    return PART_SLUGS.has(p.slug) ? 'parts' : 'accessories';
+}
+
 function filterProducts() {
     const q = productSearchQuery.toLowerCase();
+    const kind = productFilterCategory === 'All' ? productKindFilter : '';
     return PRODUCTS_DATA.filter(p => (productFilterCategory === 'All' || p.category === productFilterCategory)
+        && (!kind || productKind(p) === kind)
         && (p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)));
 }
 
+// The filter row on the All carts page, with how many of each match the search
+function renderProductKindFilter() {
+    if (productFilterCategory !== 'All') return '';
+    const q = productSearchQuery.toLowerCase();
+    const matching = PRODUCTS_DATA.filter(p => p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q));
+    return `<div class="admin-chips product-kinds" role="group" aria-label="Show">${PRODUCT_KINDS.map(([id, label]) =>
+        `<button type="button" aria-pressed="${productKindFilter === id}" onclick="setProductKind('${id}')">${label} <span>${id ? matching.filter(p => productKind(p) === id).length : matching.length}</span></button>`).join('')}</div>`;
+}
+
+// Redraws the results, count and filter row only, so the search box keeps what's typed
+function refreshProductResults() {
+    const list = filterProducts();
+    const grid = document.getElementById('product-grid-container');
+    if (grid) grid.innerHTML = renderProductResults(list);
+    const count = document.getElementById('product-count');
+    if (count) count.textContent = `${list.length} ${list.length === 1 ? 'result' : 'results'}`;
+    const kinds = document.getElementById('product-kinds');
+    if (kinds) kinds.innerHTML = renderProductKindFilter();
+}
+
+function setProductKind(id) {
+    productKindFilter = id;
+    refreshProductResults();
+}
+
 function renderProductGridItems(list) {
+    // Each card opens its model page; its Get a quote opens the quote form with that model chosen
     return list.length
-        ? list.map(p => `<li>${renderModelTile(p)}</li>`).join('')
+        ? list.map(p => `<li class="flex flex-col">${renderModelTile(p)}<button type="button" onclick="openQuoteModal('${p.slug}')" class="btn btn-outline product-quote">Get a quote</button></li>`).join('')
         : `<li class="col-span-full py-16 border-y border-line"><p class="type-md text-ink">Nothing matches "${productSearchQuery.replace(/</g, '&lt;')}".</p><p class="mt-2">Try a model name, such as Tempo or Villager.</p></li>`;
 }
 
@@ -3850,6 +4017,10 @@ function accessoryGroupsOf(list) {
 // The results grid: one grid of carts, or on Parts & Accessories a titled grid per accessory group
 function renderProductResults(list) {
     const grid = items => `<ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-14">${renderProductGridItems(items)}</ul>`;
+    // Parts or accessories on their own: the denser grid, so the small items' photos aren't oversized
+    if (productFilterCategory === 'All' && (productKindFilter === 'parts' || productKindFilter === 'accessories') && list.length) {
+        return `<ul class="accessory-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-5 gap-y-10">${renderProductGridItems(list)}</ul>`;
+    }
     if (productFilterCategory !== 'Accessories' || !list.length) return grid(list);
     // Accessories are small parts: a denser grid than the carts', so their photos aren't oversized
     return accessoryGroupsOf(list).map(g => `
@@ -3884,11 +4055,12 @@ function renderProductsPage() {
             <div class="mt-12 flex flex-col-reverse md:flex-row md:items-end justify-between gap-4 border-b border-line pb-4">
                 <p class="text-sm text-mute"><span id="product-count" aria-live="polite">${filtered.length} ${filtered.length === 1 ? 'result' : 'results'}</span>${productFilterCategory !== 'All'
                     ? ` · <a href="carts/" data-route="products" data-category="All" class="link text-ink">See all carts</a>` : ''}</p>
-                <div class="field md:w-72">
+                <div class="field md:w-72 md:ml-auto">
                     <label for="product-search-input" class="sr-only">Search carts and accessories</label>
                     <input id="product-search-input" type="search" value="${productSearchQuery.replace(/"/g, '&quot;')}" placeholder="Search carts and accessories" class="!min-h-[2.75rem]">
                 </div>
             </div>
+            <div id="product-kinds">${renderProductKindFilter()}</div>
             ${renderAccessoryGroupNav()}
         </section>
 
@@ -3913,11 +4085,7 @@ function bindProductsFilterEvents() {
     if (!input) return;
     input.addEventListener('input', e => {
         productSearchQuery = e.target.value;
-        const list = filterProducts();
-        const grid = document.getElementById('product-grid-container');
-        if (grid) grid.innerHTML = renderProductResults(list);
-        const count = document.getElementById('product-count');
-        if (count) count.textContent = `${list.length} ${list.length === 1 ? 'result' : 'results'}`;
+        refreshProductResults();
     });
 }
 
@@ -4091,9 +4259,12 @@ function getDetailCanopyOptions(product) {
 // Accessory options from the "Versions" cart-builder sheet (STEP 4 ACCESSORIES tab).
 // Each item can also say: `slot`, a kind a cart takes only one of (a second pick replaces the first);
 // `builder`, the Tempo build option that covers it (chosen in the build, so not offered again here);
-// `includedOn`, model tags whose carts already come with it; `needsLift`, only offered for a lifted cart.
+// `includedOn`, model tags whose carts already come with it; `notOn`, model tags it doesn't fit;
+// `needsLift`, only offered for a lifted cart.
 // `fits` lists the product accessoryTags each item is compatible with, based on the item names
 // (e.g. "Villager 6 Rain Enclosure"); Precedent-only items are omitted. `product` links a catalog photo.
+// Carts with a rear-facing seat, where the sand bottle, ball washer and caddie cooler would mount
+const REAR_SEAT_TAGS = ['tempo-2+2', 'tempo-4+2'];
 const ACCESSORY_CATALOG = [
     { group: 'Windshield', items: [
         { id: 'ws-clear', slot: 'windshield', builder: 'windshield', includedOn: ['tempo'], name: 'Clear Hinged Windshield', sku: 'SJK-0066', fits: ['tempo'], image: 'image/Options/windshield-clear.jpg' },
@@ -4108,10 +4279,10 @@ const ACCESSORY_CATALOG = [
         { id: 'lt-gc-tempo-rgb', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit RGB', sku: 'SJK-1548', fits: ['tempo'] }
     ] },
     { group: 'Golf Accessories', items: [
-        { id: 'golf-sand', builder: 'sandBottle', name: 'Sand Bottle', sku: 'SJK-0332', fits: ['golf'], product: 'acc-divot-sand-bottle' },
-        { id: 'golf-washer', builder: 'ballWasher', name: 'Ball Washer', sku: 'SJK-0248', fits: ['golf'], product: 'acc-ball-cleaner' },
-        { id: 'golf-cooler', slot: 'cooler', builder: 'cooler', name: 'Caddie Cooler', sku: 'SJK-0257', fits: ['golf'], product: 'acc-cooler' },
-        { id: 'golf-cooler-premium', slot: 'cooler', builder: 'cooler', name: 'Premium Caddie Cooler', sku: 'SJK-1363', fits: ['golf'] },
+        { id: 'golf-sand', notOn: REAR_SEAT_TAGS, builder: 'sandBottle', name: 'Sand Bottle', sku: 'SJK-0332', fits: ['golf'], product: 'acc-divot-sand-bottle' },
+        { id: 'golf-washer', notOn: REAR_SEAT_TAGS, builder: 'ballWasher', name: 'Ball Washer', sku: 'SJK-0248', fits: ['golf'], product: 'acc-ball-cleaner' },
+        { id: 'golf-cooler', notOn: REAR_SEAT_TAGS, slot: 'cooler', builder: 'cooler', name: 'Caddie Cooler', sku: 'SJK-0257', fits: ['golf'], product: 'acc-cooler' },
+        { id: 'golf-cooler-premium', notOn: REAR_SEAT_TAGS, slot: 'cooler', builder: 'cooler', name: 'Premium Caddie Cooler', sku: 'SJK-1363', fits: ['golf'], image: 'image/Options/cooler-premium.jpg' },
         { id: 'golf-caddie', slot: 'caddie', name: 'Caddie Carrier', sku: 'SJK-1374', fits: ['golf'], image: 'image/Options/caddy-stand.jpg' },
         { id: 'golf-bag-mag-black', slot: 'bagCover', builder: 'bagCover', name: 'Premium Magnetic Bag Cover (Black)', sku: 'SJK-0344', fits: ['golf'], product: 'acc-bag-cover' },
         { id: 'golf-bag-mag-beige', slot: 'bagCover', builder: 'bagCover', name: 'Premium Magnetic Bag Cover (Beige)', sku: 'SJK-0347', fits: ['golf'], product: 'acc-bag-cover' },
@@ -4213,6 +4384,7 @@ function getCompatibleAccessoryGroups(productName, build = quoteBuildFor(product
         .map(g => ({ group: g.group, items: g.items.filter(i =>
             i.fits.some(t => tags.includes(t) || (t === 'lifted' && lifted)) &&
             !(i.includedOn && i.includedOn.some(t => tags.includes(t))) &&
+            !(i.notOn && i.notOn.some(t => tags.includes(t))) &&
             !(i.builder && covered.includes(i.builder)) &&
             !(i.needsLift && !lifted)) }))
         .filter(g => g.items.length);
@@ -4224,7 +4396,7 @@ function detailAccessoryGroups() {
     return product ? getCompatibleAccessoryGroups(product.slug, getBuildDetails()) : [];
 }
 
-// The accessory list under "More accessories" (Tempo) or "Add accessories" (other models) on the model page
+// The accessory list under "More accessories" (Tempo) or "Accessories" (other models) on the model page
 function renderAccessoryPicker() {
     const picker = document.getElementById('detail-accessories');
     if (!picker) return;
@@ -4239,18 +4411,18 @@ function renderAccessoryPicker() {
             <legend class="text-sm text-ink-2 mb-3">${g.group}${onlyOne(g) ? ' <span class="text-mute">(choose one)</span>' : oneEach(g) ? ' <span class="text-mute">(one of each kind)</span>' : ''}</legend>
             <div class="grid gap-2 ${picker.dataset.cols === '2' ? 'sm:grid-cols-2' : ''}">
             ${g.items.map(item => {
-                // Text only; a photo opens from the eye button
+                // The photo on the card, or a plain picture tile until there is one (text only, with an eye button,
+                // when OPTION_CARD_PHOTOS is off)
                 const image = item.image || (item.product && (PRODUCTS_DATA.find(p => p.slug === item.product) || {}).image);
-                const photo = OPTION_CARD_PHOTOS && image;
                 return `
                     <label class="flex items-center gap-3 p-2.5 bg-paper border ${quoteAccessories.has(item.id) ? 'border-ink' : 'border-line'} hover:border-ink-2 cursor-pointer">
                         <input type="checkbox" data-acc-id="${item.id}" ${quoteAccessories.has(item.id) ? 'checked' : ''} onchange="toggleQuoteAccessory('${item.id}')" class="w-4 h-4 accent-[#151714] flex-shrink-0">
-                        ${photo ? `<span class="w-14 h-14 bg-stone flex items-center justify-center overflow-hidden flex-shrink-0"><img src="${photo}" alt="" loading="lazy" class="max-w-full max-h-full object-contain mix-blend-multiply"></span>` : ''}
+                        ${OPTION_CARD_PHOTOS ? `<span class="w-16 h-16 bg-stone text-mute flex items-center justify-center overflow-hidden flex-shrink-0">${image ? `<img src="${image}" alt="" loading="lazy" class="max-w-full max-h-full object-contain mix-blend-multiply">` : OPTION_PLACEHOLDER}</span>` : ''}
                         <span class="flex-1 min-w-0 text-sm">
                             <span class="block text-ink">${item.name}</span>
                             ${item.sku ? `<span class="block text-xs text-mute">${item.sku}</span>` : ''}
                         </span>
-                        ${photo ? '' : optionEye(image, item.name).replace('class="opt-eye"', 'class="opt-eye opt-eye-static"')}
+                        ${OPTION_CARD_PHOTOS ? '' : optionEye(image, item.name).replace('class="opt-eye"', 'class="opt-eye opt-eye-static"')}
                     </label>`;
             }).join('')}
             </div>
@@ -4270,8 +4442,7 @@ function refreshDetailAccessories() {
     quoteAccessories = new Set([...quoteAccessories].filter(id => fitting.has(id)));
     const count = document.getElementById('detail-accessory-count');
     if (count) count.textContent = `(${quoteAccessories.size ? `${quoteAccessories.size} of ${fitting.size} selected` : fitting.size})`;
-    const picker = document.getElementById('detail-accessories');
-    if (picker && !picker.hidden) renderAccessoryPicker();
+    renderAccessoryPicker();
 }
 
 function toggleQuoteAccessory(id) {
@@ -4282,15 +4453,6 @@ function toggleQuoteAccessory(id) {
         quoteAccessories.add(id);
     }
     refreshDetailAccessories();
-}
-
-// Opens or closes the model page's accessory list
-function toggleDetailAccessories(button) {
-    const picker = document.getElementById('detail-accessories');
-    if (!picker) return;
-    picker.hidden = !picker.hidden;
-    button.setAttribute('aria-expanded', String(!picker.hidden));
-    if (!picker.hidden) renderAccessoryPicker();
 }
 
 // Another model chosen in the quote form: the accessories picked for this page's model don't go with it
@@ -4422,6 +4584,178 @@ function toggleColorLens() {
     const btn = document.getElementById('color-lens-toggle');
     if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     if (!on) hideColorLens();
+}
+
+// ==========================================
+// CART DEPTH: gives the builder's cart photo depth. Each cart photo has a depth map (image/depth/, same file
+// name; white = near, made once from the photo by a depth-estimation model). A canvas over the photo redraws it
+// with near parts shifted one way and far parts the other, following the pointer across the Colors section, so
+// the cart seems to turn a little. Phones get a slow sway instead. The photo itself stays in place underneath
+// (invisible): the magnifier and the zoom-to-part still work from it, and the cart holds still while the pointer
+// is on the photo so the magnifier matches. Not started for reduced motion, without WebGL, or for a photo with no
+// depth map: the plain photo shows as before.
+// ==========================================
+let detailDepth = null;
+
+// The depth map for the photo the preview is showing (repaints keep their base photo's shape)
+function detailDepthSrc(img) {
+    const product = currentDetailProduct();
+    if (!product) return null;
+    const key = detailPreviewKey(product);
+    const shown = img.getAttribute('src') || '';
+    const photo = shown.startsWith('data:') ? (hasLiveColorPreview(key) ? COLOR_PREVIEW[key].base : null) : shown;
+    if (!photo) return null;
+    const name = decodeURIComponent(photo.split('/').pop()).replace(/\.(png|jpe?g)(\.webp)?$/i, '');
+    return `image/depth/${name}.jpg`;
+}
+
+function initDetailDepth() {
+    if (detailDepth) detailDepth.stop();
+    detailDepth = null;
+    const img = document.getElementById('detail-color-img');
+    const section = document.getElementById('colors');
+    if (!img || !section || !window.WebGLRenderingContext || !window.IntersectionObserver) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const frame = img.parentElement;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'absolute inset-0 w-full h-full mix-blend-multiply pointer-events-none';
+    canvas.setAttribute('aria-hidden', 'true');
+    canvas.hidden = true;
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+    if (!gl) return;
+    img.after(canvas);
+
+    const compile = (type, source) => { const s = gl.createShader(type); gl.shaderSource(s, source); gl.compileShader(s); return s; };
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, 'attribute vec2 at; varying vec2 uv; void main() { uv = at * 0.5 + 0.5; gl_Position = vec4(at, 0.0, 1.0); }'));
+    // box: where the photo sits in the canvas (object-contain). The depth is read twice so edges land cleanly
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, `
+        precision mediump float;
+        uniform sampler2D photo, depth;
+        uniform vec2 shift;
+        uniform vec4 box;
+        varying vec2 uv;
+        void main() {
+            vec2 p = (uv - box.xy) / box.zw;
+            vec2 q = p + shift * (texture2D(depth, p).r - 0.5);
+            q = p + shift * (texture2D(depth, q).r - 0.5);
+            bool outside = p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0;
+            gl_FragColor = outside ? vec4(1.0) : texture2D(photo, q);
+        }`));
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { canvas.remove(); return; }
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const at = gl.getAttribLocation(program, 'at');
+    gl.enableVertexAttribArray(at);
+    gl.vertexAttribPointer(at, 2, gl.FLOAT, false, 0, 0);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    const texture = unit => {
+        const t = gl.createTexture();
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach(w => gl.texParameteri(gl.TEXTURE_2D, w, gl.CLAMP_TO_EDGE));
+        [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach(f => gl.texParameteri(gl.TEXTURE_2D, f, gl.LINEAR));
+        return t;
+    };
+    texture(0);
+    texture(1);
+    gl.uniform1i(gl.getUniformLocation(program, 'photo'), 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'depth'), 1);
+    const uShift = gl.getUniformLocation(program, 'shift'), uBox = gl.getUniformLocation(program, 'box');
+    const upload = (unit, source) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source); };
+
+    let depthSrc = null, depthReady = false, photoReady = false, stopped = false, running = false, onScreen = false, drawn = null;
+    const show = on => { canvas.hidden = !on; img.style.opacity = on ? '0' : ''; };
+
+    // Each time the photo changes (a repaint, another build): take it as the texture, and its depth map if new
+    const onPhoto = () => {
+        if (stopped || !img.naturalWidth) return;
+        try { upload(0, img); photoReady = true; } catch (err) { photoReady = false; }
+        const src = detailDepthSrc(img);
+        if (src !== depthSrc) {
+            depthSrc = src;
+            depthReady = false;
+            if (src) {
+                const map = new Image();
+                map.onload = () => { if (!stopped && depthSrc === src) { upload(1, map); depthReady = true; draw(); } };
+                map.src = src;
+            }
+        }
+        draw();
+    };
+
+    const target = { x: 0, y: 0 }, eased = { x: 0, y: 0 };
+    const draw = () => {
+        if (!photoReady || !depthReady) { show(false); return; }
+        const w = img.clientWidth, h = img.clientHeight, ratio = Math.min(window.devicePixelRatio || 1, 2);
+        if (!w || !h) return;
+        if (canvas.width !== Math.round(w * ratio) || canvas.height !== Math.round(h * ratio)) {
+            canvas.width = Math.round(w * ratio);
+            canvas.height = Math.round(h * ratio);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        const scale = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+        const bw = img.naturalWidth * scale / w, bh = img.naturalHeight * scale / h;
+        gl.uniform4f(uBox, (1 - bw) / 2, (1 - bh) / 2, bw, bh);
+        gl.uniform2f(uShift, eased.x * 0.026, eased.y * -0.014); // more than this tears thin parts (struts) from what is behind them
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        // The zoom-to-part moves the photo: the canvas follows it
+        canvas.style.transform = img.style.transform;
+        canvas.style.transformOrigin = img.style.transformOrigin;
+        canvas.style.transition = getComputedStyle(img).transition;
+        show(true);
+    };
+
+    const fine = window.matchMedia('(pointer: fine)').matches;
+    const onMove = e => {
+        if (frame.contains(e.target)) { target.x = target.y = 0; return; } // still under the magnifier
+        const r = frame.getBoundingClientRect();
+        target.x = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / r.width));
+        target.y = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / r.height));
+    };
+    const onLeave = () => { target.x = target.y = 0; };
+    if (fine) {
+        section.addEventListener('pointermove', onMove);
+        section.addEventListener('pointerleave', onLeave);
+    }
+
+    const loop = () => {
+        if (!running || !canvas.isConnected) { running = false; return; }
+        if (!fine) { const t = performance.now() / 1000; target.x = Math.sin(t * 0.7) * 0.6; target.y = Math.sin(t * 0.45) * 0.3; }
+        eased.x += (target.x - eased.x) * 0.07;
+        eased.y += (target.y - eased.y) * 0.07;
+        // Redraw when the cart has moved, the frame was resized or the zoom-to-part changed
+        const state = `${eased.x.toFixed(3)} ${eased.y.toFixed(3)} ${img.clientWidth} ${img.style.transform}`;
+        if (state !== drawn) { drawn = state; draw(); }
+        requestAnimationFrame(loop);
+    };
+    const update = () => {
+        const should = onScreen && !document.hidden && !stopped;
+        if (should && !running) { running = true; requestAnimationFrame(loop); }
+        if (!should) running = false;
+    };
+    const observer = new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; update(); });
+    observer.observe(frame);
+    document.addEventListener('visibilitychange', update);
+    img.addEventListener('load', onPhoto);
+    canvas.addEventListener('webglcontextlost', () => { photoReady = false; show(false); });
+    if (img.complete) onPhoto();
+
+    detailDepth = {
+        stop() {
+            stopped = true;
+            running = false;
+            observer.disconnect();
+            document.removeEventListener('visibilitychange', update);
+            img.removeEventListener('load', onPhoto);
+            section.removeEventListener('pointermove', onMove);
+            section.removeEventListener('pointerleave', onLeave);
+            show(false);
+            canvas.remove();
+        }
+    };
 }
 
 function hideColorLens() {
@@ -5144,6 +5478,7 @@ const OPTION_PHOTOS = {
     '14" Zeus Gloss Black, Kraken tires': 'wheel-14-zeus-kraken',
     '14" Athena Solid Gloss Black, Kraken tires': 'wheel-14-athena-gloss-kraken',
     'Clear windshield': 'windshield-clear',
+    'Tinted windshield': 'windshield-tinted',
     'Battlite lithium battery': 'battery-battlite',
     'Side mirrors': 'mirror-side',
     'Side mirrors and 5 panel rear mirror': 'mirror-5-panel',
@@ -5156,6 +5491,8 @@ const OPTION_PHOTOS = {
     'Sand bottle': 'sand-bottle',
     'Two sand bottles (2pcs)': 'sand-bottle',
     'GC Bluetooth speaker': 'audio-gc-soundbar-27',
+    'Club Car Premium Sound Bar': 'audio-cc-soundbar',
+    'Mirror package': 'mirror-kit',
     'Wireless charging': 'charge-wireless',
     'GC Premium floor mat': 'floor-mat-gc',
     'GC Premium lift kit': 'lift-gc-35',
@@ -5197,8 +5534,8 @@ const OPTION_PHOTOS = {
     'Three-sided rain enclosure, Beige': 'enclosure-3-beige',
     'Three-sided rain enclosure, White': 'enclosure-3-white',
     'Three-sided rain enclosure, Black': 'enclosure-3-black'
-    // No photo yet (a name here must have its file in image/Options, or its eye opens a broken image): Club Car
-    // Premium Sound Bar, Overhead Storage Console, Tempo Fenders 1.5", Two-sided rain enclosure (Club Car)
+    // No photo yet (a name here must have its file in image/Options, or its eye opens a broken image):
+    // Overhead Storage Console, Tempo Fenders 1.5", Two-sided rain enclosure (Club Car)
 };
 
 // A photo for an option (by option name, or by the group's id for single-item groups such as the ball washer)
@@ -5217,9 +5554,9 @@ function splitOptionName(text) {
 // covers the glyph, which shows again if the photo fails to load
 const OPTION_PLACEHOLDER = '<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.25"><rect x="3.5" y="5" width="17" height="14" rx="1"/><circle cx="9" cy="10" r="1.75"/><path d="M4 17.5l5-4.5 3.5 3 3-2.5 4.5 4"/></svg>';
 
-// The builder's option cards are text only (the user's choice, 2026-11-06), except wheels and tires, which show
-// their photo on the card. Every other option with a photo gets an eye button that opens it (optionEye)
-const OPTION_CARD_PHOTOS = false;
+// The builder's option cards show their photo on the card (the user's choice, 2026-11-10; text-only cards with an
+// eye button to open the photo were used from 2026-11-06). false brings the eye buttons back (optionEye)
+const OPTION_CARD_PHOTOS = true;
 
 // `inline`: show the photo on the card anyway (wheels and tires)
 function optionMedia(photo, inline = false) {
@@ -5234,7 +5571,8 @@ function optionMedia(photo, inline = false) {
 // The eye button on a text-only card: opens the option's photo (showOptionPhoto). Nothing when there's no photo
 const OPTION_EYE_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function optionEye(photo, name) {
-    if (!photo) return '';
+    // Cards that show their photo don't need one
+    if (!photo || OPTION_CARD_PHOTOS) return '';
     return `<button type="button" class="opt-eye" onclick="event.preventDefault();event.stopPropagation();showOptionPhoto(this)" data-photo="${attrText(photo)}" data-name="${attrText(name)}" aria-label="See a photo of ${attrText(name)}" title="See photo">${OPTION_EYE_ICON}</button>`;
 }
 
@@ -5891,12 +6229,16 @@ function renderProductDetailsPage() {
                     <div class="lg:col-span-6 space-y-8">
                         <div id="detail-color-pickers" class="space-y-8">${renderDetailColorPickers(product)}</div>
 
+                        ${accessoryCount && !tempo ? `
+                            <div>
+                                <h3 class="type-md text-ink mb-4">Accessories <span id="detail-accessory-count" class="text-sm text-mute">(${accessoryCount})</span></h3>
+                                <div id="detail-accessories" class="space-y-8"></div>
+                            </div>` : ''}
                         <div class="flex flex-wrap gap-3">
-                            ${tempo ? `<button type="button" onclick="scrollToDetailSection('options')" class="btn btn-primary">Choose equipment</button>` : ''}
-                            <button type="button" id="detail-color-quote" onclick="requestQuoteInColor()" class="btn ${tempo ? 'btn-outline' : 'btn-primary'}">${bodyColors.length || canopyOptions.length ? 'Get a quote for this build' : 'Get a quote'}</button>
-                            ${accessoryCount && !tempo ? `<button type="button" onclick="toggleDetailAccessories(this)" aria-expanded="false" aria-controls="detail-accessories" class="btn btn-outline">Add accessories <span id="detail-accessory-count" class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
+                            ${tempo
+                                ? `<button type="button" onclick="scrollToDetailSection('options')" class="btn btn-primary">Next section</button>`
+                                : `<button type="button" id="detail-color-quote" onclick="requestQuoteInColor()" class="btn btn-primary">${bodyColors.length || canopyOptions.length ? 'Get a quote for this build' : 'Get a quote'}</button>`}
                         </div>
-                        ${accessoryCount && !tempo ? '<div id="detail-accessories" class="space-y-8" hidden></div>' : ''}
                     </div>
                 </div>
             </div>
@@ -5917,11 +6259,14 @@ function renderProductDetailsPage() {
                 </aside>
                 <div class="lg:col-span-8">
                     <div id="detail-options">${renderTempoOptions(product)}</div>
+                    ${accessoryCount ? `
+                        <div class="mt-12">
+                            <h3 class="type-md text-ink mb-4">More accessories <span id="detail-accessory-count" class="text-sm text-mute">(${accessoryCount})</span></h3>
+                            <div id="detail-accessories" data-cols="2" class="space-y-8"></div>
+                        </div>` : ''}
                     <div class="mt-12 flex flex-wrap gap-3">
                         <button type="button" onclick="requestQuoteInColor()" class="btn btn-primary">Get a quote for this build</button>
-                        ${accessoryCount ? `<button type="button" onclick="toggleDetailAccessories(this)" aria-expanded="false" aria-controls="detail-accessories" class="btn btn-outline">More accessories <span id="detail-accessory-count" class="font-normal text-mute">(${accessoryCount})</span></button>` : ''}
                     </div>
-                    ${accessoryCount ? '<div id="detail-accessories" data-cols="2" class="mt-8 space-y-8" hidden></div>' : ''}
                 </div>
             </div>
         </section>

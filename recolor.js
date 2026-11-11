@@ -156,17 +156,75 @@ function loadRecolorMask(src, w, h) {
     });
 }
 
+// One channel of a paint map as each pixel's share of paint (0 to 1), with the map's hard edge softened to follow
+// the photo. The maps are traced as solid shapes, but a photo's edge is a pixel or two of blend between the part
+// and its neighbour; painted to the traced line, that blend showed as stair-steps and as a rim of the old colour.
+// So within two pixels of the map's edge a pixel's share is read from its colour: where it sits between the part's
+// colour just inside and the neighbour's colour just outside. The map still bounds how far that can move the edge
+// (fully within one pixel, half at two), and the more alike the two colours are, the more the map stands.
+function matteWeights(base, mask, channel) {
+    const { w, h } = base, px = base.imageData.data, n = w * h;
+    const m = new Float32Array(n);
+    for (let i = 0; i < n; i++) m[i] = mask[i * 4 + channel] / 255;
+    // How close each pixel is to the map's edge: 1 or 2 pixels (0 = further), and which side it is clearly on
+    const near = new Uint8Array(n), side = new Uint8Array(n);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x, own = m[i] > 0.5;
+        let lo1 = 1, hi1 = 0, lo2 = 1, hi2 = 0;
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+            const xx = x + dx, yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+            const v = m[yy * w + xx];
+            if (v < lo2) lo2 = v;
+            if (v > hi2) hi2 = v;
+            if (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) { if (v < lo1) lo1 = v; if (v > hi1) hi1 = v; }
+        }
+        near[i] = lo1 < 0.5 && hi1 > 0.5 ? 1 : lo2 < 0.5 && hi2 > 0.5 ? 2 : 0;
+        side[i] = near[i] ? 2 : own ? 1 : 0; // 2 = at the edge, else clearly in (1) or out (0)
+    }
+    const out = m.slice();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (!near[i]) continue;
+        // The part's colour and the neighbour's, from the pixels clear of the edge around this one
+        const fg = [0, 0, 0], bg = [0, 0, 0];
+        let nf = 0, nb = 0;
+        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+            const xx = x + dx, yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+            const j = yy * w + xx;
+            if (side[j] === 1) { fg[0] += px[j * 4]; fg[1] += px[j * 4 + 1]; fg[2] += px[j * 4 + 2]; nf++; }
+            else if (side[j] === 0) { bg[0] += px[j * 4]; bg[1] += px[j * 4 + 1]; bg[2] += px[j * 4 + 2]; nb++; }
+        }
+        if (!nf || !nb) continue;
+        let dot = 0, len = 0;
+        for (let c = 0; c < 3; c++) {
+            const d = fg[c] / nf - bg[c] / nb;
+            dot += (px[i * 4 + c] - bg[c] / nb) * d;
+            len += d * d;
+        }
+        // The more alike the two colours, the less the reading can be trusted (black paint beside dark glass read
+        // as specks): it counts in full only from a clear difference, and not at all below a faint one
+        const sure = Math.max(0, Math.min(1, (Math.sqrt(len) - 70) / 70));
+        if (!sure) continue;
+        const share = Math.max(0, Math.min(1, dot / len));
+        const reach = near[i] === 1 ? 1 : 0.5;
+        out[i] = m[i] + (share - m[i]) * reach * sure;
+    }
+    return out;
+}
+
 // A region from one channel of a paint map (0 body, 1 seat, 2 canopy), in the shape collectRegion returns,
 // plus each pixel's weight and the region's typical (median) linear brightness
 function maskRegion(base, mask, channel) {
     const idx = [];
     const weight = [];
     const xs = [];
+    const share = matteWeights(base, mask, channel);
     for (let i = 0; i < base.w * base.h; i++) {
-        const m = mask[i * 4 + channel];
-        if (m > 8) {
+        if (share[i] > 0.03) {
             idx.push(i);
-            weight.push(m / 255);
+            weight.push(share[i]);
             xs.push(i % base.w);
         }
     }

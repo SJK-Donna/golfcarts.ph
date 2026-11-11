@@ -424,6 +424,72 @@
             padding-bottom: 4.5rem;
         }
     }
+    /* Holiday theme (html.holiday, set by applyHoliday): the chosen photo fixed behind the whole site, under a veil of the
+       page colour so text stays readable. Light mode only, never in the admin. A fixed layer rather than a fixed
+       background, which phones don't support. Plain sections let it show through; cards, photos and pop-ups keep theirs. */
+    html.holiday:not([data-theme="dark"]) { background: var(--paper); }
+    html.holiday:not([data-theme="dark"]) body:not(.admin-mode) { background: transparent; }
+    html.holiday:not([data-theme="dark"]) body:not(.admin-mode)::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background: var(--holiday-bg, var(--paper));
+    }
+    /* A tablet held upright: the computer photo, laid out for a tall screen. Phones: their own photo */
+    @media (orientation: portrait) {
+        html.holiday:not([data-theme="dark"]) body:not(.admin-mode)::before { background: var(--holiday-bg-tall, var(--paper)); }
+    }
+    @media (max-width: 767px) {
+        html.holiday:not([data-theme="dark"]) body:not(.admin-mode)::before { background: var(--holiday-bg-phone, var(--paper)); }
+    }
+    html.holiday:not([data-theme="dark"]) body:not(.admin-mode) section.bg-paper { background-color: transparent; }
+
+    /* What falls: snow (soft white dots and drawn flakes), spiders on a thread and cobwebs, or hearts. Over the page and
+       under the menu, never in the way of a click */
+    .holiday-snow { position: fixed; inset: 0; z-index: 35; overflow: hidden; pointer-events: none; }
+    .admin-mode .holiday-snow { display: none; }
+    .holiday-flake { position: absolute; top: -28px; left: var(--x); width: var(--s); height: var(--s); opacity: var(--o); animation: holiday-fall var(--d) linear var(--delay) infinite; will-change: transform; }
+    .holiday-dot { border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(110, 130, 150, 0.22), 0 1px 3px rgba(40, 60, 80, 0.25); }
+    .holiday-flake svg { display: block; width: 100%; height: 100%; }
+    .holiday-shape { color: #8FA6BC; filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); }
+    /* Halloween: one cobweb in the bottom-right corner (a quarter of it on screen), and one spider on a thread that
+       drops from the top to about halfway down, waits, and climbs back up */
+    .holiday-corner-web { position: absolute; right: -130px; bottom: -130px; width: 260px; height: 260px; }
+    .holiday-web { color: rgba(90, 90, 90, 0.55); filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.9)); }
+    .holiday-dangle { position: absolute; top: 0; right: 14%; width: 26px; height: 26px; transform: translateY(-60px); animation: holiday-dangle 16s ease-in-out infinite; will-change: transform; }
+    .holiday-dangle::before { content: ''; position: absolute; left: 50%; bottom: 60%; width: 1px; height: 100vh; background: rgba(60, 60, 60, 0.5); }
+    .holiday-spider { display: block; width: 100%; height: 100%; color: #1E1A16; filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8)); }
+    .holiday-corner-web svg, .holiday-spider svg { display: block; width: 100%; height: 100%; }
+    @keyframes holiday-dangle {
+        0%, 100% { transform: translateY(-60px); }
+        40%, 62% { transform: translateY(45vh); }
+    }
+    @media (max-width: 767px) {
+        .holiday-corner-web { right: -90px; bottom: -90px; width: 180px; height: 180px; }
+        .holiday-dangle { right: 10%; width: 22px; height: 22px; }
+    }
+    .holiday-heart { filter: drop-shadow(0 1px 1px rgba(120, 0, 20, 0.25)); }
+    :root[data-theme="dark"] .holiday-shape { color: #DCE6F0; filter: none; }
+    :root[data-theme="dark"] .holiday-spider { color: #E9E3D6; filter: none; }
+    :root[data-theme="dark"] .holiday-dangle::before { background: rgba(230, 230, 230, 0.45); }
+    :root[data-theme="dark"] .holiday-web { color: rgba(230, 230, 230, 0.5); filter: none; }
+    @keyframes holiday-fall { to { transform: translate3d(var(--sway), 112vh, 0) rotate(var(--spin, 260deg)); } }
+    @media (max-width: 767px) { .holiday-flake:nth-child(n+19) { display: none; } }
+    @media (prefers-reduced-motion: reduce) { .holiday-snow { display: none; } }
+
+    /* The admin's picker for the holiday photos */
+    .holiday-picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+    @media (min-width: 640px) { .holiday-picks { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    .holiday-pick { display: grid; gap: 0.375rem; padding: 0.375rem; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); text-align: left; font-size: 0.75rem; color: var(--ink-2); cursor: pointer; }
+    .holiday-pick img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 5px; background: var(--stone); }
+    .holiday-pick[aria-pressed="true"] { border-color: var(--green); box-shadow: inset 0 0 0 2px var(--green); color: var(--ink); font-weight: 600; }
+
+    /* All carts: the Carts / Parts / Accessories row, and each card's Get a quote */
+    .product-kinds { margin-top: 1.25rem; }
+    .product-quote { align-self: flex-start; min-height: 2.5rem; margin-top: 0.75rem; padding: 0 1rem; font-size: 0.875rem; }
+
     /* The Red Series runs straight into the Golfer section below it, with no gap between them */
     .home-section.home-promo { padding-bottom: 0; }
     .home-hero-toggle {
@@ -1966,6 +2032,7 @@
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 0.75rem;
             padding: 4.5rem 0.75rem 4rem; /* room for the background's "Red Series" title, and the buttons below */
+            aspect-ratio: auto; /* the desktop's fixed shape made the row wider than the screen, cutting off the third cart */
         }
         /* Names sit under their carts here, so the desktop's centering shift would push them off the left edge */
         .lineup.lineup-promo .lineup-label {

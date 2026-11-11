@@ -614,6 +614,7 @@ const ADMIN_ORIGINALS = {
     event: { title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text.slice(), header: HOME_EVENT.header, headerAlt: '', photos: clone(HOME_EVENT.photos), effects: true },
     banners: clone(HOME_BANNERS),
     blogs: clone(BLOGS_DATA),
+    holiday: clone(HOLIDAY),
     promo: { settings: clone(HOME_PROMO_SETTINGS), carts: HOME_PROMO.map(c => ({ name: c.name, seats: c.seats, image: c.image, seat: c.seat, canopy: c.canopy })) }
 };
 // From the site_edits table: { 'product:<slug>': { value, updated_by }, 'accessory:<id>': { value: { image } }, event: { ... } }
@@ -628,6 +629,8 @@ function applyAdminEdits() {
     Object.assign(HOME_EVENT, clone(ADMIN_ORIGINALS.event), clone((siteEdits.event || {}).value));
     const banners = ((siteEdits.banners || {}).value || {}).slides;
     HOME_BANNERS.splice(0, HOME_BANNERS.length, ...clone(banners && banners.length ? banners : ADMIN_ORIGINALS.banners));
+    Object.assign(HOLIDAY, clone(ADMIN_ORIGINALS.holiday), clone((siteEdits.holiday || {}).value || {}));
+    applyHoliday();
     // The Red Series: its photos and effects, and each cart's editable fields, over the shipped ones
     const promo = (siteEdits.promo || {}).value || {};
     Object.assign(HOME_PROMO_SETTINGS, clone(ADMIN_ORIGINALS.promo.settings), clone(promo.settings || {}));
@@ -793,7 +796,7 @@ function adminHeading(data) {
         golfers: ['Golfers', data ? `${plural((data.golfers || []).length, 'member')}, ${(data.golfers || []).filter(g => g.news).length} want member news` : '', ''],
         bundles: ['Bundles', 'Cost lines for each build, in USD. Quotations are priced from these.', ''],
         products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
-        content: ['Site content', 'The homepage carousel, the Red Series and the event story.', ''],
+        content: ['Site content', 'The holiday theme, the homepage carousel, the Red Series and the event story.', ''],
         stories: ['Stories and guides', 'Add, edit or remove the stories on the Stories and Guides page.', ''],
         zoho: ['Zoho leads', 'Each quote request from the website, and whether it reached Zoho CRM Leads. Newest first.', '<button type="button" onclick="reloadPageData()" class="adm-btn">Refresh</button>'],
         users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`],
@@ -1843,6 +1846,77 @@ function undoStory(slug) {
     saveSiteEdit(`story:${slug}`, null, 'The original story is back.');
 }
 
+// --- Holiday theme: on or off, the photo behind the site (one for computers and tablets, one for phones), and snow ---
+let holidayDraft = null;
+
+function holidayFields() {
+    if (!holidayDraft) holidayDraft = clone(HOLIDAY);
+    return holidayDraft;
+}
+
+function renderHolidayEditor() {
+    const edit = siteEdits.holiday, d = holidayFields();
+    if (!HOLIDAY_THEMES[d.theme]) d.theme = 'christmas';
+    if (d.effects === undefined) d.effects = d.snow !== false;
+    const theme = HOLIDAY_THEMES[d.theme];
+    const picks = key => `<div class="holiday-picks" role="group">${Object.entries(HOLIDAY_DESIGNS).filter(([, x]) => x.theme === d.theme).map(([id, x]) => `
+        <button type="button" class="holiday-pick" aria-pressed="${d[key] === id}" onclick="setHolidayPick('${key}', '${id}', this)">
+            <img src="${escapeHtml(x.image)}" alt="" loading="lazy"><span>${escapeHtml(x.label)}</span>
+        </button>`).join('')}</div>`;
+    return `
+        <form data-no-prefill onsubmit="saveHolidayEdit(event)" class="admin-card grid gap-5 max-w-3xl mb-6" novalidate>
+            <div>
+                <h2 class="type-md text-ink">Holiday theme</h2>
+                <p class="text-sm text-mute mt-1">A holiday photo behind the whole website, and falling snow on every page. The photo shows in light mode only, and none of it shows in the admin.${edit && edit.updated_by ? ` Last edited by ${escapeHtml(adminName(edit.updated_by))}.` : ''}</p>
+            </div>
+            <label class="flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox"${d.on ? ' checked' : ''} onchange="setHoliday('on', this.checked)"> Show the holiday theme on the website</label>
+            <fieldset><legend class="text-sm font-semibold text-ink mb-2">Theme</legend>
+                <div class="admin-chips" role="group">${Object.entries(HOLIDAY_THEMES).map(([id, t]) => `<button type="button" aria-pressed="${d.theme === id}" onclick="setHolidayTheme('${id}')">${escapeHtml(t.label)}</button>`).join('')}</div></fieldset>
+            <fieldset class="grid gap-2"><legend class="text-sm font-semibold text-ink mb-2">Background on computers and tablets</legend>${picks('design')}</fieldset>
+            <fieldset class="grid gap-2"><legend class="text-sm font-semibold text-ink mb-2">Background on phones</legend>${picks('phone')}</fieldset>
+            <p class="text-xs text-mute">Each photo is placed by where its decoration is, so the decoration always shows: a tall photo stands on its decorated side at the screen's height on a computer, with its own background colour around it. Dark and red photos are paled so the website's text stays readable.</p>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox"${d.effects !== false ? ' checked' : ''} onchange="setHoliday('effects', this.checked)"> ${escapeHtml(theme.effect)} on every page</label>
+            <p class="text-xs text-mute">These photos are 1024 px wide or smaller, so they look a little soft on big screens. The same photos at 2560 px or wider would look sharp.</p>
+            <div class="flex flex-wrap gap-4 items-center">
+                <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm">Save holiday theme</button>
+                ${edit ? '<button type="button" onclick="resetHolidayEdit()" class="link text-sm">Undo edits</button>' : ''}
+            </div>
+        </form>`;
+}
+
+function setHoliday(key, value) {
+    holidayFields()[key] = value;
+    contentPreviewChanged();
+}
+
+// A theme starts with its own photos for computers and phones
+function setHolidayTheme(id) {
+    Object.assign(holidayFields(), { theme: id, design: HOLIDAY_THEMES[id].design, phone: HOLIDAY_THEMES[id].phone });
+    renderApp();
+}
+
+// Marks the chosen photo in place (a redraw would reload the preview)
+function setHolidayPick(key, id, button) {
+    holidayFields()[key] = id;
+    button.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+    contentPreviewChanged();
+}
+
+async function saveHolidayEdit(e) {
+    e.preventDefault();
+    const d = holidayFields();
+    if (await saveSiteEdit('holiday', clone(d), d.on ? 'Holiday theme saved. It is on the website now.' : 'Saved. The holiday theme is off.')) {
+        holidayDraft = null;
+        renderApp();
+    }
+}
+
+function resetHolidayEdit() {
+    if (!confirm('Go back to no holiday theme? This removes it from the website.')) return;
+    holidayDraft = null;
+    saveSiteEdit('holiday', null, 'The holiday theme is off.');
+}
+
 // --- The Red Series: its cover, background and effects, and each cart's photo, name, seats line, seat and canopy.
 // The seat and canopy lists are the Scratch build's, from the bundles, so a Red Series quote is still priced. ---
 let promoDraft = null;
@@ -2009,7 +2083,7 @@ function pushContentPreview() {
     const frame = document.getElementById('content-preview');
     try {
         if (frame && frame.contentWindow && frame.contentWindow.applyPreviewDraft) {
-            frame.contentWindow.applyPreviewDraft({ banners: bannerSlides(), event: eventFields(), promo: promoFields(), focus: previewFocus });
+            frame.contentWindow.applyPreviewDraft({ banners: bannerSlides(), event: eventFields(), promo: promoFields(), holiday: holidayFields(), focus: previewFocus });
         }
     } catch (err) { console.warn('Preview not updated:', err); }
 }
@@ -2038,6 +2112,7 @@ function renderAdminContent() {
     return `
         <div class="content-workspace">
         <div class="content-forms">
+        ${renderHolidayEditor()}
         ${renderBannerEditor()}
         ${renderPromoEditor()}
         <form data-no-prefill onsubmit="saveEventEdit(event)" class="admin-card grid gap-5 max-w-3xl" novalidate>
@@ -3176,7 +3251,7 @@ function activitySentence(e) {
         const product = kind === 'product' && PRODUCTS_DATA.find(p => p.slug === id);
         const accessory = kind === 'accessory' && ACCESSORY_CATALOG.flatMap(g => g.items).find(i => i.id === id);
         const name = kind === 'product' ? (product ? product.name : id) : kind === 'accessory' ? `${accessory ? accessory.name : id} photo`
-            : e.item === 'banners' ? 'the homepage carousel' : e.item === 'event' ? 'the homepage event' : e.item === 'promo' ? 'the Red Series' : e.item;
+            : e.item === 'banners' ? 'the homepage carousel' : e.item === 'event' ? 'the homepage event' : e.item === 'promo' ? 'the Red Series' : e.item === 'holiday' ? 'the holiday theme' : e.item;
         return del ? `Put back the original of ${name}` : `Edited ${name}`;
     }
     if (e.area === 'bundles') return `${verb} bundle line ${e.item}`;
