@@ -424,6 +424,8 @@
             padding-bottom: 4.5rem;
         }
     }
+    /* The Red Series runs straight into the Golfer section below it, with no gap between them */
+    .home-section.home-promo { padding-bottom: 0; }
     .home-hero-toggle {
         position: absolute;
         right: 1.25rem;
@@ -1714,7 +1716,7 @@
     .promo-stage {
         position: relative;
         overflow: hidden;
-        background: #B30F12 url('../image/Promo/red-series-stage.jpg') center / cover no-repeat;
+        background: #B30F12 var(--promo-stage-img, url('../image/Promo/red-series-stage.jpg')) center / cover no-repeat;
     }
     .lineup-promo {
         aspect-ratio: 3.33 / 1;
@@ -1813,7 +1815,7 @@
         justify-content: center;
         padding: 1.25rem 1.5rem 1rem;
         /* The background's right side: its left has the "Red Series" title */
-        background: #B30F12 url('../image/Promo/red-series-stage.jpg') right center / cover no-repeat;
+        background: #B30F12 var(--promo-stage-img, url('../image/Promo/red-series-stage.jpg')) right center / cover no-repeat;
     }
     .red-series-photo img {
         height: 13rem;
@@ -2724,11 +2726,25 @@
     .admin-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
     .admin-banner-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* Admin, Zoho leads: a filter row and a status per lead */
-    .zoho-filter { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem; }
-    .zoho-filter button { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.8rem; border: 1px solid var(--line); border-radius: 999px; font-size: 0.8125rem; color: var(--ink-2); background: var(--paper); cursor: pointer; }
-    .zoho-filter button span { font-variant-numeric: tabular-nums; color: var(--mute); }
-    .zoho-filter button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+    /* Admin, Zoho leads: a filter row and a status per lead (the chips are shared with the Site content preview) */
+    .zoho-filter { margin-bottom: 1.25rem; }
+    .zoho-filter, .admin-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .zoho-filter button, .admin-chips button { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.8rem; border: 1px solid var(--line); border-radius: 999px; font-size: 0.8125rem; color: var(--ink-2); background: var(--paper); cursor: pointer; }
+    .zoho-filter button span, .admin-chips button span { font-variant-numeric: tabular-nums; color: var(--mute); }
+    .zoho-filter button[aria-pressed="true"], .admin-chips button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+
+    /* Site content: the forms, and a live preview of the homepage (beside them on wide screens, above them otherwise) */
+    .content-workspace { display: flex; flex-direction: column; gap: 1.5rem; }
+    .content-forms { min-width: 0; }
+    .admin-preview { order: -1; display: grid; gap: 0.75rem; min-width: 0; }
+    .admin-preview-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
+    .admin-preview-head h2 { margin-right: auto; }
+    .admin-preview-stage { position: relative; overflow: hidden; border-radius: 8px; background: var(--stone); }
+    .admin-preview-stage iframe { display: block; border: 0; background: var(--paper); transform-origin: top left; box-shadow: 0 0 0 1px var(--line); }
+    @media (min-width: 1400px) {
+        .content-workspace { display: grid; grid-template-columns: minmax(0, 48rem) minmax(0, 1fr); align-items: start; }
+        .admin-preview { order: 0; position: sticky; top: 1rem; }
+    }
     .zoho-state { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
     .zoho-sent { background: #E6EEDA; color: #3F5A1A; }
     .zoho-failed, .zoho-stuck { background: #F6E0DC; color: #8A2A1C; }
@@ -2794,6 +2810,13 @@
         .guide-tab, .guide-tab::before, .story-arrow, .story-photo img { transition: none; }
         a:hover .story-arrow, .story-photo:hover img { transform: none; }
     }
+
+    /* The best size beside each photo upload, and the homepage event's wide header */
+    .admin-photo-size { display: block; margin: 0.125rem 0 0.25rem; font-size: 0.6875rem; font-weight: 400; color: var(--mute); }
+    .admin-banner-bar .admin-photo-size { display: inline; margin: 0 0 0 0.5rem; }
+    .admin-promo-cart { width: 12rem; background: #B30F12; }
+    .admin-event-header { overflow: hidden; border-radius: 6px; background: var(--stone); text-align: center; }
+    .admin-event-header img { display: block; width: 100%; aspect-ratio: 1571 / 285; object-fit: cover; }
 
     /* Stories and guides editor: a small whole photo beside its details */
     .admin-stories { display: grid; gap: 1rem; }

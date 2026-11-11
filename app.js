@@ -2610,6 +2610,42 @@ function renderHomeBanners() {
 
 // Crossfades between banners; advances every few seconds unless paused, hovered, focused, off screen,
 // or the visitor prefers reduced motion
+// The admin's live preview of Site content: the homepage in a frame (?preview=admin), drawn with the admin's unsaved
+// banners and event. Only that frame uses this; visitors never see a draft.
+const IS_ADMIN_PREVIEW = new URLSearchParams(location.search).get('preview') === 'admin' && window.parent !== window;
+let previewDraft = null;
+
+function applyPreviewDraft(draft) {
+    previewDraft = JSON.parse(JSON.stringify(draft)); // a copy in this page's own objects
+    applyPreviewNow();
+}
+
+function applyPreviewNow() {
+    if (!previewDraft || currentPage !== 'home') return;
+    const { banners, event, promo, focus } = previewDraft;
+    if (banners) HOME_BANNERS.splice(0, HOME_BANNERS.length, ...banners);
+    if (event) Object.assign(HOME_EVENT, event);
+    if (promo) {
+        Object.assign(HOME_PROMO_SETTINGS, promo.settings);
+        promo.carts.forEach((c, i) => HOME_PROMO[i] && Object.assign(HOME_PROMO[i], c));
+    }
+    document.documentElement.classList.remove('edits-pending');
+    renderApp();
+    document.querySelectorAll('.rise').forEach(el => el.classList.add('is-visible'));
+    if (focus && focus.section === 'promo') {
+        const el = document.querySelector('[aria-labelledby="home-promo-title"]');
+        if (el) el.scrollIntoView({ block: 'center', behavior: 'instant' });
+        if (focus.open) togglePromoCover(true, true);
+    } else if (focus && focus.section === 'event') {
+        const el = document.querySelector('[aria-labelledby="home-events-title"]');
+        // Straight there: the site's smooth scrolling would make the preview lag behind the typing
+        if (el) el.scrollIntoView({ block: 'start', behavior: 'instant' });
+    } else {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        if (homeBanners) { homeBanners.show((focus && focus.slide) || 0); homeBanners.pause(); }
+    }
+}
+
 function initHomeBanners() {
     if (homeBanners) homeBanners.stop();
     homeBanners = null;
@@ -2681,6 +2717,8 @@ function initHomeBanners() {
     setPaused(state.paused);
 
     homeBanners = {
+        show: i => show(i, false),
+        pause: () => setPaused(true),
         stop() {
             clearTimeout(state.timer);
             if (observer) observer.disconnect();
@@ -2726,6 +2764,11 @@ const HOME_PROMO = [
     { name: 'Golfer 2', seats: '2 seats', image: 'image/Promo/cutouts/red-series-tempo-2.png', slug: 'golfer-tempo-2', left: 79.5, width: 19.6, height: 66.1, seat: 'White', canopy: '2 Pass Canopy White' }
 ];
 
+// The section's photos and effects. Marketing can change these, and each cart's photo, name, seats line, seat and
+// canopy, in the admin (site_edits row "promo", applied by account.js); the model, build, Sangria body and each cart's
+// place in the line-up stay as set here. What staff typed is escaped where it's drawn.
+const HOME_PROMO_SETTINGS = { cover: 'image/Promo/red-series-cover.jpg', coverAlt: 'Red Series', stage: 'image/Promo/red-series-stage.jpg', effects: true };
+
 // A Red Series cart is one fixed cart, nothing to choose (the user's choice, 2026-11-07): the Scratch build in Sangria,
 // with the seats and canopy in its photo and the build's standard equipment. Its quote carries all of that, so the
 // admin prices it from the Scratch bundle like any other build.
@@ -2757,10 +2800,10 @@ function openRedSeries(index) {
     modal.innerHTML = `
         <div role="dialog" aria-modal="true" aria-labelledby="red-series-title" class="red-series-card m-auto w-full max-w-xl bg-paper border border-line">
             <div class="red-series-scroll">
-                <div class="red-series-photo"><img src="${cart.image}" alt="${attrText(cart.name)} in the Red Series"></div>
+                <div class="red-series-photo"><img src="${attrText(cart.image)}" alt="${attrText(cart.name)} in the Red Series"></div>
                 <div class="px-5 sm:px-6 pt-5">
-                    <h2 id="red-series-title" class="type-md text-ink">${cart.name} · Red Series</h2>
-                    <p class="text-sm text-mute mt-1">${cart.seats}</p>
+                    <h2 id="red-series-title" class="type-md text-ink">${attrText(cart.name)} · Red Series</h2>
+                    <p class="text-sm text-mute mt-1">${attrText(cart.seats)}</p>
                     <dl class="red-series-list">${redSeriesDetails(cart).equipment.map(([label, value]) => `<div><dt>${attrText(label)}</dt><dd>${attrText(value)}</dd></div>`).join('')}</dl>
                 </div>
             </div>
@@ -2813,14 +2856,18 @@ function renderPromoEffects() {
 }
 
 function renderHomePromo() {
+    const s = HOME_PROMO_SETTINGS, fx = s.effects === false ? '' : renderPromoEffects();
+    // The background behind the carts, as a CSS variable the stylesheet uses. A full address: a relative one would be
+    // read from the stylesheet's folder (css/). JSON quoting keeps it a CSS string
+    const stage = new URL(s.stage, document.baseURI).href;
     return `
-        <section class="rise home-section" aria-labelledby="home-promo-title">
-            <div class="promo-stage">
+        <section class="rise home-section home-promo" aria-labelledby="home-promo-title">
+            <div class="promo-stage" style="--promo-stage-img:url(${attrText(JSON.stringify(stage))})">
                 <h2 id="home-promo-title" class="sr-only">Red Series</h2>
-                ${renderPromoEffects()}
+                ${fx}
                 <div class="promo-cover">
-                    <img src="image/Promo/red-series-cover.jpg" alt="Red Series" loading="lazy" decoding="async">
-                    ${renderPromoEffects()}
+                    <img src="${attrText(s.cover)}" alt="${attrText(s.coverAlt || 'Red Series')}" loading="lazy" decoding="async">
+                    ${fx}
                     <button type="button" class="promo-arrow promo-open" onclick="togglePromoCover(true)">
                         See the Red Series
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -2834,10 +2881,10 @@ function renderHomePromo() {
                     ${HOME_PROMO.map((c, i) => `
                         <li class="lineup-item" style="--left:${c.left}%; --width:${c.width}%; --height:${c.height}%; z-index:${i + 1}">
                             <button type="button" onclick="openRedSeries(${i})" class="lineup-cart">
-                                <img src="${c.image}" alt="" loading="lazy" decoding="async">
+                                <img src="${attrText(c.image)}" alt="" loading="lazy" decoding="async">
                                 <span class="lineup-label">
-                                    <span class="lineup-name">${c.name}</span>
-                                    <span class="lineup-seats">${c.seats}</span>
+                                    <span class="lineup-name">${attrText(c.name)}</span>
+                                    <span class="lineup-seats">${attrText(c.seats)}</span>
                                 </span>
                             </button>
                         </li>
@@ -2849,7 +2896,7 @@ function renderHomePromo() {
 }
 
 // Red Series cover: the banner lies over the carts; its arrow slides it away to show them, the back arrow returns it
-function togglePromoCover(open) {
+function togglePromoCover(open, quiet) {
     const stage = document.querySelector('.promo-stage');
     if (!stage) return;
     stage.classList.toggle('is-open', open);
@@ -2858,7 +2905,7 @@ function togglePromoCover(open) {
     stage.querySelector('.lineup-promo').inert = !open;
     back.hidden = !open;
     stage.querySelector('.promo-hint').hidden = !open;
-    (open ? back : stage.querySelector('.promo-open')).focus();
+    if (!quiet) (open ? back : stage.querySelector('.promo-open')).focus();
 }
 
 function renderHomeUseTile(id, sizeClass, imageClass) {
@@ -3477,6 +3524,8 @@ function renderSpookyEffects() {
         </div>`;
 }
 
+// Edited in the admin (site_edits row "event", applied by account.js), so what staff typed is escaped where it's drawn.
+// effects: the Halloween bats and spider over the header; off for any other event.
 function renderHomeEvents() {
     const e = HOME_EVENT;
     // Each column shows every photo twice in a row, so its scroll loops seamlessly; the second column starts
@@ -3486,7 +3535,7 @@ function renderHomeEvents() {
         return `
             <div class="events-col ${down ? 'events-col-down' : ''}">
                 <div class="events-track">
-                    ${[...photos, ...photos].map((p, i) => `<img src="${p.image}" alt="${i < photos.length && !down ? p.alt : ''}" loading="lazy" decoding="async">`).join('')}
+                    ${[...photos, ...photos].map((p, i) => `<img src="${attrText(p.image)}" alt="${i < photos.length && !down ? attrText(p.alt || '') : ''}" loading="lazy" decoding="async">`).join('')}
                 </div>
             </div>`;
     };
@@ -3494,23 +3543,23 @@ function renderHomeEvents() {
         <section class="rise home-section" aria-labelledby="home-events-title">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
                 <div class="relative">
-                    <img src="${e.header}" alt="${e.title}" loading="lazy" decoding="async" class="w-full h-auto block">
-                    ${renderSpookyEffects()}
+                    <img src="${attrText(e.header)}" alt="${attrText(e.headerAlt || e.title)}" loading="lazy" decoding="async" class="w-full aspect-[1571/285] object-cover block">
+                    ${e.effects === false ? '' : renderSpookyEffects()}
                 </div>
                 <!-- The event's story on the left, its photos on the right (stacked on phones) -->
                 <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 mt-8">
                     <div class="space-y-4">
-                        <p class="text-sm text-mute">Events · ${e.date}</p>
-                        <h2 id="home-events-title" class="type-md text-ink">${e.title}</h2>
+                        <p class="text-sm text-mute">Events · ${attrText(e.date)}</p>
+                        <h2 id="home-events-title" class="type-md text-ink">${attrText(e.title)}</h2>
                         <!-- The first paragraph shows; Read more opens the rest -->
-                        ${e.text.slice(0, 1).map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${p}</p>`).join('')}
+                        ${e.text.slice(0, 1).map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${attrText(p)}</p>`).join('')}
                         <div id="home-events-more" class="space-y-4" hidden>
-                            ${e.text.slice(1).map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${p}</p>`).join('')}
+                            ${e.text.slice(1).map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${attrText(p)}</p>`).join('')}
                         </div>
                         <button type="button" class="link text-sm block" aria-expanded="false" aria-controls="home-events-more" onclick="toggleEventStory(this)">Read more</button>
                         <a href="./#home-quote" onclick="event.preventDefault(); goToHomeSection('home-quote')" class="btn btn-primary">Bring carts to your event</a>
                     </div>
-                    <div class="events-carousel" role="group" aria-label="${e.title} photos">
+                    <div class="events-carousel" role="group" aria-label="${attrText(e.title)} photos">
                         <div class="events-frame">${column(0, false)}${column(2, true)}</div>
                     </div>
                 </div>
@@ -5470,7 +5519,7 @@ function renderBuildCard(product, b, k, focus) {
 }
 
 // After a visitor has chosen a build (the Private Golf Carts finder, or the homepage's Build button): that build
-// large, the others as small cards under "Changed your mind?", and a way back to all of them side by side
+// large, the others as small cards under "Looking for something else?", and a way back to all of them side by side
 let detailBuildFocus = false;
 
 function renderFocusedBuilds(product, buildSet) {
@@ -5481,7 +5530,7 @@ function renderFocusedBuilds(product, buildSet) {
             ${renderBuildCard(product, buildSet.builds[k], k, true)}
             <div class="build-focus-side">
             <div class="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-                <h3 class="text-base font-semibold text-ink">Changed your mind? Choose another build</h3>
+                <h3 class="text-base font-semibold text-ink">Looking for something else? Explore other setups</h3>
                 <button type="button" class="link text-sm" onclick="setBuildFocus(false)">Compare all builds</button>
             </div>
             <div class="build-minis mt-3">

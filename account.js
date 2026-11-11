@@ -611,9 +611,10 @@ const productFields = p => Object.fromEntries(PRODUCT_EDIT_FIELDS.filter(k => p[
 const ADMIN_ORIGINALS = {
     products: Object.fromEntries(PRODUCTS_DATA.map(p => [p.slug, productFields(p)])),
     accessories: Object.fromEntries(ACCESSORY_CATALOG.flatMap(g => g.items.map(i => [i.id, i.image || '']))),
-    event: { title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text.slice() },
+    event: { title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text.slice(), header: HOME_EVENT.header, headerAlt: '', photos: clone(HOME_EVENT.photos), effects: true },
     banners: clone(HOME_BANNERS),
-    blogs: clone(BLOGS_DATA)
+    blogs: clone(BLOGS_DATA),
+    promo: { settings: clone(HOME_PROMO_SETTINGS), carts: HOME_PROMO.map(c => ({ name: c.name, seats: c.seats, image: c.image, seat: c.seat, canopy: c.canopy })) }
 };
 // From the site_edits table: { 'product:<slug>': { value, updated_by }, 'accessory:<id>': { value: { image } }, event: { ... } }
 let siteEdits = {};
@@ -624,9 +625,13 @@ function applyAdminEdits() {
         const edit = (siteEdits[`accessory:${i.id}`] || {}).value;
         i.image = (edit && edit.image) || ADMIN_ORIGINALS.accessories[i.id] || undefined;
     }));
-    Object.assign(HOME_EVENT, ADMIN_ORIGINALS.event, (siteEdits.event || {}).value);
+    Object.assign(HOME_EVENT, clone(ADMIN_ORIGINALS.event), clone((siteEdits.event || {}).value));
     const banners = ((siteEdits.banners || {}).value || {}).slides;
     HOME_BANNERS.splice(0, HOME_BANNERS.length, ...clone(banners && banners.length ? banners : ADMIN_ORIGINALS.banners));
+    // The Red Series: its photos and effects, and each cart's editable fields, over the shipped ones
+    const promo = (siteEdits.promo || {}).value || {};
+    Object.assign(HOME_PROMO_SETTINGS, clone(ADMIN_ORIGINALS.promo.settings), clone(promo.settings || {}));
+    HOME_PROMO.forEach((c, i) => Object.assign(c, clone(ADMIN_ORIGINALS.promo.carts[i]), clone((promo.carts || [])[i] || {})));
     // Each story is its own row: 'story:<slug>' holds the whole story, or { removed: true } for a shipped one taken down
     const stories = new Map(ADMIN_ORIGINALS.blogs.map(p => [p.slug, clone(p)]));
     Object.entries(siteEdits).filter(([key]) => key.startsWith('story:')).forEach(([key, row]) => {
@@ -678,6 +683,7 @@ async function loadSiteEdits({ rerender = true } = {}) {
             applyPageMeta(currentPage, currentSlug);
             renderApp();
         }
+        if (IS_ADMIN_PREVIEW) applyPreviewNow();
     } catch (err) {
         console.warn('Site edits not loaded:', err);
     } finally {
@@ -787,7 +793,7 @@ function adminHeading(data) {
         golfers: ['Golfers', data ? `${plural((data.golfers || []).length, 'member')}, ${(data.golfers || []).filter(g => g.news).length} want member news` : '', ''],
         bundles: ['Bundles', 'Cost lines for each build, in USD. Quotations are priced from these.', ''],
         products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
-        content: ['Site content', 'The homepage carousel and the event story.', ''],
+        content: ['Site content', 'The homepage carousel, the Red Series and the event story.', ''],
         stories: ['Stories and guides', 'Add, edit or remove the stories on the Stories and Guides page.', ''],
         zoho: ['Zoho leads', 'Each quote request from the website, and whether it reached Zoho CRM Leads. Newest first.', '<button type="button" onclick="reloadPageData()" class="adm-btn">Refresh</button>'],
         users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`],
@@ -963,7 +969,8 @@ function renderAdminHome(data) {
                 <section class="adm-panel adm-panel-wide">
                     <div class="adm-panel-head"><h2>Photo tips</h2></div>
                     <ul class="adm-tips">
-                        <li>Use JPEG or PNG. Large photos are resized to 1920px before they upload, so there is no need to shrink them first.</li>
+                        <li>Use JPEG or PNG. Larger photos are made smaller before they upload, so there is no need to shrink them first.</li>
+                        <li>Best sizes: model main and gallery photos ${PHOTO_SIZES.main}; build photos ${PHOTO_SIZES.build}; accessory photos ${PHOTO_SIZES.accessory}; homepage banners ${PHOTO_SIZES.banner}; event header ${PHOTO_SIZES.eventHeader}; event photos ${PHOTO_SIZES.eventPhoto}; Red Series cover and background ${PHOTO_SIZES.promoCover}, carts as ${PHOTO_SIZES.promoCart}; story photos ${PHOTO_SIZES.storyMain}. Each upload shows its size too.</li>
                         <li>Build photos show on the model page when a visitor picks that build: keep the cart in the same spot and angle as the others.</li>
                         <li>Homepage banners are 2880 × 864 pixels. Any other shape gets cropped, so check the preview in Site content before you save.</li>
                         <li>An edit goes live for every visitor as soon as you save it. Undo puts the shipped photo or text back.</li>
@@ -1311,8 +1318,25 @@ function resetProductEdit(slug) {
     saveSiteEdit(`product:${slug}`, null, 'Back to the original.');
 }
 
+// The best size for each kind of photo, measured from the site's own photos; shown beside each upload
+const PHOTO_SIZES = {
+    main: '1080 × 1080 px, square',
+    build: '1600 × 1200 px (4:3)',
+    gallery: '1080 × 1080 px, square',
+    accessory: '1080 × 1080 px, square',
+    banner: '2880 × 864 px',
+    eventHeader: '1920 × 350 px, a wide strip',
+    eventPhoto: '750 × 1000 px, portrait (3:4)',
+    storyMain: '1600 × 1200 px (4:3)',
+    storyPhoto: '1600 × 1200 px (4:3)',
+    promoCover: '2880 × 864 px',
+    promoStage: '2880 × 864 px, with the left third clear for the "Red Series" title',
+    promoCart: 'PNG cut-out with a see-through background, about 1000 px tall, side-on like the others'
+};
+const photoSize = kind => `<span class="admin-photo-size">Best size: ${PHOTO_SIZES[kind]}</span>`;
+
 // A photo with its Replace button (a file picker) and, when it was changed, a way back
-function photoTile({ src, label, slug, target, changed, extra = '' }) {
+function photoTile({ src, label, slug, target, changed, extra = '', size = '' }) {
     const id = `ph-${slug}-${target.replace(/[^a-z0-9]/gi, '-')}`;
     const busy = photoBusy === `${slug}:${target}`;
     return `
@@ -1320,6 +1344,7 @@ function photoTile({ src, label, slug, target, changed, extra = '' }) {
             <span class="admin-photo-img">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo</span>'}</span>
             <figcaption>
                 <span class="text-xs font-semibold text-ink">${escapeHtml(label)}</span>${changed ? ' <span class="admin-badge">New</span>' : ''}
+                ${size ? photoSize(size) : ''}
                 <span class="admin-photo-actions">
                     <label for="${id}" class="link text-xs">${busy ? 'Uploading…' : src ? 'Replace' : 'Add'}</label>
                     <input id="${id}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseProductPhoto('${slug}', '${target}', this)"${busy ? ' disabled' : ''}>
@@ -1343,25 +1368,25 @@ function renderProductEditor(p) {
                 <section>
                     <h3 class="text-sm font-semibold text-ink mb-2">Photos</h3>
                     <div class="admin-photos">
-                        ${photoTile({ src: d.image, label: 'Main photo', slug, target: 'image', changed: d.image !== original.image,
+                        ${photoTile({ src: d.image, label: 'Main photo', slug, target: 'image', changed: d.image !== original.image, size: 'main',
                             extra: d.image !== original.image ? `<button type="button" onclick="restoreProductPhoto('${slug}', 'image')" class="link text-xs">Original</button>` : '' })}
                         ${buildSet ? buildSet.builds.map(b => {
                             const src = (d.buildPhotos || {})[b.id], was = (original.buildPhotos || {})[b.id];
-                            return photoTile({ src, label: `${b.name} build`, slug, target: `build:${b.id}`, changed: src !== was,
+                            return photoTile({ src, label: `${b.name} build`, slug, target: `build:${b.id}`, changed: src !== was, size: 'build',
                                 extra: src !== was ? `<button type="button" onclick="restoreProductPhoto('${slug}', 'build:${b.id}')" class="link text-xs">Original</button>` : '' });
                         }).join('') : ''}
                     </div>
-                    <p class="text-xs text-mute mt-2">The main photo shows on the model cards and the model page${buildSet ? '; each build photo shows when that build is chosen, and in its quotation PDF' : ''}. Large photos are resized to ${SITE_PHOTO_MAX}px. The colour preview photos stay as they are (they are painted by the site).</p>
+                    <p class="text-xs text-mute mt-2">The main photo shows on the model cards and the model page${buildSet ? '; each build photo shows when that build is chosen, and in its quotation PDF' : ''}. Larger photos are made smaller before they upload, so there is no need to resize them first. Build photos look best with the cart in the same spot and angle as the other builds. The colour preview photos stay as they are (they are painted by the site).</p>
                 </section>
                 <section>
                     <h3 class="text-sm font-semibold text-ink mb-2">Gallery (model page)</h3>
                     <div class="admin-photos">
-                        ${gallery.map((src, i) => photoTile({ src, label: `Photo ${i + 1}${d.galleryLevels && d.galleryLevels[i] ? ` · ${levelName(d.galleryLevels[i])}` : ''}`, slug, target: `gallery:${i}`,
+                        ${gallery.map((src, i) => photoTile({ src, label: `Photo ${i + 1}${d.galleryLevels && d.galleryLevels[i] ? ` · ${levelName(d.galleryLevels[i])}` : ''}`, slug, target: `gallery:${i}`, size: 'gallery',
                             changed: src !== (original.gallery || [])[i],
                             extra: `<button type="button" onclick="moveGalleryPhoto('${slug}', ${i}, -1)" class="link text-xs"${i === 0 ? ' disabled' : ''} aria-label="Move photo ${i + 1} earlier">←</button>
                                 <button type="button" onclick="moveGalleryPhoto('${slug}', ${i}, 1)" class="link text-xs"${i === gallery.length - 1 ? ' disabled' : ''} aria-label="Move photo ${i + 1} later">→</button>
                                 <button type="button" onclick="removeGalleryPhoto('${slug}', ${i})" class="link text-xs">Remove</button>` })).join('')}
-                        ${photoTile({ src: '', label: 'New photo', slug, target: 'gallery:new', changed: false })}
+                        ${photoTile({ src: '', label: 'New photo', slug, target: 'gallery:new', changed: false, size: 'gallery' })}
                     </div>
                 </section>
                 <section class="grid sm:grid-cols-2 gap-x-6 gap-y-5">
@@ -1447,6 +1472,7 @@ function renderAccessoryPhotos() {
                             <span class="admin-photo-img">${src ? `<img src="${escapeHtml(src)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo</span>'}</span>
                             <figcaption>
                                 <span class="text-xs font-semibold text-ink">${escapeHtml(i.name)}</span>${edited ? ' <span class="admin-badge">New</span>' : ''}
+                                ${photoSize('accessory')}
                                 <span class="admin-photo-actions">
                                     <label for="${fid}" class="link text-xs">${photoBusy === `accessory:${i.id}` ? 'Uploading…' : src ? 'Replace' : 'Add'}</label>
                                     <input id="${fid}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseAccessoryPhoto('${i.id}', this)">
@@ -1502,10 +1528,10 @@ function renderBannerEditor() {
                 <p class="text-sm text-mute mt-1">The banners at the top of the homepage, in the order they play. Use a photo 2880 × 864 pixels: any other shape gets cropped, as the preview shows.${edit && edit.updated_by ? ` Last edited by ${escapeHtml(adminName(edit.updated_by))}.` : ''}</p>
             </div>
             <ol class="admin-banners">${slides.map((b, i) => `
-                <li class="admin-banner">
+                <li class="admin-banner" onfocusin="contentPreviewChanged({ section: 'banners', slide: ${i} })">
                     <div class="admin-banner-img">${b.image ? `<img src="${escapeHtml(b.image)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
                     <div class="admin-banner-bar">
-                        <span class="text-sm font-semibold text-ink">Banner ${i + 1}</span>
+                        <span class="text-sm font-semibold text-ink">Banner ${i + 1} ${photoSize('banner')}</span>
                         <span class="admin-photo-actions">
                             <label for="ab-photo-${i}" class="link text-xs">${photoBusy === `banner:${i}` ? 'Uploading…' : b.image ? 'Replace photo' : 'Add photo'}</label>
                             <input id="ab-photo-${i}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseBannerPhoto(${i}, this)">
@@ -1515,10 +1541,10 @@ function renderBannerEditor() {
                         </span>
                     </div>
                     <div class="grid sm:grid-cols-2 gap-4">
-                        <div class="field"><label for="ab-cta-${i}">Button text</label><input id="ab-cta-${i}" type="text" value="${escapeHtml(b.cta)}" onchange="setBannerField(${i}, 'cta', this.value)"></div>
+                        <div class="field"><label for="ab-cta-${i}">Button text</label><input id="ab-cta-${i}" type="text" value="${escapeHtml(b.cta)}" oninput="setBannerField(${i}, 'cta', this.value)"></div>
                         <div class="field"><label for="ab-link-${i}">Button goes to</label>
                             <select id="ab-link-${i}" onchange="setBannerLink(${i}, this.value)">${destinations.map(([route, slug, label]) => `<option value="${route}|${slug}"${route === b.route && slug === (b.slug || '') ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select></div>
-                        <div class="field sm:col-span-2"><label for="ab-alt-${i}">What the banner shows or says</label><input id="ab-alt-${i}" type="text" value="${escapeHtml(b.alt)}" onchange="setBannerField(${i}, 'alt', this.value)">
+                        <div class="field sm:col-span-2"><label for="ab-alt-${i}">What the banner shows or says</label><input id="ab-alt-${i}" type="text" value="${escapeHtml(b.alt)}" oninput="setBannerField(${i}, 'alt', this.value)">
                             <p class="text-xs text-mute mt-1">For people using screen readers, and for search engines. Type out any words in the photo.</p></div>
                     </div>
                 </li>`).join('')}</ol>
@@ -1536,6 +1562,7 @@ async function chooseBannerPhoto(i, input) {
     const file = input.files && input.files[0];
     if (!file) return;
     const slide = bannerSlides()[i];
+    previewFocus = { section: 'banners', slide: i };
     photoBusy = `banner:${i}`;
     renderApp();
     try {
@@ -1550,11 +1577,13 @@ async function chooseBannerPhoto(i, input) {
 
 function setBannerField(i, key, value) {
     bannerSlides()[i][key] = value.trim();
+    contentPreviewChanged({ section: 'banners', slide: i });
 }
 
 function setBannerLink(i, value) {
     const [route, slug] = value.split('|');
     Object.assign(bannerSlides()[i], { route, slug: slug || null });
+    contentPreviewChanged({ section: 'banners', slide: i });
 }
 
 function moveBanner(i, by) {
@@ -1655,7 +1684,7 @@ function renderStoryEditor() {
                 <div class="admin-story-img">${d.image ? `<img src="${escapeHtml(d.image)}" alt="">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
                 <div class="grid gap-2 min-w-0">
                     <div class="admin-banner-bar">
-                        <span class="text-sm font-semibold text-ink">Main photo</span>
+                        <span class="text-sm font-semibold text-ink">Main photo ${photoSize('storyMain')}</span>
                         <span class="admin-photo-actions">
                             <label for="as-photo" class="link text-xs">${photoBusy === 'story:image' ? 'Uploading…' : d.image ? 'Replace photo' : 'Add photo'}</label>
                             <input id="as-photo" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseStoryPhoto(this)">
@@ -1667,7 +1696,7 @@ function renderStoryEditor() {
 
             <div class="grid gap-3">
                 <div class="admin-banner-bar">
-                    <span class="text-sm font-semibold text-ink">More photos</span>
+                    <span class="text-sm font-semibold text-ink">More photos ${photoSize('storyPhoto')}</span>
                     <span class="admin-photo-actions">
                         <label for="as-gallery" class="link text-xs">${photoBusy === 'story:gallery' ? 'Uploading…' : 'Add photos'}</label>
                         <input id="as-gallery" type="file" multiple accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="addStoryPhotos(this)">
@@ -1814,33 +1843,344 @@ function undoStory(slug) {
     saveSiteEdit(`story:${slug}`, null, 'The original story is back.');
 }
 
-function renderAdminContent() {
-    const edit = siteEdits.event;
-    return `
-        ${renderBannerEditor()}
-        <form data-no-prefill onsubmit="saveEventEdit(event)" class="admin-card grid gap-5 max-w-3xl">
-            <div>
-                <h2 class="type-md text-ink">Homepage event</h2>
-                <p class="text-sm text-mute mt-1">The event story on the homepage. The photos stay as they are.${edit && edit.updated_by ? ` Last edited by ${escapeHtml(adminName(edit.updated_by))}.` : ''}</p>
+// --- The Red Series: its cover, background and effects, and each cart's photo, name, seats line, seat and canopy.
+// The seat and canopy lists are the Scratch build's, from the bundles, so a Red Series quote is still priced. ---
+let promoDraft = null;
+
+function promoFields() {
+    if (!promoDraft) promoDraft = { settings: clone(HOME_PROMO_SETTINGS), carts: HOME_PROMO.map(c => ({ name: c.name, seats: c.seats, image: c.image, seat: c.seat, canopy: c.canopy })) };
+    return promoDraft;
+}
+
+// The Scratch build's seat and canopy choices for a Red Series cart's model
+function promoChoices(i) {
+    const product = PRODUCTS_DATA.find(p => p.slug === HOME_PROMO[i].slug) || {};
+    return { seats: TEMPO_MATRIX.seat[RED_SERIES_LEVEL], canopies: (TEMPO_MATRIX.canopy[product.layout] || [])[RED_SERIES_LEVEL] || [] };
+}
+
+function renderPromoEditor() {
+    const edit = siteEdits.promo, d = promoFields(), s = d.settings;
+    const options = (list, chosen) => list.map(v => `<option${v === chosen ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
+    const photoRow = (id, label, size, src, busy, onchange, wide) => `
+        <div class="grid gap-2">
+            <div class="admin-banner-bar">
+                <span class="text-sm font-semibold text-ink">${label} ${photoSize(size)}</span>
+                <span class="admin-photo-actions">
+                    <label for="${id}" class="link text-xs">${photoBusy === busy ? 'Uploading…' : 'Replace photo'}</label>
+                    <input id="${id}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="${onchange}">
+                </span>
             </div>
-            <div class="field"><label for="ae-title">Title</label><input id="ae-title" name="title" type="text" required value="${escapeHtml(HOME_EVENT.title)}"></div>
-            <div class="field"><label for="ae-date">Date and place</label><input id="ae-date" name="date" type="text" value="${escapeHtml(HOME_EVENT.date)}"></div>
-            <div class="field"><label for="ae-text">Story (a blank line between paragraphs)</label><textarea id="ae-text" name="text" rows="12">${escapeHtml(HOME_EVENT.text.join('\n\n'))}</textarea></div>
+            <div class="${wide ? 'admin-banner-img' : 'admin-story-img admin-promo-cart'}">${src ? `<img src="${escapeHtml(src)}" alt="">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
+        </div>`;
+    return `
+        <form data-no-prefill onsubmit="savePromoEdit(event)" class="admin-card grid gap-5 max-w-3xl mb-6" novalidate>
+            <div>
+                <h2 class="type-md text-ink">Red Series</h2>
+                <p class="text-sm text-mute mt-1">The Red Series on the homepage: the cover, the background behind the carts, and the three carts. Each cart is a fixed Scratch build in Sangria; its seat and canopy are what its quote asks for.${edit && edit.updated_by ? ` Last edited by ${escapeHtml(adminName(edit.updated_by))}.` : ''}</p>
+            </div>
+            <div onfocusin="contentPreviewChanged({ section: 'promo' })">
+                ${photoRow('rp-cover', 'Cover', 'promoCover', s.cover, 'promo:cover', 'choosePromoPhoto(\'cover\', this)', true)}
+                <div class="field mt-3"><label for="rp-cover-alt">What the cover shows or says</label><input id="rp-cover-alt" type="text" value="${escapeHtml(s.coverAlt)}" oninput="setPromoSetting('coverAlt', this.value)"></div>
+            </div>
+            <div onfocusin="contentPreviewChanged({ section: 'promo', open: true })">
+                ${photoRow('rp-stage', 'Background behind the carts', 'promoStage', s.stage, 'promo:stage', 'choosePromoPhoto(\'stage\', this)', true)}
+            </div>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox"${s.effects !== false ? ' checked' : ''} onchange="setPromoSetting('effects', this.checked)"> Show the falling snow, holly and sparkles</label>
+            <ol class="admin-banners">${d.carts.map((c, i) => {
+                const choice = promoChoices(i);
+                return `
+                <li class="admin-banner" onfocusin="contentPreviewChanged({ section: 'promo', open: true })">
+                    ${photoRow(`rp-cart-${i}`, `Cart ${i + 1}: ${escapeHtml(PRODUCTS_DATA.find(p => p.slug === HOME_PROMO[i].slug).name)}`, 'promoCart', c.image, `promo:cart:${i}`, `choosePromoPhoto('cart:${i}', this)`, false)}
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div class="field"><label for="rp-name-${i}">Name on the homepage</label><input id="rp-name-${i}" type="text" maxlength="20" value="${escapeHtml(c.name)}" oninput="setPromoCart(${i}, 'name', this.value)"></div>
+                        <div class="field"><label for="rp-seats-${i}">Seats line</label><input id="rp-seats-${i}" type="text" maxlength="40" value="${escapeHtml(c.seats)}" oninput="setPromoCart(${i}, 'seats', this.value)"></div>
+                        <div class="field"><label for="rp-seat-${i}">Seat</label><select id="rp-seat-${i}" onchange="setPromoCart(${i}, 'seat', this.value)">${options(choice.seats, c.seat)}</select></div>
+                        <div class="field"><label for="rp-canopy-${i}">Canopy</label><select id="rp-canopy-${i}" onchange="setPromoCart(${i}, 'canopy', this.value)">${options(choice.canopies, c.canopy)}</select></div>
+                    </div>
+                </li>`;
+            }).join('')}</ol>
+            <p class="text-xs text-mute -mt-2">Change the seat or canopy only together with a cart photo that shows them. The body colour stays Sangria.</p>
             <div class="flex flex-wrap gap-4 items-center">
-                <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm">Save</button>
-                <a href="./" data-route="home" class="link text-sm">See the homepage</a>
-                ${edit ? '<button type="button" onclick="resetEventEdit()" class="link text-sm">Undo edits</button>' : ''}
+                <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm"${photoBusy ? ' disabled' : ''}>Save Red Series</button>
+                ${edit ? '<button type="button" onclick="resetPromoEdit()" class="link text-sm">Undo edits</button>' : ''}
             </div>
         </form>`;
 }
 
-function saveEventEdit(e) {
+function setPromoSetting(key, value) {
+    promoFields().settings[key] = typeof value === 'string' ? value.trim() : value;
+    contentPreviewChanged({ section: 'promo', open: key !== 'coverAlt' && key !== 'cover' });
+}
+
+function setPromoCart(i, key, value) {
+    promoFields().carts[i][key] = value.trim();
+    contentPreviewChanged({ section: 'promo', open: true });
+}
+
+// target: 'cover', 'stage' or 'cart:<index>'. Cut-outs stay PNG to keep their see-through background
+async function choosePromoPhoto(target, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const draft = promoFields();
+    const cart = target.startsWith('cart:') ? +target.slice(5) : null;
+    if (cart !== null && file.type !== 'image/png' && !confirm('This is not a PNG, so it has no see-through background: the cart will show on a box. Use it anyway?')) { input.value = ''; return; }
+    previewFocus = { section: 'promo', open: target !== 'cover' };
+    photoBusy = `promo:${target}`;
+    renderApp();
+    try {
+        const url = await uploadSitePhoto(file, 'promo', cart === null ? { max: BANNER_PHOTO_MAX, jpeg: true } : {});
+        if (cart === null) draft.settings[target] = url;
+        else draft.carts[cart].image = url;
+        showToast('Photo uploaded. Save the Red Series to put it on the site.');
+    } catch (err) {
+        showToast(`Not uploaded: ${err.message}.`);
+    }
+    photoBusy = '';
+    renderApp();
+}
+
+async function savePromoEdit(e) {
     e.preventDefault();
-    const data = new FormData(e.target);
-    saveSiteEdit('event', { title: data.get('title').trim(), date: data.get('date').trim(), text: data.get('text').split(/\n\s*\n/).map(t => t.trim()).filter(Boolean) }, 'Homepage event saved.');
+    const d = promoFields();
+    const missing = d.carts.findIndex(c => !c.name || !c.image);
+    if (missing >= 0) { showToast(`Cart ${missing + 1} needs a name and a photo.`); return; }
+    if (!d.settings.cover || !d.settings.stage) { showToast('The Red Series needs a cover and a background.'); return; }
+    if (await saveSiteEdit('promo', clone(d), 'Red Series saved. It is on the homepage now.')) {
+        promoDraft = null;
+        renderApp();
+    }
+}
+
+function resetPromoEdit() {
+    if (!confirm('Go back to the original Red Series? This removes your edited photos and text from the homepage.')) return;
+    promoDraft = null;
+    saveSiteEdit('promo', null, 'Back to the original Red Series.');
+}
+
+// --- The homepage event: its text, header, photos and effects, edited here and saved together ---
+const EVENT_PHOTO_MAX = 1200; // the event photos show in narrow columns
+let eventDraft = null;        // the event being edited; starts as what the site shows
+
+function eventFields() {
+    if (!eventDraft) eventDraft = clone({ title: HOME_EVENT.title, date: HOME_EVENT.date, text: HOME_EVENT.text, header: HOME_EVENT.header,
+        headerAlt: HOME_EVENT.headerAlt || '', photos: HOME_EVENT.photos, effects: HOME_EVENT.effects !== false });
+    return eventDraft;
+}
+
+// --- Live preview: the homepage at a phone, tablet or desktop width, showing the unsaved changes as they're typed ---
+const PREVIEW_DEVICES = { desktop: ['Desktop', 1366, 768], tablet: ['Tablet (iPad)', 820, 1180], mobile: ['Mobile', 390, 844] };
+let previewDevice = 'mobile';
+let previewFocus = { section: 'banners', slide: 0 };
+let previewTimer = 0;
+
+function renderContentPreview() {
+    const [label, w, h] = PREVIEW_DEVICES[previewDevice];
+    setTimeout(fitContentPreview, 0);
+    return `
+        <section class="admin-card admin-preview" aria-labelledby="preview-title">
+            <div class="admin-preview-head">
+                <h2 id="preview-title" class="type-md text-ink">Preview</h2>
+                <div class="admin-chips" role="group" aria-label="Screen">${Object.entries(PREVIEW_DEVICES).map(([id, [name, dw]]) =>
+                    `<button type="button" aria-pressed="${id === previewDevice}" onclick="setPreviewDevice('${id}')">${name} <span>${dw}px</span></button>`).join('')}</div>
+                <div class="admin-chips" role="group" aria-label="Show">
+                    <button type="button" aria-pressed="${previewFocus.section !== 'event'}" onclick="showPreviewSection('banners')">Carousel</button>
+                    <button type="button" aria-pressed="${previewFocus.section === 'promo'}" onclick="showPreviewSection('promo')">Red Series</button>
+                    <button type="button" aria-pressed="${previewFocus.section === 'event'}" onclick="showPreviewSection('event')">Event</button>
+                </div>
+            </div>
+            <p class="text-xs text-mute">Your changes show here as you type or add a photo, before you save. Visitors see them once you save.</p>
+            <div class="admin-preview-stage"><iframe id="content-preview" title="Homepage preview, ${label}, ${w} pixels wide" src="./?preview=admin" width="${w}" height="${h}" style="width:${w}px;height:${h}px" onload="pushContentPreview()"></iframe></div>
+        </section>`;
+}
+
+// The frame is drawn at the device's real width and scaled down to fit the panel
+function fitContentPreview() {
+    const stage = document.querySelector('.admin-preview-stage'), frame = document.getElementById('content-preview');
+    if (!stage || !frame) return;
+    const [, w, h] = PREVIEW_DEVICES[previewDevice];
+    const scale = Math.min(1, stage.clientWidth / w, (window.innerHeight * 0.75) / h);
+    frame.style.transform = `scale(${scale})`;
+    stage.style.height = `${Math.round(h * scale)}px`;
+    frame.style.marginLeft = `${Math.max(0, Math.round((stage.clientWidth - w * scale) / 2))}px`;
+}
+window.addEventListener('resize', () => fitContentPreview());
+
+function pushContentPreview() {
+    const frame = document.getElementById('content-preview');
+    try {
+        if (frame && frame.contentWindow && frame.contentWindow.applyPreviewDraft) {
+            frame.contentWindow.applyPreviewDraft({ banners: bannerSlides(), event: eventFields(), promo: promoFields(), focus: previewFocus });
+        }
+    } catch (err) { console.warn('Preview not updated:', err); }
+}
+
+// Typing updates the preview a moment after the last key, without redrawing the admin
+function contentPreviewChanged(focus) {
+    if (focus) previewFocus = focus;
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(pushContentPreview, 150);
+}
+
+function setPreviewDevice(id) {
+    previewDevice = id;
+    renderApp();
+}
+
+function showPreviewSection(section) {
+    previewFocus = section === 'banners' ? { section, slide: previewFocus.slide || 0 } : section === 'promo' ? { section, open: true } : { section };
+    const order = ['banners', 'promo', 'event'];
+    document.querySelectorAll('.admin-preview [aria-label="Show"] button').forEach((b, k) => b.setAttribute('aria-pressed', String(order[k] === section)));
+    pushContentPreview();
+}
+
+function renderAdminContent() {
+    const edit = siteEdits.event, d = eventFields();
+    return `
+        <div class="content-workspace">
+        <div class="content-forms">
+        ${renderBannerEditor()}
+        ${renderPromoEditor()}
+        <form data-no-prefill onsubmit="saveEventEdit(event)" class="admin-card grid gap-5 max-w-3xl" novalidate>
+            <div>
+                <h2 class="type-md text-ink">Homepage event</h2>
+                <p class="text-sm text-mute mt-1">The event story on the homepage: its text, the wide header photo and the photos beside the story.${edit && edit.updated_by ? ` Last edited by ${escapeHtml(adminName(edit.updated_by))}.` : ''}</p>
+            </div>
+            <div class="field"><label for="ae-title">Title</label><input id="ae-title" name="title" type="text" required value="${escapeHtml(d.title)}" oninput="setEventField('title', this.value)"></div>
+            <div class="field"><label for="ae-date">Date and place</label><input id="ae-date" name="date" type="text" value="${escapeHtml(d.date)}" oninput="setEventField('date', this.value)"></div>
+            <div class="field"><label for="ae-text">Story (a blank line between paragraphs)</label><textarea id="ae-text" name="text" rows="12" oninput="setEventText(this.value)">${escapeHtml(d.text.join('\n\n'))}</textarea></div>
+
+            <div class="grid gap-2">
+                <div class="admin-banner-bar">
+                    <span class="text-sm font-semibold text-ink">Header photo ${photoSize('eventHeader')}</span>
+                    <span class="admin-photo-actions">
+                        <label for="ae-header" class="link text-xs">${photoBusy === 'event:header' ? 'Uploading…' : 'Replace photo'}</label>
+                        <input id="ae-header" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseEventHeader(this)">
+                    </span>
+                </div>
+                <div class="admin-event-header">${d.header ? `<img src="${escapeHtml(d.header)}" alt="">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
+                <div class="field"><label for="ae-header-alt">What the header shows or says</label><input id="ae-header-alt" type="text" value="${escapeHtml(d.headerAlt)}" placeholder="Leave empty to use the title" oninput="setEventField('headerAlt', this.value)"></div>
+                <p class="text-xs text-mute">The header is always a wide strip: a photo of another shape is cropped to it, as the preview shows.</p>
+                <label class="flex items-center gap-2 text-sm"><input type="checkbox"${d.effects ? ' checked' : ''} onchange="setEventEffects(this.checked)"> Show the Halloween bats and spider over the header</label>
+            </div>
+
+            <div class="grid gap-3">
+                <div class="admin-banner-bar">
+                    <span class="text-sm font-semibold text-ink">Photos beside the story ${photoSize('eventPhoto')}</span>
+                    <span class="admin-photo-actions">
+                        <label for="ae-photos" class="link text-xs">${photoBusy === 'event:photos' ? 'Uploading…' : 'Add photos'}</label>
+                        <input id="ae-photos" type="file" multiple accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="addEventPhotos(this)">
+                    </span>
+                </div>
+                <p class="text-xs text-mute -mt-1">They scroll in two columns, so use at least 4. Portrait photos fill the columns best.</p>
+                ${d.photos.map((p, i) => `<div class="admin-story-photo">
+                    <div class="admin-story-img"><img src="${escapeHtml(p.image)}" alt="" loading="lazy"></div>
+                    <div class="grid gap-2 min-w-0">
+                        <div class="field"><label for="ae-p-${i}">What photo ${i + 1} shows</label><input id="ae-p-${i}" type="text" value="${escapeHtml(p.alt || '')}" oninput="setEventPhotoAlt(${i}, this.value)"></div>
+                        <span class="admin-photo-actions">
+                            <button type="button" onclick="moveEventPhoto(${i}, -1)" class="link text-xs"${i === 0 ? ' disabled' : ''}>Move up</button>
+                            <button type="button" onclick="moveEventPhoto(${i}, 1)" class="link text-xs"${i === d.photos.length - 1 ? ' disabled' : ''}>Move down</button>
+                            <button type="button" onclick="removeEventPhoto(${i})" class="link text-xs">Remove</button>
+                        </span>
+                    </div>
+                </div>`).join('')}
+            </div>
+
+            <div class="flex flex-wrap gap-4 items-center">
+                <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm"${photoBusy ? ' disabled' : ''}>Save</button>
+                <a href="./" data-route="home" class="link text-sm">See the homepage</a>
+                ${edit ? '<button type="button" onclick="resetEventEdit()" class="link text-sm">Undo edits</button>' : ''}
+            </div>
+        </form>
+        </div>
+        ${renderContentPreview()}
+        </div>`;
+}
+
+function setEventField(key, value) {
+    eventFields()[key] = value.trim();
+    contentPreviewChanged({ section: 'event' });
+}
+
+function setEventText(value) {
+    eventFields().text = value.split(/\n\s*\n/).map(t => t.trim()).filter(Boolean);
+    contentPreviewChanged({ section: 'event' });
+}
+
+function setEventEffects(on) {
+    eventFields().effects = on;
+    contentPreviewChanged({ section: 'event' });
+}
+
+function setEventPhotoAlt(i, value) {
+    eventFields().photos[i].alt = value.trim();
+    contentPreviewChanged({ section: 'event' });
+}
+
+// The photo goes on the draft it was chosen for, even if the page is redrawn during the upload
+async function chooseEventHeader(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const draft = eventFields();
+    previewFocus = { section: 'event' };
+    photoBusy = 'event:header';
+    renderApp();
+    try {
+        draft.header = await uploadSitePhoto(file, 'event');
+        showToast('Photo uploaded. Save the event to put it on the site.');
+    } catch (err) {
+        showToast(`Not uploaded: ${err.message}.`);
+    }
+    photoBusy = '';
+    renderApp();
+}
+
+async function addEventPhotos(input) {
+    const files = [...(input.files || [])];
+    if (!files.length) return;
+    const draft = eventFields();
+    previewFocus = { section: 'event' };
+    photoBusy = 'event:photos';
+    renderApp();
+    let failed = 0;
+    for (const file of files) {
+        try {
+            draft.photos.push({ image: await uploadSitePhoto(file, 'event', { max: EVENT_PHOTO_MAX, jpeg: true }), alt: '' });
+        } catch (err) {
+            failed++;
+            console.warn('Photo not uploaded:', err);
+        }
+        renderApp();
+    }
+    photoBusy = '';
+    showToast(failed ? `${failed} of ${files.length} photos didn't upload. Please try those again.` : 'Photos uploaded. Save the event to put them on the site.');
+    renderApp();
+}
+
+function moveEventPhoto(i, by) {
+    const list = eventFields().photos;
+    list.splice(i + by, 0, list.splice(i, 1)[0]);
+    renderApp();
+}
+
+function removeEventPhoto(i) {
+    eventFields().photos.splice(i, 1);
+    renderApp();
+}
+
+async function saveEventEdit(e) {
+    e.preventDefault();
+    const d = eventFields();
+    const missing = [[d.title, 'a title'], [d.text.length, 'its story'], [d.header, 'a header photo'], [d.photos.length >= 2, 'at least 2 photos']].find(([value]) => !value);
+    if (missing) { showToast(`The event needs ${missing[1]}.`); return; }
+    if (await saveSiteEdit('event', clone(d), 'Homepage event saved. It is on the homepage now.')) {
+        eventDraft = null;
+        renderApp();
+    }
 }
 
 function resetEventEdit() {
+    if (!confirm('Go back to the original event? This removes your edited text and photos from the homepage.')) return;
+    eventDraft = null;
     saveSiteEdit('event', null, 'Back to the original event.');
 }
 
@@ -2836,7 +3176,7 @@ function activitySentence(e) {
         const product = kind === 'product' && PRODUCTS_DATA.find(p => p.slug === id);
         const accessory = kind === 'accessory' && ACCESSORY_CATALOG.flatMap(g => g.items).find(i => i.id === id);
         const name = kind === 'product' ? (product ? product.name : id) : kind === 'accessory' ? `${accessory ? accessory.name : id} photo`
-            : e.item === 'banners' ? 'the homepage carousel' : e.item === 'event' ? 'the homepage event' : e.item;
+            : e.item === 'banners' ? 'the homepage carousel' : e.item === 'event' ? 'the homepage event' : e.item === 'promo' ? 'the Red Series' : e.item;
         return del ? `Put back the original of ${name}` : `Edited ${name}`;
     }
     if (e.area === 'bundles') return `${verb} bundle line ${e.item}`;
