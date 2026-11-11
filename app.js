@@ -1930,6 +1930,9 @@ const HOLIDAY_THEMES = {
     halloween: { label: 'Halloween', effect: 'A spider on its thread and a cobweb', design: 'halloween-pumpkins', phone: 'halloween-pumpkins' },
     hearts: { label: 'Hearts Day', effect: 'Falling hearts', design: 'hearts-white', phone: 'hearts-pink' }
 };
+// Hidden for now (the user's choice, 2026-11-11): the theme stays off on the site whatever the admin saved, and the
+// admin doesn't show its editor. false brings both back
+const HOLIDAY_HIDDEN = true;
 const HOLIDAY = { on: false, theme: 'christmas', design: 'cream-corners', phone: 'white-portrait', effects: true };
 
 const HOLIDAY_SHAPES = {
@@ -2001,7 +2004,7 @@ function applyHoliday() {
     const root = document.documentElement;
     if (!document.body) return;
     const theme = HOLIDAY_THEMES[HOLIDAY.theme] ? HOLIDAY.theme : 'christmas';
-    const on = !!HOLIDAY.on, falling = on && (HOLIDAY.effects !== undefined ? HOLIDAY.effects : HOLIDAY.snow) !== false;
+    const on = !HOLIDAY_HIDDEN && !!HOLIDAY.on, falling = on && (HOLIDAY.effects !== undefined ? HOLIDAY.effects : HOLIDAY.snow) !== false;
     root.classList.toggle('holiday', on);
     if (on) {
         const design = id => HOLIDAY_DESIGNS[id] || HOLIDAY_DESIGNS[HOLIDAY_THEMES[theme].design];
@@ -2538,6 +2541,7 @@ function renderApp() {
         viewport.innerHTML = renderSolutionsPage();
     } else if (currentPage === 'service') {
         viewport.innerHTML = renderServicePage();
+        initServicePage();
     } else if (currentPage === 'blogs') {
         viewport.innerHTML = renderBlogsPage();
     } else if (currentPage === 'blog-details') {
@@ -2714,18 +2718,6 @@ function renderHomeBanners() {
                         <div class="banner-progress" aria-hidden="true">
                             ${HOME_BANNERS.map((_, i) => `<button type="button" tabindex="-1" class="banner-dot ${i === 0 ? 'is-active' : ''}" data-banner-go="${i}"><span></span></button>`).join('')}
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button type="button" class="banner-control" data-banner="prev" aria-label="Previous banner">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-                            </button>
-                            <button type="button" class="banner-control" data-banner="toggle" aria-label="Pause banners" hidden>
-                                <svg class="icon-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
-                                <svg class="icon-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg>
-                            </button>
-                            <button type="button" class="banner-control" data-banner="next" aria-label="Next banner">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -2782,7 +2774,6 @@ function initHomeBanners() {
     const slides = [...stage.querySelectorAll('.banner-slide')];
     const ctas = [...document.querySelectorAll('[data-banner-cta]')];
     const dots = [...section.querySelectorAll('.banner-dot')];
-    const toggle = section.querySelector('[data-banner="toggle"]');
     const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const state = { index: 0, paused: reduceMotion, hovered: false, focused: false, onScreen: true, timer: 0 };
 
@@ -2810,19 +2801,11 @@ function initHomeBanners() {
     };
     const setPaused = paused => {
         state.paused = paused;
-        toggle.classList.toggle('is-paused', paused);
-        toggle.setAttribute('aria-label', paused ? 'Play banners' : 'Pause banners');
         restart();
     };
 
+    // The previous, pause and next buttons were removed (the user's choice, 2026-11-11): the lines still jump to a banner
     const onClick = e => {
-        const ctl = e.target.closest('[data-banner]');
-        if (ctl) {
-            const what = ctl.dataset.banner;
-            if (what === 'prev') show(state.index - 1, true);
-            if (what === 'next') show(state.index + 1, true);
-            if (what === 'toggle') setPaused(!state.paused);
-        }
         const go = e.target.closest('[data-banner-go]');
         if (go) show(+go.dataset.bannerGo, true);
     };
@@ -2840,7 +2823,6 @@ function initHomeBanners() {
         : null;
     if (observer) observer.observe(stage);
 
-    toggle.hidden = reduceMotion; // nothing moves by itself with reduced motion, so no pause control
     setPaused(state.paused);
 
     homeBanners = {
@@ -5040,6 +5022,18 @@ function requestQuoteInColor() {
     if (product) openQuoteModal(product.slug);
 }
 
+// Tempo pages keep Equipment and upgrades hidden until "Next section" is pressed (the user's choice, 2026-11-11).
+// Holds the slug of the model page it was opened on, so it stays open while that page re-renders
+let detailOptionsOpen = null;
+
+function showDetailOptions() {
+    detailOptionsOpen = currentSlug;
+    const section = document.getElementById('options');
+    if (!section) return;
+    section.hidden = false;
+    scrollToDetailSection('options');
+}
+
 function scrollToDetailSection(id) {
     const target = document.getElementById(id);
     if (target) target.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
@@ -6236,7 +6230,7 @@ function renderProductDetailsPage() {
                             </div>` : ''}
                         <div class="flex flex-wrap gap-3">
                             ${tempo
-                                ? `<button type="button" onclick="scrollToDetailSection('options')" class="btn btn-primary">Next section</button>`
+                                ? `<button type="button" onclick="showDetailOptions()" class="btn btn-primary">Next section</button>`
                                 : `<button type="button" id="detail-color-quote" onclick="requestQuoteInColor()" class="btn btn-primary">${bodyColors.length || canopyOptions.length ? 'Get a quote for this build' : 'Get a quote'}</button>`}
                         </div>
                     </div>
@@ -6247,7 +6241,7 @@ function renderProductDetailsPage() {
 
         ${tempo ? `
         <!-- Equipment and upgrades: what the chosen build includes and what can be added (the "Versions" document) -->
-        <section id="options" class="detail-section options-fit rise scroll-mt-32 home-section border-t border-line">
+        <section id="options" class="detail-section options-fit rise scroll-mt-32 home-section border-t border-line"${detailOptionsOpen === product.slug ? '' : ' hidden'}>
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12 items-start">
                 <!-- Your build: stays in view beside the choices on desktop -->
                 <aside class="lg:col-span-4 lg:self-stretch space-y-8" aria-label="Your build">
@@ -6530,10 +6524,186 @@ function renderSolutionsPage() {
     `;
 }
 
-function handleServiceRequestSubmit(e) {
+// ==========================================
+// SERVICE AND SUPPORT: the cart comes first. The visitor says which cart it is (theirs, or one they're buying or
+// selling), each service card notes what fits that cart, and the booking carries the cart with it. Requests are
+// saved like quote requests (sendQuoteRequest), with an SRV- reference and the source "Service and support"
+// ==========================================
+const SERVICE_MODELS = [
+    { name: 'Tempo', image: 'image/lineup/tempo.png' },
+    { name: 'Onward' },
+    { name: 'Precedent' },
+    { name: 'Carryall', image: 'image/lineup/carryall.png' },
+    { name: 'Villager', image: 'image/lineup/villager.png' },
+    { name: 'Transporter', image: 'image/Products/Transporter 4.png' },
+    { name: 'Minibus', image: 'image/lineup/minibus.png' }
+];
+const SERVICE_POWER = ['Electric, lead-acid', 'Electric, lithium', 'Gas', 'Not sure'];
+const SERVICE_SEATS = ['2', '2+2', '4', '4+2', '6 or more', 'Utility'];
+
+// cart: 'own' is the visitor's cart, 'buying' or 'selling' a cart they want inspected or valued, false no cart
+// (they're renting ours). onsite: done where the cart is, so the booking asks for the address.
+// note(cart): a line on the card for the cart described, or ''
+const SERVICE_GROUPS = [
+    { id: 'fix', title: 'Fix it', items: [
+        { name: 'Mobile home service', tag: 'Doorstep tune-up', cart: 'own', onsite: true, text: 'A technician comes to your home or site for the seven-point check and small repairs.' },
+        { name: 'Emergency breakdown and flatbed transport', cart: 'own', onsite: true, text: 'When the cart won\'t run, we come to it: fixed on the spot, or taken to the branch on a flatbed.' },
+        { name: 'Major frame-up overhauls and restorations', cart: 'own', text: 'Stripped to the frame and rebuilt: rust repair, wiring, suspension, body and seats.' }
+    ] },
+    { id: 'upgrade', title: 'Upgrade it', items: [
+        { name: 'Lithium battery conversion', tag: 'LiFePO4', cart: 'own', text: 'Lead-acid batteries swapped for a lithium pack and matched charger: lighter, no watering, longer range.',
+            note: c => c.power === 'Electric, lithium' ? 'Your cart already runs on lithium. Ask for a battery health check instead.' : c.power === 'Gas' ? 'For electric carts only.' : '' },
+        { name: 'Lights, signals and safety upgrades', cart: 'own', text: 'LED headlights and taillights, turn signals, mirrors, horn and seat belts.' },
+        { name: 'Custom upholstery, paint and accessories', cart: 'own', text: 'New seats, body color, enclosures, audio and more, fitted to your cart.',
+            note: c => c.seats && c.seats !== 'Utility' ? `Seats made for a ${c.seats} layout.` : '' },
+        { name: 'Genuine OEM parts and smart chargers', cart: 'own', text: 'Original parts, and chargers matched to your cart\'s model and batteries.',
+            note: c => c.power === 'Gas' ? 'Smart chargers are for electric carts.' : '' }
+    ] },
+    { id: 'fleet', title: 'Keep fleets running', items: [
+        { name: 'Resort and hotel fleet maintenance', tag: 'Service agreement', cart: 'own', onsite: true, text: 'Scheduled maintenance for the whole fleet, under a service agreement with set response times.' },
+        { name: 'Golf course fleet services and overhauls', cart: 'own', onsite: true, text: 'Seasonal checks, battery care and overhauls for course fleets, planned around play.' },
+        { name: 'Coastal rust and anti-corrosion care', cart: 'own', text: 'Rust treatment and protective coating for carts kept near the sea.' },
+        { name: 'Custom commercial fabrication', tag: 'Utility, cargo, ambulance', cart: 'own', text: 'Cargo beds, utility boxes and stretcher builds on your cart\'s chassis.' },
+        { name: 'Tournament and event tech standby', cart: 'own', onsite: true, text: 'A technician and spare parts on site through your tournament or event.' }
+    ] },
+    { id: 'trade', title: 'Buy, sell or rent', items: [
+        { name: 'Pre-purchase cart inspection', cart: 'buying', onsite: true, text: 'Buying a used cart? We inspect it before you pay.' },
+        { name: 'Cart trade-in, consignment and valuation', cart: 'selling', text: 'Trade your cart in towards a new one, have us sell it for you, or find out what it\'s worth.' },
+        { name: 'Short-term event and wedding rentals', cart: false, onsite: true, text: 'Carts for weddings, events and shoots, delivered and collected.' },
+        { name: 'Corporate long-term fleet leasing', cart: false, onsite: true, text: 'Carts for your property or company on a long-term lease.' }
+    ] }
+];
+const SERVICE_LIST = SERVICE_GROUPS.flatMap(g => g.items);
+let serviceAudience = 'owner'; // 'owner' or 'fleet': fleets see their services first
+
+// The cart as described in the cart step
+function serviceCart() {
+    const form = document.getElementById('svc-cart');
+    if (!form) return {};
+    const data = new FormData(form);
+    const value = name => String(data.get(name) || '').trim();
+    const model = value('model') === 'Other brand' ? value('other') || 'Other brand' : value('model') && 'Club Car ' + value('model');
+    return { model, power: value('power'), seats: value('seats'), year: value('year'), serial: value('serial'), ours: value('ours'), count: value('count') };
+}
+
+function serviceCartSummary(c) {
+    const parts = [c.model, c.seats && c.seats !== 'Utility' ? c.seats + ' seats' : c.seats, c.power, c.year && (/^\d/.test(c.year) ? 'about ' + c.year : c.year), c.count && c.count + ' carts'].filter(Boolean);
+    return parts.join(' · ');
+}
+
+function renderServiceCards() {
+    const cart = serviceCart();
+    const groups = serviceAudience === 'fleet' ? [SERVICE_GROUPS[2], ...SERVICE_GROUPS.filter(g => g.id !== 'fleet')] : SERVICE_GROUPS;
+    return groups.map(g => `
+        <div class="grid lg:grid-cols-12 gap-6 py-10 border-t border-line">
+            <h3 class="type-md text-ink lg:col-span-3">${g.title}</h3>
+            <ul class="lg:col-span-9 grid sm:grid-cols-2 gap-4">
+                ${g.items.map(item => {
+                    const note = item.note ? item.note(cart) : '';
+                    return `
+                    <li class="bg-paper border border-line p-5 flex flex-col gap-3">
+                        <div>
+                            <p class="font-semibold text-ink">${item.name}</p>
+                            ${item.tag ? `<p class="text-sm text-mute">${item.tag}</p>` : ''}
+                        </div>
+                        <p class="text-sm text-ink-2">${item.text}</p>
+                        ${note ? `<p class="text-sm text-ink border-l-2 border-ink pl-3">${note}</p>` : ''}
+                        <button type="button" onclick="pickService(${SERVICE_LIST.indexOf(item)})" class="link self-start mt-auto">Book this</button>
+                    </li>`;
+                }).join('')}
+            </ul>
+        </div>`).join('');
+}
+
+// Called whenever the cart step changes: the summary, the cards' notes and the booking form follow it
+function updateService() {
+    const form = document.getElementById('svc-cart');
+    if (!form) return;
+    const other = form.querySelector('#svc-other');
+    if (other) other.hidden = form.querySelector('input[name="model"]:checked')?.value !== 'Other brand';
+    const count = form.querySelector('#svc-count-field');
+    if (count) count.hidden = serviceAudience !== 'fleet';
+    const summary = serviceCartSummary(serviceCart());
+    document.querySelectorAll('[data-svc-summary]').forEach(el => { el.textContent = summary || 'Not described yet'; });
+    const cards = document.getElementById('svc-cards');
+    if (cards) cards.innerHTML = renderServiceCards();
+    updateServiceForm();
+}
+
+// After the page renders: the cards, summary and form match the (empty) cart step
+function initServicePage() {
+    serviceAudience = 'owner';
+    updateService();
+}
+
+function setServiceAudience(audience) {
+    serviceAudience = audience;
+    document.querySelectorAll('[data-svc-audience]').forEach(b => {
+        const on = b.dataset.svcAudience === audience;
+        b.classList.toggle('detail-trim-active', on);
+        b.setAttribute('aria-pressed', String(on));
+    });
+    updateService();
+}
+
+// The booking form shows what the chosen service needs: the cart, or (for rentals) how many carts and when
+function updateServiceForm() {
+    const form = document.getElementById('svc-book');
+    if (!form) return;
+    const item = SERVICE_LIST.find(i => i.name === form.querySelector('#sr-type').value) || SERVICE_LIST[0];
+    const cartBox = form.querySelector('#sr-cart');
+    cartBox.hidden = !item.cart;
+    form.querySelector('#sr-cart-label').textContent = item.cart === 'buying' ? 'The cart you want inspected' : item.cart === 'selling' ? 'The cart you\'re selling' : 'Your cart';
+    const rental = form.querySelector('#sr-rental');
+    rental.hidden = !!item.cart;
+    rental.querySelectorAll('input').forEach(i => { i.required = !item.cart; });
+    const where = form.querySelector('#sr-where');
+    where.hidden = !!item.onsite;
+    const atSite = item.onsite || form.querySelector('input[name="where"]:checked')?.value === 'site';
+    const address = form.querySelector('#sr-address-field');
+    address.hidden = !atSite;
+    address.querySelector('label').textContent = item.cart === false ? 'Where the carts are needed' : item.cart === 'buying' ? 'Where the cart is' : 'Address where the cart is';
+    address.querySelector('textarea').required = atSite;
+}
+
+function pickService(index) {
+    const select = document.getElementById('sr-type');
+    if (!select) return;
+    select.value = SERVICE_LIST[index].name;
+    updateServiceForm();
+    scrollToDetailSection('service-request');
+}
+
+async function handleServiceRequestSubmit(e) {
     e.preventDefault();
-    e.target.reset();
-    showToast(`Request sent. Your reference is SRV-${Math.floor(1000 + Math.random() * 9000)}.`);
+    const form = e.target;
+    const data = new FormData(form);
+    const value = name => String(data.get(name) || '').trim();
+    const item = SERVICE_LIST.find(i => i.name === value('service')) || SERVICE_LIST[0];
+    const cart = serviceCart();
+    const reference = 'SRV-' + Math.floor(100000 + Math.random() * 900000);
+    const rows = [['Service', item.name], ['Customer', serviceAudience === 'fleet' ? 'Fleet' : 'Private owner']];
+    if (value('org')) rows.push(['Company', value('org')]);
+    if (item.cart) {
+        rows.push(['Cart', cart.model || 'Not given'], ['Power', cart.power || 'Not given'], ['Seats', cart.seats || 'Not given'],
+            ['Year', cart.year || 'Not given'], ['Serial number', cart.serial || 'Not given']);
+        if (item.cart === 'own') rows.push(['Bought from us', cart.ours || 'Not given']);
+        if (cart.count) rows.push(['Carts in the fleet', cart.count]);
+    } else {
+        rows.push(['Carts needed', value('carts')], ['Dates', value('dates')]);
+    }
+    const atSite = item.onsite || value('where') === 'site';
+    rows.push(['Where', atSite ? 'At the customer\'s home or site' : 'Customer brings it to the branch']);
+    if (atSite) rows.push(['Address', value('address')]);
+    const sent = await sendQuoteRequest(form, {
+        reference, source: 'Service and support', name: value('name'), email: value('email'), phone: value('phone'),
+        model: item.cart ? cart.model : '', quantity: item.cart ? cart.count : value('carts'), branch: value('branch'),
+        notes: value('notes'), rows: JSON.stringify(rows)
+    }, null);
+    if (!sent) return;
+    form.reset();
+    updateServiceForm();
+    showToast(`Request sent. Your reference is ${reference}. We emailed you a confirmation; our service team will call you to set a schedule.`);
 }
 
 function renderServicePage() {
@@ -6556,7 +6726,7 @@ function renderServicePage() {
                         <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mt-4">
                 <h1 class="type-xl text-ink lg:col-span-7">Service, parts and support.</h1>
                 <div class="lg:col-span-5 space-y-6">
-                    <p class="measure">Preventive maintenance, repairs, original parts and battery checks from our service team, at our branches or on site.</p>
+                    <p class="measure">Repairs, upgrades, fleet care, trade-ins and rentals from our service team, for Club Car and other brands, at your home, on your site or at our branches.</p>
                     <div class="flex flex-wrap gap-3">
                         <button type="button" onclick="scrollToDetailSection('service-request')" class="btn btn-primary">Book a service</button>
                         <button type="button" onclick="goToHomeSection('home-branches')" class="btn btn-outline">Find a branch</button>
@@ -6564,6 +6734,66 @@ function renderServicePage() {
                     <!-- Parts and Accessories lives under Service and Support (website review) -->
                     <a href="carts/?category=Accessories" onclick="event.preventDefault(); setCategoryAndNavigate('Accessories')" class="link inline-block">Shop parts and accessories</a>
                 </div>
+            </div>
+        </section>
+
+        <section id="service-cart" class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12 scroll-mt-20" aria-labelledby="service-cart-title">
+            <div class="grid lg:grid-cols-12 gap-10 lg:gap-12">
+                <div class="lg:col-span-4 space-y-4">
+                    <p class="text-sm text-mute">Step 1</p>
+                    <h2 id="service-cart-title" class="type-lg text-ink">Which cart is it?</h2>
+                    <p class="measure">Tell us about the cart first, so we bring the right parts and quote the right work. Not sure? Skip what you don't know.</p>
+                    <div class="flex flex-wrap gap-2" role="group" aria-label="Who the service is for">
+                        <button type="button" data-svc-audience="owner" aria-pressed="true" onclick="setServiceAudience('owner')" class="detail-trim detail-trim-active">Private owner</button>
+                        <button type="button" data-svc-audience="fleet" aria-pressed="false" onclick="setServiceAudience('fleet')" class="detail-trim">Fleet</button>
+                    </div>
+                </div>
+                <form id="svc-cart" data-no-prefill oninput="updateService()" onchange="updateService()" onsubmit="event.preventDefault()" class="lg:col-span-8 space-y-8">
+                    <fieldset>
+                        <legend class="font-semibold text-ink mb-3">Brand and model</legend>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            ${[...SERVICE_MODELS, { name: 'Other brand' }].map(m => `
+                                <label class="svc-model">
+                                    <input type="radio" name="model" value="${m.name}" class="sr-only">
+                                    <span class="svc-model-photo">${m.image ? `<img src="${m.image}" alt="" loading="lazy" class="max-w-full max-h-full object-contain mix-blend-multiply">` : `<span class="text-sm text-mute">${m.name === 'Other brand' ? 'Any brand' : 'Club Car'}</span>`}</span>
+                                    <span class="text-sm text-ink">${m.name === 'Other brand' ? m.name : 'Club Car ' + m.name}</span>
+                                </label>`).join('')}
+                        </div>
+                        <div id="svc-other" class="field mt-4 max-w-md" hidden><label for="svc-other-input">Brand and model</label><input id="svc-other-input" name="other" type="text" placeholder="e.g. EZGO RXV, Yamaha Drive2"></div>
+                    </fieldset>
+                    <fieldset>
+                        <legend class="font-semibold text-ink mb-3">Power</legend>
+                        <div class="flex flex-wrap gap-2">${SERVICE_POWER.map(p => `<label class="detail-trim svc-chip"><input type="radio" name="power" value="${p}" class="sr-only">${p}</label>`).join('')}</div>
+                    </fieldset>
+                    <fieldset>
+                        <legend class="font-semibold text-ink mb-3">Seats</legend>
+                        <div class="flex flex-wrap gap-2">${SERVICE_SEATS.map(p => `<label class="detail-trim svc-chip"><input type="radio" name="seats" value="${p}" class="sr-only">${p}</label>`).join('')}</div>
+                    </fieldset>
+                    <div class="grid sm:grid-cols-2 gap-x-6 gap-y-5">
+                        <div class="field"><label for="svc-year">Year, roughly</label>
+                            <select id="svc-year" name="year"><option value="">Not sure</option>${Array.from({ length: new Date().getFullYear() - 1999 }, (_, i) => `<option>${new Date().getFullYear() - i}</option>`).join('')}<option>Before 2000</option></select>
+                        </div>
+                        <div class="field"><label for="svc-serial">Serial number (optional)</label><input id="svc-serial" name="serial" type="text" autocomplete="off"></div>
+                        <details class="sm:col-span-2 text-sm text-ink-2">
+                            <summary class="cursor-pointer text-ink">Where to find the serial number</summary>
+                            <p class="measure mt-2">On most Club Car carts it's on a plate on the frame under the passenger-side glove box; on older DS carts, above the accelerator pedal. On other brands, look on the frame under the seat. A photo of the plate works too: send it when we call.</p>
+                        </details>
+                        <fieldset class="sm:col-span-2">
+                            <legend class="font-semibold text-ink mb-3">Bought from us?</legend>
+                            <div class="flex flex-wrap gap-2">${['Yes', 'No'].map(p => `<label class="detail-trim svc-chip"><input type="radio" name="ours" value="${p}" class="sr-only">${p}</label>`).join('')}</div>
+                        </fieldset>
+                        <div id="svc-count-field" class="field" hidden><label for="svc-count">Carts in the fleet</label><input id="svc-count" name="count" type="number" min="1" placeholder="20"></div>
+                    </div>
+                    <p class="text-sm text-ink-2 border-t border-line pt-4">Your cart: <span data-svc-summary class="text-ink font-semibold">Not described yet</span></p>
+                </form>
+            </div>
+        </section>
+
+        <section id="service-list" class="home-section bg-stone" aria-labelledby="service-list-title">
+            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
+                <p class="text-sm text-mute">Step 2</p>
+                <h2 id="service-list-title" class="type-lg text-ink mb-8">What does it need?</h2>
+                <div id="svc-cards">${renderServiceCards()}</div>
             </div>
         </section>
 
@@ -6586,26 +6816,37 @@ function renderServicePage() {
         <section id="service-request" class="home-section bg-stone scroll-mt-20" aria-labelledby="service-request-title">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-12">
                 <div class="lg:col-span-4 space-y-5">
+                    <p class="text-sm text-mute">Step 3</p>
                     <h2 id="service-request-title" class="type-xl text-ink">Book a service.</h2>
-                    <p class="measure text-ink-2">Tell us what the cart needs. We'll confirm a schedule with you.</p>
+                    <p class="measure text-ink-2">Tell us what the cart needs. Our service team will call you to confirm a schedule.</p>
                 </div>
-                <form onsubmit="handleServiceRequestSubmit(event)" class="lg:col-span-7 lg:col-start-6 grid sm:grid-cols-2 gap-x-6 gap-y-5">
-                    <div class="field"><label for="sr-name">Name</label><input id="sr-name" required type="text" autocomplete="name"></div>
-                    <div class="field"><label for="sr-org">Club, resort or company</label><input id="sr-org" required type="text" autocomplete="organization"></div>
-                    <div class="field"><label for="sr-phone">Mobile number</label><input id="sr-phone" required type="tel" autocomplete="tel" placeholder="+63 900 000 0000"></div>
-                    <div class="field"><label for="sr-branch">Nearest branch</label>
-                        <select id="sr-branch">${BRANCHES.map(b => `<option>${b.name}</option>`).join('')}</select>
-                    </div>
+                <form id="svc-book" onsubmit="handleServiceRequestSubmit(event)" onchange="updateServiceForm()" class="lg:col-span-7 lg:col-start-6 grid sm:grid-cols-2 gap-x-6 gap-y-5">
                     <div class="field sm:col-span-2"><label for="sr-type">Service</label>
-                        <select id="sr-type">
-                            <option>Preventive maintenance (seven-point check)</option>
-                            <option>On-site technician repair</option>
-                            <option>Parts request</option>
-                            <option>Lithium battery health check</option>
-                            <option>Maintenance and charging advice</option>
-                            <option>Warranty enquiry</option>
+                        <select id="sr-type" name="service">
+                            ${SERVICE_GROUPS.map(g => `<optgroup label="${g.title}">${g.items.map(i => `<option>${i.name}</option>`).join('')}</optgroup>`).join('')}
                         </select>
                     </div>
+                    <p id="sr-cart" class="sm:col-span-2 text-sm text-ink-2"><span id="sr-cart-label">Your cart</span>: <span data-svc-summary class="text-ink font-semibold">Not described yet</span> · <button type="button" onclick="scrollToDetailSection('service-cart')" class="link">Change</button></p>
+                    <div id="sr-rental" class="sm:col-span-2 grid sm:grid-cols-2 gap-x-6 gap-y-5" hidden>
+                        <div class="field"><label for="sr-carts">Carts needed</label><input id="sr-carts" name="carts" type="number" min="1"></div>
+                        <div class="field"><label for="sr-dates">Dates or lease start</label><input id="sr-dates" name="dates" type="text" placeholder="e.g. 14 to 15 Feb 2027"></div>
+                    </div>
+                    <div class="field"><label for="sr-name">Name</label><input id="sr-name" name="name" required type="text" autocomplete="name"></div>
+                    <div class="field"><label for="sr-phone">Mobile number</label><input id="sr-phone" name="phone" required type="tel" autocomplete="tel" placeholder="+63 900 000 0000"></div>
+                    <div class="field"><label for="sr-org">Company, club or resort (optional)</label><input id="sr-org" name="org" type="text" autocomplete="organization"></div>
+                    <div class="field"><label for="sr-email">Email</label><input id="sr-email" name="email" required type="email" autocomplete="email"></div>
+                    <div class="field"><label for="sr-branch">Nearest branch</label>
+                        <select id="sr-branch" name="branch">${BRANCHES.map(b => `<option>${b.name}</option>`).join('')}</select>
+                    </div>
+                    <fieldset id="sr-where" class="sm:col-span-2">
+                        <legend class="text-sm text-ink mb-2">Where should we do the work?</legend>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="detail-trim svc-chip"><input type="radio" name="where" value="site" class="sr-only">At my home or site</label>
+                            <label class="detail-trim svc-chip"><input type="radio" name="where" value="branch" checked class="sr-only">I'll bring it to the branch</label>
+                        </div>
+                    </fieldset>
+                    <div id="sr-address-field" class="field sm:col-span-2" hidden><label for="sr-address">Address where the cart is</label><textarea id="sr-address" name="address" rows="2" autocomplete="street-address"></textarea></div>
+                    <div class="field sm:col-span-2"><label for="sr-notes">What's wrong, or what you'd like done</label><textarea id="sr-notes" name="notes" rows="4"></textarea></div>
                     <div class="sm:col-span-2"><button type="submit" class="btn btn-primary">Send request</button></div>
                 </form>
             </div>

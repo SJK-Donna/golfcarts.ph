@@ -186,6 +186,9 @@ alter table public.bundles add column if not exists updated_at timestamptz;
 alter table public.bundles add column if not exists cost_usd numeric;
 alter table public.bundles add column if not exists cost_usd_formula text;
 
+-- A photo for the line (2026-11-11), uploaded in the admin; a line without one shows its SKU's photo
+alter table public.bundles add column if not exists photo text not null default '';
+
 drop trigger if exists bundles_stamp on public.bundles;
 create trigger bundles_stamp before insert or update on public.bundles
     for each row execute function public.stamp_site_edit();
@@ -204,13 +207,17 @@ alter table public.sku_usd add column if not exists source text not null default
 alter table public.sku_usd add column if not exists updated_by text;
 alter table public.sku_usd add column if not exists updated_at timestamptz;
 
+-- The item's photo (2026-11-11), uploaded in the admin's USD SKU list
+alter table public.sku_usd add column if not exists photo text not null default '';
+
 drop trigger if exists sku_usd_stamp on public.sku_usd;
 create trigger sku_usd_stamp before insert or update on public.sku_usd
     for each row execute function public.stamp_site_edit();
 
 -- ---------- Quotations: a priced offer for a quote request, built from the bundles ----------
 -- A sales manager (or master admin) prepares it from the request's build, prices it in pesos, and submits it; a
--- master admin approves it or returns it with a note; once approved it is sent to the customer as a PDF (by the
+-- the GM or sales manager approves it or returns it with a note, by its margin (quotation_approvers below); once
+-- approved it is sent to the customer as a PDF (by the
 -- Apps Script, which loads it from here with the sender's sign-in). The workflow is enforced by the trigger below.
 
 -- Which model page a request came from, so its quotation can find the bundle for that model
@@ -267,9 +274,39 @@ create table if not exists public.quotations (
 );
 create index if not exists quotations_quote_id on public.quotations (quote_id);
 
--- The workflow: draft -> submitted -> approved (master admins) -> sent, or submitted -> returned -> draft. Changing
+-- Who may approve a submitted quotation, by its margin (2026-11-11, the margin hierarchy for carts): under 15%, the
+-- GM; 15 to 25%, the sales manager or the GM; over 25%, the Sales Executive, so submitting approves it. Set when it
+-- is submitted; empty when it was approved on submit.
+alter table public.quotations add column if not exists approvers text[] not null default '{}';
+
+-- A quotation's actual margin after any discount, as the admin shows it: (total - landed cost) / total, in %.
+-- Landed cost is USD x rate x (1 + freight), to the centavo, per line
+create or replace function public.quotation_margin(q public.quotations) returns numeric
+language sql immutable as $$
+    with per_cart as (
+        select coalesce(sum(coalesce((l ->> 'price_php')::numeric, 0) * coalesce((l ->> 'qty')::numeric, 1)), 0) as price,
+               coalesce(sum(coalesce(round((l ->> 'cost_usd')::numeric * q.exchange_rate * (1 + q.freight_pct / 100), 2), 0)
+                   * coalesce((l ->> 'qty')::numeric, 1)), 0) as cost
+        from jsonb_array_elements(q.lines) as l
+    )
+    select case when price * q.units - q.discount_php = 0 then 0
+        else (price * q.units - q.discount_php - cost * q.units) / (price * q.units - q.discount_php) * 100 end
+    from per_cart
+$$;
+
+create or replace function public.quotation_approvers(margin numeric) returns text[]
+language sql immutable as $$
+    select case
+        when margin < 15 then array['jamesugarte@sjkguahan.com']                                  -- GM
+        when margin <= 25 then array['jerusvergara@sjkguahan.com', 'jamesugarte@sjkguahan.com']   -- sales manager, or the GM
+        else '{}'::text[]                                                                        -- the Sales Executive
+    end
+$$;
+
+-- The workflow: draft -> submitted -> approved (by margin, above) -> sent, or submitted -> returned -> draft. Changing
 -- the content of a submitted or approved quotation takes it back to draft, so a changed price is approved again.
--- A sent quotation no longer changes. Who did what, and when, is stamped from the sign-in.
+-- A sent quotation no longer changes. Who did what, and when, is stamped from the sign-in. The exchange rate and
+-- freight come from the pricing settings (set by accounting, the price manager) and don't change on a quotation.
 create or replace function public.quotation_workflow() returns trigger
 language plpgsql as $$
 declare
@@ -281,6 +318,8 @@ begin
     if tg_op = 'INSERT' then
         if role = 'pricing' then raise exception 'Sales managers prepare quotations'; end if;
         if new.status <> 'draft' then raise exception 'A new quotation starts as a draft'; end if;
+        select exchange_rate, freight_pct into new.exchange_rate, new.freight_pct from public.pricing_settings where id = 1;
+        new.approvers := '{}';
         new.prepared_by := who;
         new.updated_by := who; new.updated_at := now();
         new.submitted_by := null; new.submitted_at := null; new.reviewed_by := null; new.reviewed_at := null;
@@ -293,14 +332,15 @@ begin
     new.submitted_by := old.submitted_by; new.submitted_at := old.submitted_at;
     new.reviewed_by := old.reviewed_by; new.reviewed_at := old.reviewed_at;
     new.sent_by := old.sent_by; new.sent_at := old.sent_at;
+    new.approvers := old.approvers;
+    -- Set by accounting: a quotation keeps the rate and freight it was created with
+    new.exchange_rate := old.exchange_rate; new.freight_pct := old.freight_pct;
     changed := (new.customer, new.title, new.build_rows, new.build_group, new.units, new.lines, new.exchange_rate,
                 new.freight_pct, new.margin_pct, new.discount_php, new.notes, new.terms, new.quote_id, new.reference)
         is distinct from (old.customer, old.title, old.build_rows, old.build_group, old.units, old.lines, old.exchange_rate,
                 old.freight_pct, old.margin_pct, old.discount_php, old.notes, old.terms, old.quote_id, old.reference);
-    -- The price manager approves or returns a submitted quotation as it is, and does nothing else to it
-    if role = 'pricing' and (changed or new.status not in ('approved', 'returned') or new.status = old.status) then
-        raise exception 'A price manager can only approve or return a submitted quotation';
-    end if;
+    -- The price manager (accounting) sets the rate and freight in the pricing settings, and doesn't change quotations
+    if role = 'pricing' then raise exception 'Quotations are prepared by sales and approved by the sales manager or the GM'; end if;
     if new.status = old.status then
         if changed and old.status in ('submitted', 'approved') then new.status := 'draft'; end if;
         new.review_note := old.review_note;
@@ -308,8 +348,15 @@ begin
         if old.status not in ('draft', 'returned') then raise exception 'Only a draft can be submitted'; end if;
         new.submitted_by := who; new.submitted_at := now();
         new.review_note := old.review_note;
+        new.approvers := public.quotation_approvers(public.quotation_margin(new));
+        -- Over 25%: the Sales Executive's own approval, given by submitting it
+        if cardinality(new.approvers) = 0 then
+            new.status := 'approved';
+            new.reviewed_by := who; new.reviewed_at := now();
+            new.review_note := '';
+        end if;
     elsif new.status in ('approved', 'returned') then
-        if role not in ('master', 'pricing') then raise exception 'Only the price manager or a super admin can approve or return a quotation'; end if;
+        if not (who = any(old.approvers)) then raise exception 'At this margin, only % can approve or return this quotation', array_to_string(old.approvers, ' or '); end if;
         if old.status <> 'submitted' then raise exception 'Only a submitted quotation can be approved or returned'; end if;
         if changed then raise exception 'Approve or return the quotation as it was submitted'; end if;
         new.reviewed_by := who; new.reviewed_at := now();
@@ -329,6 +376,13 @@ end $$;
 drop trigger if exists quotations_workflow on public.quotations;
 create trigger quotations_workflow before insert or update on public.quotations
     for each row execute function public.quotation_workflow();
+
+-- Quotations already waiting for approval when the margin rule arrived (2026-11-11) get their approvers. The triggers
+-- are off for this one update: it changes nothing else, and the workflow would refuse a change with no sign-in
+alter table public.quotations disable trigger user;
+update public.quotations q set approvers = public.quotation_approvers(public.quotation_margin(q))
+    where status = 'submitted' and cardinality(approvers) = 0;
+alter table public.quotations enable trigger user;
 
 -- The model photo for the quotation PDF (a path on the website, e.g. image/Products/builds/golfer-2-golfer.jpg)
 alter table public.quotations add column if not exists photo text not null default '';
@@ -649,7 +703,7 @@ create policy site_photos_read on storage.objects for select to authenticated
     using (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'));
 drop policy if exists site_photos_upload on storage.objects;
 create policy site_photos_upload on storage.objects for insert to authenticated
-    with check (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'));
+    with check (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing', 'pricing')); -- pricing: SKU and bundle photos
 drop policy if exists site_photos_change on storage.objects;
 create policy site_photos_change on storage.objects for update to authenticated
     using (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'))
@@ -681,7 +735,7 @@ create policy pricing_read on public.pricing_settings for select to authenticate
     using (public.staff_role() in ('master', 'pricing', 'sales'));
 drop policy if exists pricing_write on public.pricing_settings;
 create policy pricing_write on public.pricing_settings for update to authenticated
-    using (public.staff_role() in ('master', 'pricing')) with check (public.staff_role() in ('master', 'pricing'));
+    using (public.staff_role() = 'pricing') with check (public.staff_role() = 'pricing'); -- accounting (2026-11-11)
 
 -- quotations: staff read, prepare and move them along (the workflow trigger decides which moves each role may
 -- make: the price manager only approves or returns); sales managers and super admins create them; only super

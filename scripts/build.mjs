@@ -67,6 +67,9 @@ for (const [from, to] of Object.entries(fontFiles)) fs.copyFileSync(rel(`node_mo
 fs.mkdirSync(out('vendor/leaflet'), { recursive: true });
 for (const f of ['leaflet.js', 'leaflet.css']) fs.copyFileSync(rel(`node_modules/leaflet/dist/${f}`), out(`vendor/leaflet/${f}`));
 // Supabase client for Be a Golfer and the admin (account.js); the browser build and its one lazy chunk
+// ExcelJS: the admin's PSS.xlsx download (loaded only when someone downloads one)
+fs.mkdirSync(out('vendor/exceljs'), { recursive: true });
+fs.copyFileSync(rel('node_modules/exceljs/dist/exceljs.min.js'), out('vendor/exceljs/exceljs.min.js'));
 fs.mkdirSync(out('vendor/supabase'), { recursive: true });
 for (const f of ['supabase.js', '591.supabase.js']) fs.copyFileSync(rel(`node_modules/@supabase/supabase-js/dist/umd/${f}`), out(`vendor/supabase/${f}`));
 

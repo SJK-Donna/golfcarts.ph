@@ -556,14 +556,14 @@ const ADMIN_ROLES = {
     master: {
         label: 'Super admin',
         home: 'Everything across the business: the pipeline, what is waiting on approval, and the team.',
-        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.view', 'quotations.prepare', 'quotations.approve', 'pricing.edit', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'leads.zoho', 'bundles.view', 'export.quotes', 'export.all', 'users.manage', 'log.view']
+        can: ['quotes.view', 'quotes.status', 'quotes.delete', 'quotations.view', 'quotations.prepare', 'golfers.view', 'golfers.news', 'products.edit', 'content.edit', 'leads.zoho', 'bundles.view', 'export.quotes', 'export.all', 'users.manage', 'log.view']
     },
-    // Owns the prices: the bundles, the rate, freight, margin and warranty, and approves or returns the quotations
-    // sales managers submit. Reads the quote requests; doesn't prepare, change or send quotations
+    // Accounting: owns the costs, the bundles, the exchange rate, freight and warranty. Reads the quote requests and
+    // quotations; doesn't prepare, approve or send them (approval goes by margin: quotationApprovers)
     pricing: {
-        label: 'Price manager',
-        home: 'Quotations waiting for your approval, and the prices every new quotation starts from.',
-        can: ['quotes.view', 'quotations.view', 'quotations.approve', 'pricing.edit', 'bundles.view']
+        label: 'Price manager (accounting)',
+        home: 'The exchange rate and freight every new quotation is priced with, and the quotations in progress.',
+        can: ['quotes.view', 'quotations.view', 'pricing.edit', 'bundles.view']
     },
     // Works the leads: quotes and golfers, and prepares quotations from them. Prices, site text, a full customer export
     // and staff management stay with super admins
@@ -584,8 +584,8 @@ const ADMIN_ROLES = {
 const ADMIN_PERMISSION_LABELS = [
     ['quotes.view', 'See quotes'], ['quotes.status', 'Change quote status'], ['quotes.delete', 'Delete quotes'],
     ['golfers.view', 'See golfers'], ['golfers.news', 'Copy news emails'], ['products.edit', 'Edit product photos, text and specs'],
-    ['quotations.view', 'See quotations'], ['quotations.prepare', 'Prepare, submit and send quotations'], ['quotations.approve', 'Approve or return quotations'],
-    ['pricing.edit', 'Set exchange rate, freight, margin and warranty'],
+    ['quotations.view', 'See quotations'], ['quotations.prepare', 'Prepare, submit and send quotations'],
+    ['pricing.edit', 'Set exchange rate, freight and warranty'],
     ['content.edit', 'Edit site content'], ['bundles.view', 'See and edit bundles'], ['export.quotes', 'Export quotes'], ['export.all', 'Export all data'], ['users.manage', 'Manage staff'], ['log.view', 'See the activity log'], ['leads.zoho', 'See and resend Zoho CRM leads']
 ];
 
@@ -796,7 +796,7 @@ function adminHeading(data) {
         golfers: ['Golfers', data ? `${plural((data.golfers || []).length, 'member')}, ${(data.golfers || []).filter(g => g.news).length} want member news` : '', ''],
         bundles: ['Bundles', 'Cost lines for each build, in USD. Quotations are priced from these.', ''],
         products: ['Products', 'Photos, text and specifications of each model, and the accessory photos.', ''],
-        content: ['Site content', 'The holiday theme, the homepage carousel, the Red Series and the event story.', ''],
+        content: ['Site content', `${HOLIDAY_HIDDEN ? '' : 'The holiday theme, '}the homepage carousel, the Red Series and the event story.`.replace(/^t/, 'T'), ''],
         stories: ['Stories and guides', 'Add, edit or remove the stories on the Stories and Guides page.', ''],
         zoho: ['Zoho leads', 'Each quote request from the website, and whether it reached Zoho CRM Leads. Newest first.', '<button type="button" onclick="reloadPageData()" class="adm-btn">Refresh</button>'],
         users: ['Staff', 'Who can use the admin, and as what.', `${can('export.all') ? '<button type="button" onclick="exportAdminData()" class="adm-btn">Export all data</button>' : ''}`],
@@ -855,7 +855,7 @@ function renderAdminPage() {
     // Counts beside the sidebar items: new requests, and quotations waiting on this person
     const counts = ready ? {
         quotes: data.quotes.filter(q => q.status === 'New').length,
-        quotations: (data.quotations || []).filter(q => can('quotations.approve') ? q.status === 'submitted' : q.status === 'returned').length,
+        quotations: (data.quotations || []).filter(q => approvesQuotation(q) || (can('quotations.prepare') && q.status === 'returned')).length,
         zoho: (data.zohoLeads || []).filter(zohoNeedsSending).length
     } : {};
     const [title, summary, actions] = adminHeading(ready ? data : null);
@@ -988,20 +988,19 @@ function renderAdminHome(data) {
         const bundleLines = (data.bundles || []).length;
         return `${noTables}
             ${tiles([
-                homeTile(waiting.length, 'Waiting for your approval', '', stage('quotations', 'submitted'), true),
+                homeTile(waiting.length, 'Waiting for approval', 'by Jerus or James', stage('quotations', 'submitted'), true),
                 homeTile(at('approved').length, 'Approved, not sent yet', '', stage('quotations', 'approved')),
                 homeTile(sentThisMonth.length, 'Sent this month', '', stage('quotations', 'sent')),
                 homeTile(open.length, 'Requests not priced yet', '', stage('quotes', 'open'))
             ])}
             <div class="adm-home">
-                ${homeList('Waiting for your approval', waiting.map(qt => quotationRow(qt, `margin ${quotationTotals(qt).margin.toFixed(1)}% · from ${who(qt.submitted_by)}`, 'Review')),
-                    'Nothing to approve. Submitted quotations show here, and you get an email for each.')}
+                ${homeList('Waiting for approval', waiting.map(qt => quotationRow(qt, `margin ${quotationTotals(qt).margin.toFixed(1)}% · ${escapeHtml(approverNames(qt.approvers || []))}`, 'Open')),
+                    'Nothing waiting. Jerus or James approve submitted quotations, by margin.')}
                 <section class="adm-panel">
                     <div class="adm-panel-head"><h2>Pricing now</h2><button type="button" onclick="${tab('quotations')}" class="link text-sm">Change</button></div>
                     ${p ? `<dl class="adm-facts">
                         <div><dt>Exchange rate</dt><dd>₱${Number(p.exchange_rate)} per $1</dd></div>
                         <div><dt>Freight</dt><dd>${Number(p.freight_pct)}%</dd></div>
-                        <div><dt>Margin</dt><dd>${Number(p.margin_pct)}%</dd></div>
                         <div><dt>Warranty</dt><dd>${'warranty' in p ? (p.warranty ? 'Set' : '<span class="golfer-error">Not set</span>') : '—'}</dd></div>
                     </dl>${p.updated_by ? `<p class="adm-panel-foot">Last changed by ${who(p.updated_by)}</p>` : ''}` : '<p class="adm-panel-empty">Pricing isn\'t in the database yet.</p>'}
                 </section>
@@ -2112,7 +2111,7 @@ function renderAdminContent() {
     return `
         <div class="content-workspace">
         <div class="content-forms">
-        ${renderHolidayEditor()}
+        ${HOLIDAY_HIDDEN ? '' : renderHolidayEditor()}
         ${renderBannerEditor()}
         ${renderPromoEditor()}
         <form data-no-prefill onsubmit="saveEventEdit(event)" class="admin-card grid gap-5 max-w-3xl" novalidate>
@@ -2291,6 +2290,140 @@ function bundleGroupName(b) {
 }
 
 // The tab shows the bundles, or the USD SKU list the bundles' costs come from
+// --- Photos on SKUs and bundle lines (2026-11-11). "Add photo" uploads at once and fills the form's hidden photo field;
+// Save stores it. A bundle line without its own photo shows its SKU's ---
+function skuPhoto(sku) {
+    const s = sku && (pageData.skuUsd || []).find(x => x.sku === sku && x.photo);
+    return s ? s.photo : '';
+}
+
+function bundleLinePhoto(b) {
+    return b.photo || skuPhoto(b.sku) || siteSkuPhoto(b.sku) || bundleOptionPhoto(b);
+}
+
+// Body, Seat and Canopy lines: a real photo of their colour. Body: Club Car's close-up of the front panel in that
+// colour (the team's Drive colour folder, saved 2026-11-11 as image/Options/body-panel-*.jpg); canopy: the Golfer 2
+// Scratch with that canopy, from the site's colour preview (image/Options/canopy-*.jpg); seats: the site's seat
+// photos (image/Seats)
+const BUNDLE_SEAT_PHOTOS = {
+    'White': 'standard-white', 'Beige': 'standard-beige', 'Black': 'standard-black', 'Gray': 'standard-grey', 'Grey': 'standard-grey',
+    'Tsunami Red': 'tsunami-red-front', 'Tsunami Blue': 'tsunami-blue-front', 'Tsunami Gray': 'tsunami-grey-front',
+    'Camello': 'classic-camello', 'Black & Gray': 'classic-black-grey'
+};
+const BUNDLE_BODY_PHOTOS = ['White', 'Black', 'Cashmere', 'Sangria', 'Sapphire', 'Green', 'Platinum'];
+
+function bundleOptionPhoto(b) {
+    const part = String(b.part || '').trim().toLowerCase(), option = String(b.color || '').trim();
+    if (part === 'body' && BUNDLE_BODY_PHOTOS.includes(option)) return `image/Options/body-panel-${option.toLowerCase()}.jpg`;
+    if (part === 'seat' && BUNDLE_SEAT_PHOTOS[option]) return `image/Seats/${BUNDLE_SEAT_PHOTOS[option]}.jpg`;
+    const canopy = part === 'canopy' && (option.match(/\b(White|Beige|Black)\b/) || [])[1];
+    return canopy ? `image/Options/canopy-${canopy.toLowerCase()}.jpg` : '';
+}
+
+// Until a photo is uploaded, the list shows what the website already has (2026-11-11): the accessory's photo on the
+// site, matched by SKU, or for a Body, Seat or Canopy line, its colour as on the site's colour picker
+// Bundle SKUs matched by hand to the real photos in image/Options (from the team's Drive folders; three added
+// 2026-11-11: the overhead console, the AGM battery and the Nokken chrome wheel). The item's name on the site
+// (OPTION_PHOTOS in app.js) decided the match where the SKU isn't on the site
+const SKU_SITE_PHOTOS = {
+    'SJK-0136': 'bag-cover-black', 'SJK-1536': 'bag-cover-black', 'SJK-1038': 'bag-cover-beige', 'SJK-1040': 'bag-cover-white',
+    'SJK-0344': 'bag-cover-magnetic-black', 'SJK-0347': 'bag-cover-magnetic-beige',
+    'SJK-0154': 'mirror-5-panel', 'SJK-1146': 'mirror-side',
+    'SJK-0248': 'ball-washer', 'SJK-0257': 'caddy-cooler', 'SJK-1394': 'sand-bottle', 'SJK-1374': 'caddy-stand', 'SJK-1375': 'floor-mat-gc',
+    'SJK-1354': 'steering-scorecard', 'SJK-1355': 'steering-premium', 'SJK-1510': 'charge-wireless',
+    'SJK-0787': 'audio-cc-soundbar', 'SJK-1564': 'audio-gc-soundbar-27', 'SJK-1565': 'audio-gc-soundbar-27',
+    'SJK-0880': 'overhead-storage-console',
+    'SJK-1506': 'windshield-clear', 'SJK-1854': 'windshield-tinted',
+    'SJK-1507': 'battery-trojan-agm', 'SJK-1813': 'battery-trojan-8v', 'SJK-1597': 'battery-battlite',
+    'SJK-1770': 'wheel-8-steel', 'SJK-1939': 'wheel-8-steel', 'SJK-0259': 'wheel-10-5spoke-gunmetal',
+    'SJK-1540': 'wheel-12-triton-23105', 'SJK-1541': 'wheel-12-triton-215', 'SJK-1890': 'wheel-12-hela-215', 'SJK-1893': 'wheel-12-hela-215',
+    'SJK-1895': 'wheel-14-zeus-kraken', 'SJK-1896': 'wheel-14-aerion-chrome-kraken', 'SJK-1897': 'wheel-14-nokken-chrome',
+    'SJK-1898': 'wheel-14-aerion-gloss-kraken', 'SJK-1899': 'wheel-14-athena-gloss-kraken',
+    'SJK-1579': 'lift-gc-35', 'SJK-1542': 'fender-tempo-3', 'SJK-1993': 'brush-guard',
+    'SJK-1514': 'flip-genesis'
+};
+// The bare cart (Unit lines): the base Golfer 2 build photo
+const SKU_SITE_PHOTO_FILES = { 'SJK-1512': 'image/Products/builds/golfer-2-golfer.jpg' };
+
+function siteSkuPhoto(sku) {
+    if (!sku) return '';
+    if (SKU_SITE_PHOTO_FILES[sku]) return SKU_SITE_PHOTO_FILES[sku];
+    if (SKU_SITE_PHOTOS[sku]) return `image/Options/${SKU_SITE_PHOTOS[sku]}.jpg`;
+    const item = ACCESSORY_CATALOG.flatMap(g => g.items).find(i => i.sku === sku && (i.image || i.product));
+    return item ? item.image || (findProductRef(item.product) || {}).image || '' : '';
+}
+
+// The bundles' Option names, as the site names the same colours
+const BUNDLE_SWATCH_NAMES = {
+    'Platinum': 'Platinum Grey', 'Camello': 'Premium Camello', 'Black & Gray': 'Premium Black and Grey', 'GC Black': 'GC Black Premium Seat',
+    'Tsunami Red': 'Tsunami Silver Red & Black', 'Tsunami Blue': 'Tsunami Silver Blue & Black', 'Tsunami Gray': 'Tsunami Silver Grey & Black'
+};
+
+function bundleSwatch(b) {
+    const part = String(b.part || '').trim().toLowerCase();
+    if (!['body', 'seat', 'canopy'].includes(part) || !b.color) return '';
+    const name = BUNDLE_SWATCH_NAMES[String(b.color).trim()] || String(b.color).trim();
+    if (part === 'body') return (COLOR_FAMILIES.tempo.body.flatMap(g => g.colors).find(c => c.name === name) || {}).hex || '';
+    if (part === 'seat') return TRIM_COLOR_HEX[name] || '';
+    return getTrimHex('canopy', name) || '';
+}
+
+// A SKU's stand-in: its site photo, or the colour of a bundle line that uses it
+function skuStandIn(sku) {
+    const lines = sku ? (pageData.bundles || []).filter(b => b.sku === sku) : [];
+    const optionPhoto = lines.map(bundleOptionPhoto).find(Boolean) || '';
+    const line = lines.find(b => bundleSwatch(b));
+    return { photo: siteSkuPhoto(sku) || optionPhoto, swatch: line ? bundleSwatch(line) : '' };
+}
+
+function linePhotoThumb(url, swatch = '') {
+    const inner = url ? `<img src="${escapeHtml(url)}" alt="" loading="lazy">`
+        : swatch ? `<span class="line-swatch" style="background: ${escapeHtml(swatch)}"></span>` : '';
+    return `<span class="line-photo">${inner}</span>`;
+}
+
+function linePhotoField(url, folder, span, note = '') {
+    return `<div class="field ${span}"><span class="text-sm">Photo</span>
+        <div class="flex flex-wrap items-center gap-4 mt-1">
+            ${linePhotoThumb(url).replace('line-photo', 'line-photo line-photo-lg')}
+            <input type="hidden" name="photo" value="${escapeHtml(url || '')}">
+            <label class="btn btn-outline min-h-[2.5rem] px-4 text-sm cursor-pointer"><span>${url ? 'Replace photo' : 'Add photo'}</span><input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseLinePhoto(this, '${folder}')"></label>
+            <button type="button" onclick="clearLinePhoto(this)" class="link text-xs"${url ? '' : ' hidden'}>Remove photo</button>
+        </div>
+        ${note ? `<p class="text-xs text-mute mt-1">${note}</p>` : ''}
+    </div>`;
+}
+
+async function chooseLinePhoto(input, folder) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const field = input.closest('.field'), label = input.previousElementSibling, form = input.closest('form');
+    const submit = form.querySelector('button[type="submit"]');
+    label.textContent = 'Uploading…';
+    submit.disabled = true;
+    try {
+        const url = await uploadSitePhoto(file, folder);
+        field.querySelector('input[name="photo"]').value = url;
+        field.querySelector('.line-photo').innerHTML = `<img src="${escapeHtml(url)}" alt="">`;
+        field.querySelector('button[onclick^="clearLinePhoto"]').hidden = false;
+        label.textContent = 'Replace photo';
+        showToast('Photo uploaded. Save to keep it.');
+    } catch (err) {
+        label.textContent = field.querySelector('input[name="photo"]').value ? 'Replace photo' : 'Add photo';
+        showToast(`Not uploaded: ${err.message}.`);
+    }
+    submit.disabled = false;
+    input.value = '';
+}
+
+function clearLinePhoto(button) {
+    const field = button.closest('.field');
+    field.querySelector('input[name="photo"]').value = '';
+    field.querySelector('.line-photo').innerHTML = '';
+    field.querySelector('label span').textContent = 'Add photo';
+    button.hidden = true;
+}
+
 function renderAdminBundles(data) {
     const views = [['bundles', 'Bundles'], ['usd', 'USD SKU list']];
     return `
@@ -2337,10 +2470,11 @@ function renderSkuUsdRows(list) {
             <button type="button" onclick="editSkuUsd('new')" class="btn btn-outline min-h-[2.5rem] px-4 text-sm">Add a SKU</button>
         </div>
         ${shown.length || skuUsdEditing === 'new' ? `<div class="admin-table-wrap"><table class="admin-table bundle-table">
-            <thead><tr><th>SKU</th><th>Description</th><th class="text-right">USD</th><th><span class="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th>Photo</th><th>SKU</th><th>Description</th><th class="text-right">USD</th><th><span class="sr-only">Actions</span></th></tr></thead>
             <tbody>
                 ${skuUsdEditing === 'new' ? renderSkuUsdForm({}) : ''}
                 ${shown.map(s => skuUsdEditing === s.sheet_row ? renderSkuUsdForm(s) : `<tr>
+                    <td>${s.photo ? linePhotoThumb(s.photo) : (st => linePhotoThumb(st.photo, st.swatch))(skuStandIn(s.sku))}</td>
                     <td class="whitespace-nowrap">${escapeHtml(s.sku)}</td>
                     <td>${escapeHtml(s.description)}${s.source === 'admin' || s.updated_by ? `<p class="text-xs text-mute mt-1">${s.source === 'admin' ? 'added' : 'edited'}${s.updated_by ? ` by ${escapeHtml(adminName(s.updated_by))}` : ''}</p>` : ''}</td>
                     <td class="text-right whitespace-nowrap">${formatUsd(s.usd)}</td>
@@ -2352,12 +2486,13 @@ function renderSkuUsdRows(list) {
 
 function renderSkuUsdForm(s) {
     const isNew = s.sheet_row == null;
-    return `<tr class="bundle-editing"><td colspan="4">
+    return `<tr class="bundle-editing"><td colspan="5">
         <form data-no-prefill onsubmit="saveSkuUsd(event, ${isNew ? 'null' : s.sheet_row})" class="grid sm:grid-cols-[12rem_1fr_10rem] gap-4 items-end">
             <p class="text-sm font-semibold text-ink sm:col-span-3">${isNew ? 'New SKU' : 'Edit SKU'}</p>
             <div class="field"><label for="se-sku">SKU</label><input id="se-sku" name="sku" type="text" value="${escapeHtml(s.sku || '')}"></div>
             <div class="field"><label for="se-description">Description</label><input id="se-description" name="description" type="text" value="${escapeHtml(s.description || '')}"></div>
             <div class="field"><label for="se-usd">USD</label><input id="se-usd" name="usd" type="text" inputmode="decimal" value="${s.usd == null ? '' : Math.round(Number(s.usd) * 100) / 100}"></div>
+            ${linePhotoField(s.photo, 'skus', 'sm:col-span-3')}
             <p class="text-xs text-mute sm:col-span-3">Changing a USD cost here doesn't change the bundles' costs; those are edited on the Bundles list.</p>
             <p id="sku-usd-error" class="golfer-error sm:col-span-3" role="alert"></p>
             <div class="flex gap-4 items-center sm:col-span-3">
@@ -2380,6 +2515,8 @@ async function saveSkuUsd(e, sheetRow) {
     const data = new FormData(e.target);
     const text = key => { const v = String(data.get(key) || '').trim(); return v === '' ? null : v; };
     const row = { sku: text('sku'), description: text('description'), usd: parseAmount(String(data.get('usd') || '')) };
+    // Once schema.sql has added the photo column
+    if (!pageData.skuUsd.length || 'photo' in pageData.skuUsd[0]) row.photo = String(data.get('photo') || '');
     if (Number.isNaN(row.usd)) { document.getElementById('sku-usd-error').textContent = 'USD must be a number.'; return; }
     if (!row.sku && !row.description) { document.getElementById('sku-usd-error').textContent = 'Enter a SKU or a description.'; return; }
     const button = e.target.querySelector('button[type="submit"]');
@@ -2461,7 +2598,7 @@ function renderBundleResults(bundles) {
     if (!groups.size) return '<p class="measure">No lines match.</p>';
     // The lines' total in USD, once any of them has a cost
     const cost = lines => lines.some(b => b.cost_usd != null) ? ` · ${formatUsd(lines.reduce((s, b) => s + (bundleLineUsd(b) || 0), 0))}` : '';
-    const cols = 8;
+    const cols = 9;
     return `
         <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
             <p class="text-sm">${shown.length} line${shown.length === 1 ? '' : 's'} in ${groups.size} group${groups.size === 1 ? '' : 's'}${cost(shown)}</p>
@@ -2475,7 +2612,7 @@ function renderBundleResults(bundles) {
                         <button type="button" data-group="${escapeHtml(name)}" onclick="addBundleLine(this.dataset.group)" class="link text-xs">Add a line here</button>
                     </div>
                 </th></tr>
-                <tr class="bundle-columns"><th scope="col">SKU</th><th scope="col">Part</th><th scope="col">Option</th><th scope="col">Description</th><th scope="col" class="text-right">Qty</th><th scope="col" class="text-right">Cost (USD)</th><th scope="col" class="text-right">Total (USD)</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
+                <tr class="bundle-columns"><th scope="col">Photo</th><th scope="col">SKU</th><th scope="col">Part</th><th scope="col">Option</th><th scope="col">Description</th><th scope="col" class="text-right">Qty</th><th scope="col" class="text-right">Cost (USD)</th><th scope="col" class="text-right">Total (USD)</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
                 ${lines.map(b => bundleEditing === b.sheet_row ? renderBundleForm(b, cols) : renderBundleLine(b)).join('')}
                 ${bundleEditing && bundleEditing.group && bundleGroupName(bundleEditing.group) === name ? renderBundleForm(bundleEditing.group, cols) : ''}
             </tbody>`).join('')}
@@ -2493,6 +2630,7 @@ function renderBundleLine(b) {
     const extra = Object.entries(b.extra || {});
     const edited = b.source === 'admin' ? 'added' : b.updated_by ? 'edited' : '';
     return `<tr>
+        <td>${linePhotoThumb(bundleLinePhoto(b), bundleSwatch(b))}</td>
         <td class="whitespace-nowrap">${escapeHtml(b.sku)}</td>
         <td>${escapeHtml(b.part)}</td>
         <td>${escapeHtml(b.color)}</td>
@@ -2512,6 +2650,7 @@ function renderBundleForm(b, cols) {
             <p class="text-sm font-semibold text-ink sm:col-span-3 lg:col-span-6">${isNew ? 'New line' : 'Edit line'}</p>
             ${BUNDLE_FIELDS.map(([key, label]) => `<div class="field${key === 'description' ? ' sm:col-span-3 lg:col-span-3' : ''}"><label for="be-${key}">${label}</label>
                 <input id="be-${key}" name="${key}" type="text"${key === 'qty' || key === 'cost_usd' ? ' inputmode="decimal"' : ''} value="${escapeHtml(b[key] == null ? '' : key === 'cost_usd' ? Math.round(Number(b[key]) * 100) / 100 : key === 'qty' ? Number(b[key]) : b[key])}"></div>`).join('')}
+            ${linePhotoField(b.photo, 'bundles', 'sm:col-span-3 lg:col-span-6', !b.photo && skuPhoto(b.sku) ? 'Showing the SKU\'s photo. Add one to use a different photo for this line.' : '')}
             ${b.cost_usd_formula ? `<p class="text-xs text-mute sm:col-span-3 lg:col-span-6">In the sheet this cost came from ${escapeHtml(b.cost_usd_formula)}. Cost is per unit; the total is cost × qty.</p>` : ''}
             <p id="bundle-error" class="golfer-error sm:col-span-3 lg:col-span-6" role="alert"></p>
             <div class="flex gap-4 items-center sm:col-span-3 lg:col-span-6">
@@ -2554,6 +2693,7 @@ async function saveBundleLine(e, sheetRow) {
     const data = new FormData(e.target);
     const line = {};
     BUNDLE_FIELDS.forEach(([key]) => { const v = String(data.get(key) || '').trim(); line[key] = v === '' ? null : v; });
+    if (!pageData.bundles.length || 'photo' in pageData.bundles[0]) line.photo = String(data.get('photo') || '');
     for (const key of ['qty', 'cost_usd']) {
         line[key] = parseAmount(line[key] || '');
         if (Number.isNaN(line[key])) { document.getElementById('bundle-error').textContent = `${key === 'qty' ? 'Qty' : 'Cost'} must be a number.`; return; }
@@ -2717,14 +2857,15 @@ function bundleToQuotationLine(b) {
         qty: b.qty == null ? 1 : Number(b.qty), cost_usd: b.cost_usd == null ? null : Number(b.cost_usd), price_php: null, manual: false };
 }
 
-// A line's peso cost (USD x rate x (1 + freight)) and its unit selling price (that x (1 + margin)), to the centavo
+// A line's peso cost (USD x rate x (1 + freight)), to the centavo, and its unit selling price (that x (1 + margin)),
+// rounded to the nearest hundred pesos (2026-11-11)
 function quotationCostPhp(qt, line) {
     return line.cost_usd == null ? null : Math.round(Number(line.cost_usd) * Number(qt.exchange_rate) * (1 + Number(qt.freight_pct) / 100) * 100) / 100;
 }
 
 function quotationFormulaPrice(qt, line) {
     const cost = quotationCostPhp(qt, line);
-    return cost == null ? null : Math.round(cost * (1 + Number(qt.margin_pct) / 100) * 100) / 100;
+    return cost == null ? null : Math.round(cost * (1 + Number(qt.margin_pct) / 100) / 100) * 100;
 }
 
 // Lines priced by the formula follow the quotation's rate, freight and margin; typed prices stay as typed
@@ -2739,6 +2880,26 @@ function quotationTotals(qt) {
     const units = Number(qt.units || 1), discount = Number(qt.discount_php || 0);
     const total = perCart * units - discount, totalCost = cost * units;
     return { perCart, cost, units, discount, total, totalCost, margin: total ? (total - totalCost) / total * 100 : 0, unpriced: qt.lines.filter(l => l.price_php == null).length };
+}
+
+// Approval by margin (the margin hierarchy for carts, 2026-11-11): under 15%, the GM; 15 to 25%, the sales manager or
+// the GM; over 25%, the Sales Executive, so submitting approves it. The database (quotation_approvers in
+// supabase/schema.sql) sets and enforces it; the admin shows it
+const QUOTATION_GM = 'jamesugarte@sjkguahan.com';
+const QUOTATION_SALES_MANAGER = 'jerusvergara@sjkguahan.com';
+
+function quotationApprovers(margin) {
+    return margin < 15 ? [QUOTATION_GM] : margin <= 25 ? [QUOTATION_SALES_MANAGER, QUOTATION_GM] : [];
+}
+
+function approverNames(list) {
+    return list.map(e => e === QUOTATION_GM ? 'James (GM)' : e === QUOTATION_SALES_MANAGER ? 'Jerus (sales manager)' : adminName(e)).join(' or ');
+}
+
+// Whether the signed-in person may approve or return this quotation now
+function approvesQuotation(qt) {
+    const admin = currentAdmin();
+    return !!admin && qt.status === 'submitted' && (qt.approvers || []).includes(admin.email);
 }
 
 function formatPhp(n) {
@@ -2809,15 +2970,14 @@ function renderAdminQuotations(data) {
         <form data-no-prefill onsubmit="savePricingSettings(event)" class="admin-card grid sm:grid-cols-4 gap-5 items-end max-w-4xl mb-10">
             <div class="sm:col-span-4">
                 <h2 class="type-md text-ink">Pricing</h2>
-                <p class="text-sm text-mute mt-1">A line's price is USD cost × exchange rate × (1 + freight) × (1 + margin). New quotations start with these; each keeps the figures it was priced with.${p.updated_by ? ` Last changed by ${escapeHtml(adminName(p.updated_by))}.` : ''}</p>
+                <p class="text-sm text-mute mt-1">A line's price is USD cost × exchange rate × (1 + freight) × (1 + margin), rounded to the nearest ₱100. Accounting sets the rate and freight; new quotations take them and keep them. The salesman chooses each quotation's margin.${p.updated_by ? ` Last changed by ${escapeHtml(adminName(p.updated_by))}.` : ''}</p>
             </div>
-            ${[['exchange_rate', 'Exchange rate (₱ per $1)'], ['freight_pct', 'Freight %'], ['margin_pct', 'Margin %']].map(([key, label]) => `
+            ${[['exchange_rate', 'Exchange rate (₱ per $1)'], ['freight_pct', 'Freight %']].map(([key, label]) => `
                 <div class="field"><label for="ps-${key}">${label}</label><input id="ps-${key}" name="${key}" type="text" inputmode="decimal" value="${Number(p[key])}"${can('pricing.edit') ? '' : ' disabled'}></div>`).join('')}
             ${'warranty' in p ? `<div class="field sm:col-span-4"><label for="ps-warranty">Warranty (page 2 of every quotation PDF)</label>
                 <textarea id="ps-warranty" name="warranty" rows="4" placeholder="e.g. 2 years on the battery, 1 year on the motor and controller…"${can('pricing.edit') ? '' : ' disabled'}>${escapeHtml(p.warranty)}</textarea>
                 <p class="text-xs text-mute mt-1">A quotation picks this up when it's next saved.</p></div>` : ''}
-            ${can('pricing.edit') ? '<button type="submit" class="btn btn-primary min-h-[3rem] px-5 text-sm">Save pricing</button>' : '<p class="text-xs text-mute">Set by the price manager.</p>'}
-            ${Number(p.margin_pct) === 0 ? '<p class="golfer-error sm:col-span-4">The margin is 0%: quotations would be priced at landed cost.</p>' : ''}
+            ${can('pricing.edit') ? '<button type="submit" class="btn btn-primary min-h-[3rem] px-5 text-sm">Save pricing</button>' : '<p class="text-xs text-mute">Set by accounting (the price manager).</p>'}
         </form>
         <h2 class="type-md text-ink mb-4">Quotations</h2>
         ${list.length ? `<div class="admin-table-wrap"><table class="admin-table">
@@ -2838,9 +2998,9 @@ async function savePricingSettings(e) {
     e.preventDefault();
     const data = new FormData(e.target);
     const values = {};
-    for (const key of ['exchange_rate', 'freight_pct', 'margin_pct']) {
+    for (const key of ['exchange_rate', 'freight_pct']) {
         values[key] = parseAmount(String(data.get(key) || ''));
-        if (values[key] == null || Number.isNaN(values[key]) || values[key] < 0) { showToast('Enter numbers for the rate, freight and margin.'); return; }
+        if (values[key] == null || Number.isNaN(values[key]) || values[key] < 0) { showToast('Enter numbers for the rate and freight.'); return; }
     }
     if (data.has('warranty')) values.warranty = String(data.get('warranty')).trim();
     const { data: saved, error } = await sb.from('pricing_settings').update(values).eq('id', 1).select().single();
@@ -2887,8 +3047,8 @@ function renderQuotationEditor(data) {
                 <select id="qe-group" onchange="setQuotationGroup(this.value)"${editable ? '' : ' disabled'}>
                     <option value="">None</option>${groups.map(g => `<option${g === qt.build_group ? ' selected' : ''}>${escapeHtml(g)}</option>`).join('')}
                 </select></div>
-            <div class="field"><label for="qe-rate">Exchange rate</label>${editable ? `<input id="qe-rate" type="text" inputmode="decimal" value="${qt.exchange_rate}" onchange="setQuotationNumber('exchange_rate', this.value)">` : `<p>${qt.exchange_rate}</p>`}</div>
-            <div class="field"><label for="qe-freight">Freight %</label>${editable ? `<input id="qe-freight" type="text" inputmode="decimal" value="${qt.freight_pct}" onchange="setQuotationNumber('freight_pct', this.value)">` : `<p>${qt.freight_pct}</p>`}</div>
+            <div class="field"><span class="text-sm">Exchange rate</span><p>${qt.exchange_rate} <span class="text-xs text-mute">set by accounting</span></p></div>
+            <div class="field"><span class="text-sm">Freight %</span><p>${qt.freight_pct} <span class="text-xs text-mute">set by accounting</span></p></div>
             <div class="field"><label for="qe-margin">Margin %</label>${editable ? `<input id="qe-margin" type="text" inputmode="decimal" value="${qt.margin_pct}" onchange="setQuotationNumber('margin_pct', this.value)">` : `<p>${qt.margin_pct}</p>`}</div>
         </div>
         ${editable && qt.build_group ? `<p class="text-sm mt-3"><button type="button" onclick="rebuildQuotationLines()" class="link">Fill lines from this bundle again</button> <span class="text-mute">(replaces the lines below with the ones the request's build points at)</span></p>` : ''}
@@ -2909,7 +3069,7 @@ function renderQuotationEditor(data) {
                 ${editable ? `<td><button type="button" onclick="removeQuotationLine(${i})" class="link text-xs">Remove</button></td>` : ''}
             </tr>`).join('') || `<tr><td colspan="11" class="text-mute">No lines yet.</td></tr>`}</tbody>
         </table></div>
-        ${editable ? `<div class="flex flex-wrap gap-4 items-end mt-4">
+        ${editable && QUOTATION_ADD_LINES ? `<div class="flex flex-wrap gap-4 items-end mt-4">
             <div class="field grow max-w-2xl"><label for="qe-add">Add a line from the bundle</label>
                 <select id="qe-add" onchange="addQuotationLine(this.value)">
                     <option value="">Choose…</option>
@@ -2932,31 +3092,49 @@ function renderQuotationEditor(data) {
                 <div class="text-mute"><dt>Margin</dt><dd>${t.total ? `${t.margin.toFixed(1)}%` : ''}</dd></div>
             </dl>
         </div>
+        <p class="text-sm mt-4"><b>Approval:</b> ${escapeHtml(quotationApprovalText(qt, t))}</p>
         ${t.unpriced ? `<p class="golfer-error mt-4">${t.unpriced} line${t.unpriced === 1 ? ' has' : 's have'} no price yet.</p>` : ''}
 
         <div class="quotation-actions mt-8">
             ${editable ? `<button type="button" onclick="saveQuotation()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm"${dirty ? '' : ' disabled'}>Save draft</button>
-                <button type="button" onclick="saveQuotation('submitted')" class="btn btn-primary min-h-[2.75rem] px-5 text-sm"${t.unpriced || !qt.lines.length ? ' disabled' : ''}>Submit for approval</button>` : ''}
-            ${qt.status === 'submitted' && can('quotations.approve') ? `
+                <button type="button" onclick="saveQuotation('submitted')" class="btn btn-primary min-h-[2.75rem] px-5 text-sm"${t.unpriced || !qt.lines.length ? ' disabled' : ''}>${quotationApprovers(t.margin).length ? 'Submit for approval' : 'Submit (approved straight away)'}</button>` : ''}
+            ${approvesQuotation(qt) ? `
                 <button type="button" onclick="reviewQuotation('approved')" class="btn btn-primary min-h-[2.75rem] px-5 text-sm">Approve</button>
                 <button type="button" onclick="reviewQuotation('returned')" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Return with a note</button>` : ''}
-            ${qt.status === 'submitted' && !can('quotations.approve') ? '<p class="text-sm text-mute">Waiting for the price manager or a super admin to approve it.</p>' : ''}
+            ${qt.status === 'submitted' && !approvesQuotation(qt) ? `<p class="text-sm text-mute">Waiting for ${escapeHtml(approverNames(qt.approvers || []) || 'approval')} to approve it.</p>` : ''}
             ${(qt.status === 'draft' || qt.status === 'returned') && !prepares ? '<p class="text-sm text-mute">A sales manager is still preparing it.</p>' : ''}
             ${qt.status === 'approved' && prepares ? `<button type="button" onclick="sendQuotation()" class="btn btn-primary min-h-[2.75rem] px-5 text-sm">Send to ${escapeHtml(c.email || 'the customer')}</button>` : ''}
+            ${qt.status !== 'approved' && qt.status !== 'sent' && prepares ? `<button type="button" onclick="sendNotApproved()" aria-disabled="true" class="btn btn-primary min-h-[2.75rem] px-5 text-sm opacity-50 cursor-not-allowed">Send to ${escapeHtml(c.email || 'the customer')}</button>` : ''}
             ${qt.status === 'approved' && !prepares ? '<p class="text-sm text-mute">Approved. The sales manager sends it to the customer.</p>' : ''}
             ${(qt.status === 'submitted' || qt.status === 'approved') && prepares ? `<button type="button" onclick="reopenQuotation()" class="link text-sm">Edit (needs approval again)</button>` : ''}
             <button type="button" onclick="previewQuotation()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Preview PDF</button>
+            ${qt.status === 'approved' || qt.status === 'sent' ? '<button type="button" onclick="downloadPss()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">PSS.xlsx</button>' : ''}
             ${can('quotes.delete') && qt.status !== 'sent' ? `<button type="button" onclick="deleteQuotation()" class="link text-sm">Delete</button>` : ''}
         </div>
         ${dirty && editable ? '<p class="text-xs text-mute mt-3">Unsaved changes. The PDF preview shows the last saved version.</p>' : ''}
         ${renderQuotationEmails(qt)}`;
 }
 
+// Who approves it: for a draft, at its margin now; once submitted, as the database set it
+function quotationApprovalText(qt, t) {
+    if (qt.status === 'draft' || qt.status === 'returned') {
+        const list = quotationApprovers(t.margin);
+        return list.length ? `at ${t.margin.toFixed(1)}% margin, ${approverNames(list)} approves it.` : `over 25% margin: approved when you submit it.`;
+    }
+    if (qt.status === 'submitted') return `waiting for ${approverNames(qt.approvers || [])}.`;
+    if (!(qt.approvers || []).length && qt.reviewed_by === qt.submitted_by) return `approved on submit by ${adminName(qt.reviewed_by)} (margin over 25%).`;
+    return `approved by ${adminName(qt.reviewed_by)}.`;
+}
+
+// "Add a line from the bundle" and "Add a blank line" under a quotation's lines: hidden for now (the user's choice,
+// 2026-11-11). true brings them back
+const QUOTATION_ADD_LINES = false;
+
 function setQuotationNumber(key, text) {
     const value = parseAmount(text);
     if (value == null || Number.isNaN(value) || value < 0 || (key === 'units' && (value < 1 || !Number.isInteger(value)))) { showToast('Enter a number.'); renderApp(); return; }
     quotationDraft[key] = value;
-    if (['exchange_rate', 'freight_pct', 'margin_pct'].includes(key)) repriceQuotation(quotationDraft);
+    if (key === 'margin_pct') repriceQuotation(quotationDraft);
     renderApp();
 }
 
@@ -3083,8 +3261,9 @@ async function writeQuotation(change, message) {
 }
 
 function saveQuotation(status) {
+    const self = status === 'submitted' && !quotationApprovers(quotationTotals(quotationDraft).margin).length;
     return writeQuotation({ ...quotationContent(quotationDraft), ...(status ? { status } : {}) },
-        status === 'submitted' ? 'Submitted for approval.' : 'Draft saved.');
+        self ? 'Approved: the margin is over 25%. The PDF and PSS are ready.' : status === 'submitted' ? 'Submitted for approval.' : 'Draft saved.');
 }
 
 function reviewQuotation(status) {
@@ -3093,7 +3272,7 @@ function reviewQuotation(status) {
         note = prompt('What should be changed?');
         if (note == null || !note.trim()) return;
     }
-    return writeQuotation({ status, review_note: note.trim() }, status === 'approved' ? 'Approved. It can now be sent to the customer.' : 'Returned to the sales manager.');
+    return writeQuotation({ status, review_note: note.trim() }, status === 'approved' ? 'Approved. The PDF and PSS are ready, and it can be sent to the customer.' : 'Returned to the sales executive.');
 }
 
 function reopenQuotation() {
@@ -3114,8 +3293,8 @@ async function deleteQuotation() {
 // quotation with this sign-in, so the database decides whether this person may. Its web app address (ends in /exec),
 // the same as the Vault secret "mail_script_url"; empty until the script is deployed.
 const MAIL_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDiEGgwlisk4dikiTy7svACFWwlowq37yMsBKL39rUACzHPDevVKcVvt_U8REKxOKhfg/exec';
-const EMAIL_KINDS = { quotation_submitted: 'Approval request to the price manager and super admins', quotation_approved: 'Approved notice to the sales manager',
-    quotation_returned: 'Returned notice to the sales manager', quotation_sent: 'Quotation to the customer' };
+const EMAIL_KINDS = { quotation_submitted: 'Approval request to Jerus or James', quotation_approved: 'Approved notice to the sales executive',
+    quotation_returned: 'Returned notice to the sales executive', quotation_sent: 'Quotation to the customer' };
 const quotationEmails = {}; // quotation id -> its email_log rows
 
 async function quotationMail(action) {
@@ -3186,6 +3365,14 @@ async function previewQuotation() {
     }
 }
 
+// The Send button shows before approval too, greyed out (the user's choice, 2026-11-11): pressing it says why
+function sendNotApproved() {
+    const qt = quotationDraft;
+    showToast(qt.status === 'submitted'
+        ? `Waiting for approval by ${approverNames(qt.approvers || [])}. It can be sent once approved.`
+        : 'Waiting for approval. Submit it for approval first; it can be sent once approved.');
+}
+
 // Marking it sent is what emails it: the database tells the email script, which sends the PDF and logs the email
 async function sendQuotation() {
     const c = quotationDraft.customer || {};
@@ -3209,6 +3396,249 @@ async function resendQuotation() {
         showToast(`Not sent: ${err.message}`);
     }
     loadQuotationEmails(quotationOpen);
+}
+
+// --- PSS (Product Specification Sheet): the second document of an approved quotation, as an Excel file laid out like
+// the team's PSS sheet. Filled from the quotation; what's only known later (serial, charger, P/O, delivery, the
+// payment split, local costs) is left for the team to fill in Excel, where the totals and GP are formulas ---
+const PSS_PEOPLE = { [QUOTATION_GM]: 'James Ugarte', [QUOTATION_SALES_MANAGER]: 'Jerus Vergara', 'jasperbuiza@sjkguahan.com': 'Jasper Buiza', 'reycubar@sjkguahan.com': 'Rey Cubar' };
+
+function loadExcelJs() {
+    if (window.ExcelJS) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'vendor/exceljs/exceljs.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('the spreadsheet library didn\'t load'));
+        document.head.appendChild(script);
+    });
+}
+
+// Answers for the product specification, read from the build the customer chose and the quotation's lines
+function pssSpec(qt) {
+    const rows = qt.build_rows || [];
+    const value = label => { const r = rows.find(x => String(x[0]).toLowerCase() === label); return r ? String(r[1]) : ''; };
+    const text = rows.map(r => r.join(' ')).concat(qt.lines.map(l => [l.part, l.option, l.description].join(' '))).join(' | ').toLowerCase();
+    const yes = re => (re.test(text) ? 'YES' : 'NO');
+    const seats = (String(value('model') || qt.title).match(/\b(\d\+\d|\d)\b/) || [])[1] || '';
+    const wheels = rows.find(r => /wheel|tire/i.test(r[0]));
+    const tire = ((wheels ? String(wheels[1]) : text).match(/(\d{1,2})\s*(?:"|”|in\b|-inch)/) || [])[1];
+    const lift = text.match(/(\d(?:\.\d)?)\s*(?:"|”|-inch|in)\s*(?:gc\s*)?lift/);
+    return {
+        unit: qt.title, seats,
+        body: value('body color') || value('body'), canopy: value('canopy'), seat: value('seat'),
+        tire: tire ? `${tire}"` : '', rims: yes(/\brims?\b|alloy|aerion|zeus|nokken/),
+        sideMirrors: yes(/side mirror|turn signal mirror/), rearMirror: yes(/rear(?:-view| view)? mirror|panoramic/),
+        enclosure: yes(/enclosure|weather cover/), bagCover: yes(/bag cover/), upholstery: yes(/upholster|custom seat/),
+        cooler: yes(/cooler/), lift: lift ? `YES, ${lift[1]}"` : yes(/lift kit|lifted/), lights: yes(/light/),
+        washer: yes(/ball washer|ball cleaner|sand bottle/), battery: value('battery')
+    };
+}
+
+async function downloadPss() {
+    const qt = quotationDraft;
+    try {
+        await loadExcelJs();
+    } catch (err) {
+        showToast(`The PSS could not be made: ${err.message}`);
+        return;
+    }
+    const c = qt.customer || {};
+    const t = quotationTotals(qt);
+    const spec = pssSpec(qt);
+    const day = iso => (iso ? new Date(iso) : null);
+    const person = email => PSS_PEOPLE[email] || adminName(email);
+    const selfApproved = !(qt.approvers || []).length && qt.reviewed_by && qt.reviewed_by === qt.submitted_by;
+
+    const book = new ExcelJS.Workbook();
+    book.creator = 'Golfcarts.ph admin';
+    const ws = book.addWorksheet('PSS', { pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+    ws.columns = [{ width: 26 }, { width: 34 }, { width: 14 }, { width: 8 }, { width: 18 }, { width: 22 }, { width: 18 }];
+    const money = '#,##0.00';
+    const thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+    const box = cell => { cell.border = { top: thin, left: thin, bottom: thin, right: thin }; };
+    const section = title => {
+        const r = ws.addRow([title]);
+        ws.mergeCells(r.number, 1, r.number, 7);
+        r.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        r.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF151714' } };
+        return r;
+    };
+    // label, value, label, value across the sheet: labels in bold, values boxed
+    const pair = (l1, v1, l2, v2) => {
+        const r = ws.addRow([l1, v1, '', '', l2 || '', v2 == null ? '' : v2]);
+        ws.mergeCells(r.number, 2, r.number, 4);
+        ws.mergeCells(r.number, 6, r.number, 7);
+        [1, 5].forEach(i => { r.getCell(i).font = { bold: true }; });
+        [2, 6].forEach(i => box(r.getCell(i)));
+        return r;
+    };
+    const dateCell = (cell, d) => { if (d) { cell.value = d; cell.numFmt = 'dd-mmm-yy'; cell.alignment = { horizontal: 'left' }; } };
+
+    const head = ws.addRow(['PRODUCT SPECIFICATION SHEET', '', '', '', 'REF#', qt.reference]);
+    ws.mergeCells(head.number, 1, head.number, 4);
+    head.getCell(1).font = { bold: true, size: 16 };
+    head.getCell(5).font = { bold: true };
+    const sub = ws.addRow(['SJK GUAHAN EQUIPMENT', '', '', '', 'Start date', '']);
+    sub.getCell(1).font = { bold: true, color: { argb: 'FF6B6B66' } };
+    sub.getCell(5).font = { bold: true };
+    dateCell(sub.getCell(6), day(qt.reviewed_at));
+    const eff = ws.addRow(['', '', '', '', 'Effective date', '']);
+    eff.getCell(5).font = { bold: true };
+    ws.addRow([]);
+
+    section(`CLIENT'S IDENTIFICATION: ${String(c.name || '').toUpperCase()}`);
+    pair('Client / owner', c.name || '', 'Project name', qt.title);
+    pair('Office address', '', 'TIN', '');
+    pair('Contact person', c.name || '', 'Phone no.', c.phone || '');
+    pair('Email', c.email || '', 'Nearest branch', c.branch || '');
+    const unit = pair('Unit details', [qt.title, spec.body && `${spec.body} body`, spec.canopy && `${spec.canopy} canopy`, spec.seat && `${spec.seat} seats`].filter(Boolean).join(', '), 'Units', qt.units);
+    unit.getCell(2).alignment = { wrapText: true, vertical: 'top' };
+    pair('Model', qt.title, 'Serial no.', 'To follow');
+    pair('Order no.', '', 'Charger no.', 'To follow');
+    pair('Inputted in Zoho?', '', 'Dated', '');
+    pair("Customer's P/O no.", '', 'Dated', '');
+    ws.addRow([]);
+
+    section('COST ALLOCATION (internal use only)');
+    pair('Sales order no.', '', '', '');
+    const costHead = ws.addRow(['Description', '', 'Part number', 'Qty', 'Landed cost', 'Local cost', 'Amount']);
+    costHead.font = { bold: true };
+    ws.mergeCells(costHead.number, 1, costHead.number, 2);
+    const locals = ['PDI', 'Delivery', "Operator's training", 'Others'];
+    const lineRows = Math.max(qt.lines.length, locals.length);
+    const first = costHead.number + 1;
+    for (let i = 0; i < lineRows; i++) {
+        const l = qt.lines[i];
+        const cost = l ? quotationCostPhp(qt, l) : null;
+        const qty = l ? Number(l.qty == null ? 1 : l.qty) * Number(qt.units || 1) : null;
+        const r = ws.addRow([l ? [l.part, l.option, l.description].filter(Boolean).join(' · ') : '', '', l ? l.sku : '', qty, cost == null || !l ? null : Math.round(cost * qty * 100) / 100, locals[i] || '', null]);
+        ws.mergeCells(r.number, 1, r.number, 2);
+        [5, 7].forEach(n => { r.getCell(n).numFmt = money; box(r.getCell(n)); });
+    }
+    const last = first + lineRows - 1;
+    const totals = ws.addRow(['Total machine cost', '', '', '', { formula: `SUM(E${first}:E${last})` }, 'Total local cost', { formula: `SUM(G${first}:G${last})` }]);
+    totals.font = { bold: true };
+    [5, 7].forEach(n => { totals.getCell(n).numFmt = money; });
+    const allocated = ws.addRow(['TOTAL ALLOCATED COST', '', '', '', { formula: `E${totals.number}+G${totals.number}` }, 'GP', null]);
+    allocated.font = { bold: true };
+    allocated.getCell(5).numFmt = money;
+    ws.addRow([]);
+
+    section('PAYMENT TERMS');
+    const payHead = ws.addRow(['', '', '%', '', 'Amount', 'Remarks']);
+    payHead.font = { bold: true };
+    ['Down payment', 'Progress payment', 'Final payment'].forEach(label => {
+        const r = ws.addRow([label, '', null, '', null, '']);
+        r.getCell(1).font = { bold: true };
+        r.getCell(3).numFmt = '0%';
+        r.getCell(5).numFmt = money;
+        [3, 5].forEach(n => box(r.getCell(n)));
+        ws.mergeCells(r.number, 6, r.number, 7);
+    });
+    const total = ws.addRow(['Total (quotation)', '', '', '', Math.round(t.total * 100) / 100, '']);
+    total.font = { bold: true };
+    total.getCell(5).numFmt = money;
+    const net = ws.addRow(['Total net of VAT', '', '', '', { formula: `E${total.number}/1.12` }, '']);
+    net.font = { bold: true };
+    net.getCell(5).numFmt = money;
+    // GP as on the team's sheet: (net of VAT - total allocated cost) / net of VAT
+    allocated.getCell(7).value = { formula: `IF(E${net.number}=0,0,(E${net.number}-E${allocated.number})/E${net.number})` };
+    allocated.getCell(7).numFmt = '0.00%';
+    ws.addRow([]);
+
+    section('DELIVERY SCHEDULE');
+    pair('Delivery date', '', 'Delivery contact', c.name || '');
+    pair('Delivery to site', '', 'Contact no.', c.phone || '');
+    pair('Special instructions', '', '', '');
+    ws.addRow([]);
+
+    section('OTHER REQUIREMENTS');
+    pair('Pre-delivery inspection', '', 'Date required', '');
+    pair("Operator's training", '', 'Date required', '');
+    pair('Free PM service', '', 'No. of visits', '');
+    pair('Others', '', '', '');
+    ws.addRow([]);
+
+    section('REMARKS');
+    const remarkHead = ws.addRow(['#', 'Remark', '', '', '', 'Settled on']);
+    remarkHead.font = { bold: true };
+    const remarks = [qt.notes].filter(Boolean);
+    for (let i = 0; i < 4; i++) {
+        const r = ws.addRow([i + 1, remarks[i] || '', '', '', '', '']);
+        ws.mergeCells(r.number, 2, r.number, 5);
+        r.getCell(2).alignment = { wrapText: true, vertical: 'top' };
+        box(r.getCell(2)); box(r.getCell(6));
+    }
+    ws.addRow([]);
+
+    section('APPROVALS');
+    const signHead = ws.addRow(['', 'Name', '', '', 'Signature', 'Date']);
+    signHead.font = { bold: true };
+    const sign = (role, email, when, note) => {
+        const r = ws.addRow([role, email ? person(email) + (note ? ` (${note})` : '') : '', '', '', '', '']);
+        ws.mergeCells(r.number, 2, r.number, 4);
+        r.getCell(1).font = { bold: true };
+        dateCell(r.getCell(6), when);
+        [2, 5, 6].forEach(n => box(r.getCell(n)));
+    };
+    sign('Issued by: Sales Executive', qt.submitted_by || qt.prepared_by, day(qt.submitted_at), selfApproved ? 'approved on submit, margin over 25%' : '');
+    sign('Approved by: Sales Manager', qt.reviewed_by === QUOTATION_SALES_MANAGER ? qt.reviewed_by : '', qt.reviewed_by === QUOTATION_SALES_MANAGER ? day(qt.reviewed_at) : null);
+    sign('Approved by: GM', qt.reviewed_by === QUOTATION_GM ? qt.reviewed_by : '', qt.reviewed_by === QUOTATION_GM ? day(qt.reviewed_at) : null);
+    sign('Service Manager', '', null);
+
+    // The product specification, on its own sheet (the PSS and the unit configuration are kept separately)
+    const ps = book.addWorksheet('Product specification', { pageSetup: { paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+    ps.columns = [{ width: 34 }, { width: 24 }, { width: 34 }, { width: 24 }];
+    const psTitle = ps.addRow([`CARTS & EVs PRODUCT SPECIFICATION: ${c.name || ''}`]);
+    ps.mergeCells(psTitle.number, 1, psTitle.number, 4);
+    psTitle.getCell(1).font = { bold: true, size: 14 };
+    ps.addRow([]);
+    const qa = (q1, a1, q2, a2) => {
+        const r = ps.addRow([q1, a1 == null ? '' : a1, q2 || '', a2 == null ? '' : a2]);
+        [1, 3].forEach(n => { r.getCell(n).font = { bold: true }; });
+        [2, 4].forEach(n => { if (r.getCell(n - 1).value) box(r.getCell(n)); });
+    };
+    const psSection = title => {
+        const r = ps.addRow([title]);
+        ps.mergeCells(r.number, 1, r.number, 4);
+        r.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        r.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF151714' } };
+    };
+    psSection('DESCRIPTION OF EQUIPMENT');
+    qa('Type of unit', spec.unit, 'Quantity', qt.units);
+    qa('Model / serial number', 'To follow', 'Charger number', 'To follow');
+    qa('Controller number', '', '', '');
+    psSection('APPLICATION');
+    qa('How many seater?', spec.seats, 'Local painting needed?', 'NO');
+    qa('Color of the body?', spec.body.toUpperCase(), 'Color of the canopy?', spec.canopy.toUpperCase());
+    qa('Color of the seats?', spec.seat.toUpperCase(), 'Ground conditions?', '');
+    qa('Side mirrors needed?', spec.sideMirrors, 'Specialized tire needed?', '');
+    qa('Rear view mirror needed?', spec.rearMirror, 'Enclosure needed?', spec.enclosure);
+    qa('If yes, what kind?', '', 'Bag cover needed?', spec.bagCover);
+    qa('What size tire?', spec.tire, 'Custom upholstery needed?', spec.upholstery);
+    qa('Rims needed?', spec.rims, 'Cooler?', spec.cooler);
+    qa('Lift kit needed? If yes, how many inches?', spec.lift, 'Other requirements?', '');
+    qa('Lights included?', spec.lights, 'Ball washer and sand bottle?', spec.washer);
+    psSection('STRETCH');
+    qa('Is this a stretch project?', 'NO', 'What type of configuration?', spec.seats);
+    qa('M&M or Nivel stretch?', 'N/A', 'Lift kit required?', spec.lift);
+    psSection('BATTERY');
+    qa('Battery', spec.battery, 'Charging time', '');
+    qa('Hours of use per day', '', 'Customer informed about the charging time?', '');
+    qa('Battery voltage [V]', '', 'Running time suits the application?', '');
+    qa('Rated capacity [Ah]', '', 'Power supply at the site meets our requirements?', '');
+    qa('Voltage at customer site [V / Hz / phase]', '', '', '');
+
+    const buffer = await book.xlsx.writeBuffer();
+    const name = `PSS_${c.name || 'customer'}_${qt.title || qt.reference}`.replace(/[\\/:*?"<>|·]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    link.download = `${name}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 10000);
 }
 
 // --- Activity log (super admins only): who changed what. The database writes it (log_activity in supabase/schema.sql);

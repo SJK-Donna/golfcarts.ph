@@ -996,6 +996,38 @@
         color: var(--ink);
         font-weight: 600;
     }
+    /* Service page: the radio chips and model tiles of the cart step and booking form (the radio itself is hidden) */
+    .svc-chip { cursor: pointer; }
+    #svc-cart [hidden], #svc-book [hidden] { display: none !important; } /* .field and .grid would show them */
+    .svc-chip:has(input:checked) {
+        border-color: var(--ink);
+        box-shadow: inset 0 0 0 1px var(--ink);
+        color: var(--ink);
+        font-weight: 600;
+    }
+    .svc-chip:has(input:focus-visible),
+    .svc-model:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .svc-model {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 0.5rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+        cursor: pointer;
+        transition: border-color 0.25s var(--ease);
+    }
+    .svc-model:hover { border-color: var(--ink-2); }
+    .svc-model:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+    .svc-model-photo {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 4 / 3;
+        background: var(--stone);
+        overflow: hidden;
+    }
     /* Seat and canopy colors as round swatches like the body colors; the name shows on hover (data-tip) and in the
        picker's heading once chosen */
     .detail-trim.trim-swatch,
@@ -2283,28 +2315,6 @@
         height: 100%;
         object-fit: cover;
     }
-    .banner-control {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 2.5rem;
-        height: 2.5rem;
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        color: var(--ink);
-        transition: background-color 0.25s var(--ease), border-color 0.25s var(--ease);
-    }
-    .banner-control:hover {
-        background: var(--stone);
-        border-color: var(--ink-2);
-    }
-    .banner-control .icon-play,
-    .banner-control.is-paused .icon-pause {
-        display: none;
-    }
-    .banner-control.is-paused .icon-play {
-        display: block;
-    }
     .banner-progress {
         display: flex;
         gap: 4px;
@@ -2724,6 +2734,11 @@
     /* ---- Admin (account.js) ---- */
     /* position: relative keeps hidden screen-reader labels inside the scrolling box, so a wide table can't widen the page */
     .admin-table-wrap { position: relative; overflow-x: auto; border: 1px solid var(--line); }
+    /* Photos of SKUs and bundle lines in the admin */
+    .line-photo { display: flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; background: var(--stone); border: 1px solid var(--line); overflow: hidden; flex-shrink: 0; }
+    .line-photo img { max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+    .line-photo-lg { width: 5rem; height: 5rem; }
+    .line-swatch { width: 70%; height: 70%; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }
     .admin-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
     .admin-table th { text-align: left; font-weight: 600; color: var(--ink); background: var(--stone); padding: 0.75rem 1rem; white-space: nowrap; }
     .admin-table td { padding: 0.75rem 1rem; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }

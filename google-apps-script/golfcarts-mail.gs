@@ -3,7 +3,7 @@
 // Called by the database (supabase/schema.sql, notify_mail) with the shared secret and the record:
 //   quote_created          a quote request arrived: the customer gets an acknowledgement (no prices), the owner and
 //                          the sales managers get the request
-//   quotation_submitted    the master admins are asked to approve it
+//   quotation_submitted    its approvers (the GM, or the sales manager and the GM, by margin) are asked to approve it
 //   quotation_approved     the person who submitted it can now send it
 //   quotation_returned     the person who submitted it gets the master admin's note
 //   quotation_sent         the customer gets the quotation PDF
@@ -137,6 +137,7 @@ function sendMail(kind, refTable, refId, mail) {
 function quoteCreated(q, staff) {
   if (!q) return;
   const rows = requestRows(q);
+  if (q.source === 'Service and support') return serviceCreated(q, rows, staff);
   sendMail('request_received', 'quotes', q.id, {
     to: [q.email], replyTo: OWNER_EMAIL,
     subject: 'We received your quotation request ' + q.reference,
@@ -152,13 +153,32 @@ function quoteCreated(q, staff) {
   sendLead(q);
 }
 
+// A booking from the Service and support page: saved with the quotes, but worded as a service request.
+// Its rows already carry the service, the cart, the branch and the note
+function serviceCreated(q, rows, staff) {
+  sendMail('request_received', 'quotes', q.id, {
+    to: [q.email], replyTo: OWNER_EMAIL,
+    subject: 'We received your service request ' + q.reference,
+    html: emailPage('Thank you, ' + esc(q.name) + '!', 'We received your service request <b>' + esc(q.reference) + '</b>. Our service team will call you to confirm a schedule.',
+      rowsTable(rows))
+  });
+  sendMail('request_staff', 'quotes', q.id, {
+    to: [OWNER_EMAIL].concat(staff.sales || []), replyTo: q.email,
+    subject: 'New service request ' + q.reference + ' from ' + q.name,
+    html: emailPage('New service request', 'From the Service and support page. Reply to this email to answer ' + esc(q.name) + ' directly.',
+      rowsTable([['Name', q.name], ['Email', q.email], ['Mobile', q.phone]].concat(rows)) + adminLink('Open the admin'))
+  });
+  sendLead(q);
+}
+
 function quotationEvent(qt, status, staff) {
   if (!qt) return;
   const t = totals(qt), c = qt.customer || {};
   const summary = rowsTable([['Quotation', qt.reference], ['Customer', (c.name || '') + ' (' + (c.email || '') + ')'], ['Build', qt.title], ['Total', peso(t.total)]]);
   if (status === 'submitted') {
     sendMail('quotation_submitted', 'quotations', qt.id, {
-      to: staff.master || [], replyTo: qt.submitted_by,
+      // Whoever may approve it at its margin (the GM, or the sales manager and the GM); set by the database
+      to: (qt.approvers && qt.approvers.length) ? qt.approvers : (staff.master || []), replyTo: qt.submitted_by,
       subject: 'Approve quotation ' + qt.reference + ' for ' + (c.name || 'a customer'),
       html: emailPage('A quotation is waiting for your approval', esc(qt.submitted_by) + ' submitted quotation ' + esc(qt.reference) + '.', summary + adminLink('Review it in the admin'))
     });
@@ -168,7 +188,9 @@ function quotationEvent(qt, status, staff) {
       to: [qt.submitted_by || qt.prepared_by], replyTo: qt.reviewed_by,
       subject: 'Quotation ' + qt.reference + ' ' + (approved ? 'approved' : 'returned'),
       html: emailPage(approved ? 'Your quotation is approved' : 'Your quotation was returned',
-        approved ? esc(qt.reviewed_by) + ' approved quotation ' + esc(qt.reference) + '. You can now send it to the customer from the admin.'
+        approved ? (qt.reviewed_by === qt.submitted_by && !(qt.approvers || []).length
+            ? 'Quotation ' + esc(qt.reference) + ' has a margin over 25%, so it was approved when you submitted it. Its PDF and PSS are ready in the admin, and you can send it to the customer.'
+            : esc(qt.reviewed_by) + ' approved quotation ' + esc(qt.reference) + '. Its PDF and PSS are ready in the admin, and you can send it to the customer.')
           : esc(qt.reviewed_by) + ' returned quotation ' + esc(qt.reference) + ': <b>' + esc(qt.review_note) + '</b>',
         summary + adminLink('Open it in the admin'))
     });
