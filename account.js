@@ -32,6 +32,17 @@ async function rows(query) {
     return data;
 }
 
+// Every row of a long list: Supabase hands back at most 1,000 rows a request, so it's read in pages of 1,000
+// (2026-11-12: the stock sheet has 1,727 SKUs). build() makes the query, ordered so the pages don't overlap
+async function allRows(build) {
+    const page = 1000, all = [];
+    for (let from = 0; ; from += page) {
+        const part = await rows(build().range(from, from + page - 1));
+        all.push(...part);
+        if (part.length < page) return all;
+    }
+}
+
 // A full link to a page of this site, for the links in Supabase's emails
 function siteLink(path) {
     return location.origin + siteBasePath() + path;
@@ -67,6 +78,7 @@ async function loadAccount(user) {
     refreshGolferUI();
     prefillGolferForms();
     if (currentPage === 'golfer' || currentPage === 'admin') renderApp();
+    else renderPageTextButton(); // staff who may edit the page text get its "Edit this page" button
 }
 
 if (sb) {
@@ -704,6 +716,324 @@ async function saveSiteEdit(key, value, message) {
     return true;
 }
 
+// --- Page text, edited on the page itself (2026-11-12; every page since 2026-11-12) ---
+// Super admins and marketing (content.edit) press "Edit this page" on any page of the site (2026-11-12: every page,
+// not only the homepage), click a heading, paragraph, label or button, and change its text, font, size, alignment and
+// position (and a button's link and style) in a small panel beside it. Saved per page in site_edits (pageTextKey():
+// "home-text" for the homepage, "page-text:<page>[/<slug>]" for the rest): { items: { key: { orig, text, font, bold,
+// size, align, x, y, link, style } } }. key: the section (its id or heading's id) and the element's place among that
+// section's texts, plus "@<scope>" for a text that changes with a choice on the page (the cart stage's build: each build's
+// line is its own edit); orig: its text as shipped, so an edit only lands on the text it was made for: if the code's
+// text changes, the edit is skipped (and listed as out of date while editing). The banners, the Red Series and the
+// event story have their own editors and are left out, as are the forms, the stage's build cards, its color and its
+// specs (edited in the admin's Products). Text is set as plain text (never as HTML)
+const PAGE_TEXT_SKIP = '.home-banners, .home-promo, .home-stage-cards, .home-stage-shown, .home-stage-facts, [aria-labelledby="home-events-title"], form';
+const PAGE_TEXT_OFF = ['admin', 'not-found'];
+const pageTextKey = () => currentPage === 'home' ? 'home-text' : `page-text:${currentPage}${currentSlug ? '/' + currentSlug : ''}`;
+let pageTextDraftKey = null; // the page the draft belongs to
+const PAGE_TEXT_TAGS = 'h1, h2, h3, h4, p, li, dt, dd, figcaption, blockquote, a, button';
+const PAGE_TEXT_INNER = 'a, button, input, select, textarea, img, svg, video, picture, p, div, ul, ol, li, h1, h2, h3, h4, table';
+const PAGE_TEXT_STEP = 8; // px per arrow press
+let pageTextDraft = null;    // while editing: the items as edited so far
+let pageTextSelected = null; // the element being edited
+const pageTextOriginal = new WeakMap();
+
+const pageTextNorm = s => String(s || '').replace(/\s+/g, ' ').trim();
+
+function pageTextItems() {
+    return pageTextDraft || pageTextSaved();
+}
+
+function pageTextSaved() {
+    return ((siteEdits[pageTextKey()] || {}).value || {}).items || {};
+}
+
+function canEditPageText() {
+    return !PAGE_TEXT_OFF.includes(currentPage) && typeof can === 'function' && can('content.edit');
+}
+
+// The page's editable texts: elements holding only text (and simple formatting), outside the skipped parts
+function pageTextTargets() {
+    const root = document.getElementById('app-viewport');
+    if (!root || PAGE_TEXT_OFF.includes(currentPage)) return [];
+    const out = [];
+    root.querySelectorAll('section').forEach((section, s) => {
+        if (section.matches(PAGE_TEXT_SKIP) || section.closest(PAGE_TEXT_SKIP)) return;
+        const name = section.id || section.getAttribute('aria-labelledby') || `section-${s}`;
+        [...section.querySelectorAll(PAGE_TEXT_TAGS)]
+            .filter(el => !el.closest(PAGE_TEXT_SKIP) && !el.querySelector(PAGE_TEXT_INNER) && (el.dataset.txtOrig || pageTextNorm(el.textContent)))
+            .forEach((el, i) => out.push({ el, key: `${name}/${i}${el.dataset.txtScope ? '@' + el.dataset.txtScope : ''}` }));
+    });
+    return out;
+}
+
+function safePageLink(link) {
+    const l = String(link || '').trim();
+    return /^(#[\w-]+|tel:[+\d\s()-]+|mailto:\S+|https?:\/\/\S+|[\w./?=&%-]+)$/i.test(l) && !/^javascript:/i.test(l) ? l : '';
+}
+
+function followPageLink(link) {
+    if (link.startsWith('#')) {
+        const target = document.getElementById(link.slice(1));
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        location.href = link;
+    }
+}
+
+function resetPageTextEl(el) {
+    const o = pageTextOriginal.get(el);
+    if (!o) return;
+    // The selection outline and a stage text mid-swap (is-out) aren't part of the design: kept as they are
+    const keep = ['is-txt-selected', 'is-out'].filter(c => el.classList.contains(c));
+    el.innerHTML = o.html;
+    if (o.style == null) el.removeAttribute('style'); else el.setAttribute('style', o.style);
+    el.className = o.cls;
+    keep.forEach(c => el.classList.add(c));
+    if (o.href == null) el.removeAttribute('href'); else el.setAttribute('href', o.href);
+    if (o.route == null) el.removeAttribute('data-route'); else el.setAttribute('data-route', o.route);
+    el.onclick = o.onclick;
+}
+
+function applyPageTextEl(el, e) {
+    if (!pageTextOriginal.has(el)) {
+        pageTextOriginal.set(el, { html: el.innerHTML, style: el.getAttribute('style'), cls: el.className, href: el.getAttribute('href'),
+            route: el.getAttribute('data-route'), onclick: el.onclick });
+    }
+    resetPageTextEl(el);
+    if (!e) return;
+    if (e.text != null && pageTextNorm(e.text) && pageTextNorm(e.text) !== el.dataset.txtOrig) el.textContent = e.text;
+    if (e.font) el.style.fontFamily = e.font === 'serif' ? 'var(--font-display)' : 'var(--font-text)';
+    if (e.bold) el.style.fontWeight = e.bold === 'bold' ? '700' : '400';
+    // A share of the size the page gives it at this screen width, so it still scales down on phones
+    if (e.size && e.size !== 100) el.style.fontSize = `${parseFloat(getComputedStyle(el).fontSize) * e.size / 100}px`;
+    if (e.align) el.style.textAlign = e.align;
+    if (e.x || e.y) el.style.translate = `${e.x || 0}px ${e.y || 0}px`;
+    if (e.style && el.classList.contains('btn')) {
+        el.classList.remove('btn-primary', 'btn-outline');
+        el.classList.add(e.style === 'green' ? 'btn-primary' : 'btn-outline');
+    }
+    const link = safePageLink(e.link);
+    if (link) {
+        if (el.tagName === 'A') el.setAttribute('href', link);
+        el.removeAttribute('data-route');
+        el.onclick = ev => { ev.preventDefault(); followPageLink(link); };
+    }
+}
+
+// After each draw of a page (renderApp) and on resize: the saved (or, while editing, the drafted) edits
+function applyPageText() {
+    // A draft stays on the page it was started on: going to another page ends it (unsaved)
+    if (pageTextDraft && pageTextDraftKey !== pageTextKey()) endPageTextEditing();
+    if (PAGE_TEXT_OFF.includes(currentPage)) { endPageTextEditing(); renderPageTextButton(); return; }
+    const items = pageTextItems();
+    pageTextTargets().forEach(({ el, key }) => {
+        if (!el.dataset.txtOrig) el.dataset.txtOrig = pageTextNorm(el.textContent);
+        el.dataset.txtKey = key;
+        const e = items[key];
+        applyPageTextEl(el, e && e.orig === el.dataset.txtOrig ? e : null);
+    });
+    if (pageTextSelected && !pageTextSelected.isConnected) pageTextSelected = null;
+    renderPageTextButton();
+    renderPageTextBar();
+    renderPageTextTools();
+}
+
+let pageTextResize = 0;
+window.addEventListener('resize', () => { clearTimeout(pageTextResize); pageTextResize = setTimeout(() => { if (!PAGE_TEXT_OFF.includes(currentPage)) applyPageText(); }, 150); });
+
+// A part of the page that redraws its own texts (the cart stage on a build change): its texts go back to as shipped
+// and are forgotten, so the part can set its new texts; applyPageText() afterwards puts the edits back
+function releasePageText(root) {
+    root.querySelectorAll('[data-txt-key]').forEach(el => {
+        resetPageTextEl(el);
+        pageTextOriginal.delete(el);
+        delete el.dataset.txtOrig;
+    });
+}
+
+// The edits whose text isn't on the page any more (the shipped text changed since). A scoped edit ("@build") whose
+// text is in place but shows another choice right now (another build) isn't out of date
+function stalePageTextKeys() {
+    const targets = pageTextTargets();
+    const live = new Map(targets.map(({ el, key }) => [key, el.dataset.txtOrig]));
+    const scoped = new Set(targets.filter(({ el }) => el.dataset.txtScope).map(({ key }) => key.split('@')[0]));
+    return Object.entries(pageTextItems())
+        .filter(([key, e]) => live.has(key) ? live.get(key) !== e.orig : !(key.includes('@') && scoped.has(key.split('@')[0])))
+        .map(([key]) => key);
+}
+
+// --- The editing controls: a button to start, a bar to save, and a panel beside the chosen text ---
+function pageTextUi(id, html, cls) {
+    let el = document.getElementById(id);
+    if (!html) { if (el) el.remove(); return null; }
+    if (!el) { el = document.createElement('div'); el.id = id; document.body.append(el); }
+    el.className = `page-text-ui ${cls}`;
+    el.innerHTML = html;
+    return el;
+}
+
+function renderPageTextButton() {
+    pageTextUi('page-text-start', canEditPageText() && !pageTextDraft
+        ? '<button type="button" onclick="startPageTextEditing()">Edit this page</button>' : '', 'page-text-start');
+}
+
+function renderPageTextBar() {
+    if (!pageTextDraft) { pageTextUi('page-text-bar', ''); return; }
+    const stale = stalePageTextKeys();
+    const changed = JSON.stringify(pageTextDraft) !== JSON.stringify(pageTextSaved());
+    pageTextUi('page-text-bar', `
+        <span>Editing ${currentPage === 'home' ? 'the homepage' : 'this page'}: click any text or button. ${Object.keys(pageTextDraft).length - stale.length} edited</span>
+        ${stale.length ? `<button type="button" onclick="removeStalePageText()" class="page-text-quiet">${stale.length} out of date: remove</button>` : ''}
+        <button type="button" onclick="discardPageText()" class="page-text-quiet">${changed ? 'Discard' : 'Close'}</button>
+        <button type="button" onclick="savePageText(this)" class="page-text-save"${changed ? '' : ' disabled'}>Save</button>`, 'page-text-bar');
+}
+
+function startPageTextEditing() {
+    pageTextDraft = clone(pageTextSaved());
+    pageTextDraftKey = pageTextKey();
+    document.body.classList.add('page-editing');
+    applyPageText();
+}
+
+function endPageTextEditing() {
+    pageTextDraft = null;
+    pageTextDraftKey = null;
+    if (pageTextSelected) pageTextSelected.classList.remove('is-txt-selected');
+    pageTextSelected = null;
+    document.body.classList.remove('page-editing');
+    pageTextUi('page-text-bar', '');
+    pageTextUi('page-text-tools', '');
+}
+
+function discardPageText() {
+    if (JSON.stringify(pageTextDraft) !== JSON.stringify(pageTextSaved()) && !confirm('Discard your changes to this page\'s text?')) return;
+    endPageTextEditing();
+    renderApp();
+}
+
+function removeStalePageText() {
+    stalePageTextKeys().forEach(key => delete pageTextDraft[key]);
+    renderPageTextBar();
+}
+
+async function savePageText(button) {
+    button.disabled = true;
+    const items = pageTextDraft, key = pageTextDraftKey;
+    endPageTextEditing();
+    const ok = await saveSiteEdit(key, Object.keys(items).length ? { items } : null, key === 'home-text' ? 'Homepage text saved.' : 'Page text saved.');
+    if (!ok) { pageTextDraft = items; pageTextDraftKey = key; document.body.classList.add('page-editing'); applyPageText(); }
+}
+
+// While editing, a click on the page picks a text instead of following links or buttons
+document.addEventListener('click', ev => {
+    if (!pageTextDraft || ev.target.closest('.page-text-ui')) return;
+    // A choice that changes the texts (the stage's build cards) still works, so each choice's texts can be edited
+    if (!ev.target.closest('#app-viewport') || ev.target.closest('[data-txt-pass]')) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const el = ev.target.closest('[data-txt-key]');
+    if (el) selectPageText(el);
+}, true);
+
+function selectPageText(el) {
+    if (pageTextSelected) pageTextSelected.classList.remove('is-txt-selected');
+    pageTextSelected = el;
+    el.classList.add('is-txt-selected');
+    renderPageTextTools();
+    const text = document.getElementById('pt-text');
+    if (text) { text.focus(); text.select(); }
+}
+
+function pageTextEntry() {
+    const el = pageTextSelected, key = el.dataset.txtKey;
+    const e = pageTextDraft[key];
+    return e && e.orig === el.dataset.txtOrig ? e : { orig: el.dataset.txtOrig };
+}
+
+// One change from the panel: kept in the draft (dropped again when everything is back to the original) and shown
+function setPageText(field, value) {
+    const el = pageTextSelected;
+    if (!el) return;
+    const e = { ...pageTextEntry(), [field]: value };
+    if (field === 'x' || field === 'y' || field === 'size') e[field] = Number(value) || 0;
+    if (e.text != null && pageTextNorm(e.text) === e.orig) delete e.text;
+    ['font', 'bold', 'align', 'link', 'style'].forEach(k => { if (!e[k]) delete e[k]; });
+    if (e.size === 100 || e.size === 0) delete e.size;
+    ['x', 'y'].forEach(k => { if (!e[k]) delete e[k]; });
+    const key = el.dataset.txtKey;
+    if (Object.keys(e).length > 1) pageTextDraft[key] = e; else delete pageTextDraft[key];
+    applyPageTextEl(el, pageTextDraft[key] || null);
+    renderPageTextBar();
+    if (field !== 'text' && field !== 'link') renderPageTextTools();
+    else placePageTextTools();
+}
+
+function nudgePageText(dx, dy) {
+    const e = pageTextEntry();
+    setPageText('x', (e.x || 0) + dx * PAGE_TEXT_STEP);
+    setPageText('y', (pageTextEntry().y || 0) + dy * PAGE_TEXT_STEP);
+}
+
+function resetPageTextItem() {
+    const el = pageTextSelected;
+    if (!el) return;
+    delete pageTextDraft[el.dataset.txtKey];
+    applyPageTextEl(el, null);
+    renderPageTextBar();
+    renderPageTextTools();
+}
+
+function closePageTextTools() {
+    if (pageTextSelected) pageTextSelected.classList.remove('is-txt-selected');
+    pageTextSelected = null;
+    pageTextUi('page-text-tools', '');
+}
+
+function renderPageTextTools() {
+    const el = pageTextSelected;
+    if (!pageTextDraft || !el || !el.isConnected) { pageTextUi('page-text-tools', ''); return; }
+    const e = pageTextEntry();
+    const isButton = el.matches('a, button');
+    const choice = (field, options) => `<select onchange="setPageText('${field}', this.value)">${options.map(([v, label]) => `<option value="${v}"${(e[field] || '') === v ? ' selected' : ''}>${label}</option>`).join('')}</select>`;
+    const pressed = (field, value, label, title) => `<button type="button" title="${title}" aria-pressed="${(e[field] || '') === value}" onclick="setPageText('${field}', '${value}')">${label}</button>`;
+    pageTextUi('page-text-tools', `
+        <div class="page-text-head"><b>${isButton ? 'Button or link' : 'Text'}</b><button type="button" onclick="closePageTextTools()" aria-label="Close">✕</button></div>
+        <label>Text<textarea id="pt-text" rows="2" oninput="setPageText('text', this.value)">${escapeHtml(e.text != null ? e.text : e.orig)}</textarea></label>
+        <div class="page-text-row">
+            <label>Font${choice('font', [['', 'As designed'], ['serif', 'Serif (headings)'], ['sans', 'Sans (body)']])}</label>
+            <label>Weight${choice('bold', [['', 'As designed'], ['bold', 'Bold'], ['regular', 'Regular']])}</label>
+        </div>
+        <label>Size: ${e.size || 100}%<input type="range" min="50" max="200" step="5" value="${e.size || 100}" oninput="setPageText('size', this.value)"></label>
+        ${isButton ? '' : `<div class="page-text-row"><span class="page-text-label">Align</span>
+            ${pressed('align', '', 'Auto', 'As designed')}${pressed('align', 'left', 'Left', 'Align left')}${pressed('align', 'center', 'Centre', 'Centre')}${pressed('align', 'right', 'Right', 'Align right')}</div>`}
+        <div class="page-text-row"><span class="page-text-label">Move</span>
+            <button type="button" onclick="nudgePageText(-1, 0)" aria-label="Move left">←</button>
+            <button type="button" onclick="nudgePageText(0, -1)" aria-label="Move up">↑</button>
+            <button type="button" onclick="nudgePageText(0, 1)" aria-label="Move down">↓</button>
+            <button type="button" onclick="nudgePageText(1, 0)" aria-label="Move right">→</button>
+            <span class="page-text-label">${e.x || 0}, ${e.y || 0}</span></div>
+        ${isButton ? `
+            <label>Goes to<input type="text" value="${escapeHtml(e.link || '')}" placeholder="As designed (e.g. carts/, #home-quote, tel:+63277455089)" oninput="setPageText('link', this.value)"></label>
+            ${el.classList.contains('btn') ? `<label>Style${choice('style', [['', 'As designed'], ['green', 'Green'], ['outline', 'Outlined']])}</label>` : ''}` : ''}
+        <div class="page-text-row page-text-end"><button type="button" onclick="resetPageTextItem()">Reset this</button><button type="button" onclick="closePageTextTools()">Done</button></div>`, 'page-text-tools');
+    placePageTextTools();
+}
+
+// The panel sits beside the chosen text, inside the window
+function placePageTextTools() {
+    const panel = document.getElementById('page-text-tools');
+    if (!panel || !pageTextSelected) return;
+    const r = pageTextSelected.getBoundingClientRect(), w = panel.offsetWidth, h = panel.offsetHeight;
+    const fitsRight = r.right + 16 + w < window.innerWidth;
+    let left = fitsRight ? r.right + 16 : r.left - 16 - w;
+    if (left < 8) left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left));
+    const top = Math.max(8, Math.min(window.innerHeight - h - 72, r.top));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+}
+window.addEventListener('scroll', () => { if (pageTextSelected) placePageTextTools(); }, { passive: true });
+
 // --- Admin sign in ---
 async function handleAdminSignIn(e) {
     e.preventDefault();
@@ -829,19 +1159,30 @@ function renderAdminPage() {
         // Bundles are read by everyone who prices quotations; tables not created yet (supabase/schema.sql not re-run)
         // come back as null, and the rest of the admin still loads
         const costs = can('bundles.view') || can('quotations.view');
-        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads] = await Promise.all([
+        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads, skuPhotos, skuPhotoSync, zohoItems, skuSitePhotos, stockSheet] = await Promise.all([
             can('quotes.view') ? rows(sb.from('quotes').select('*').order('created_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('golfers').select('*').order('joined_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('saved_builds').select('golfer_id')) : Promise.resolve([]),
             can('users.manage') ? rows(sb.from('staff').select('*').order('added_at')) : Promise.resolve([]),
-            costs ? rows(sb.from('bundles').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
-            costs ? rows(sb.from('sku_usd').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
+            costs ? allRows(() => sb.from('bundles').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
+            costs ? allRows(() => sb.from('sku_usd').select('*').order('sheet_row')).catch(() => null) : Promise.resolve([]),
             can('quotations.view') ? rows(sb.from('quotations').select('*').order('created_at', { ascending: false })).catch(() => null) : Promise.resolve([]),
             can('quotations.view') ? rows(sb.from('pricing_settings').select('*').eq('id', 1).maybeSingle()).catch(() => null) : Promise.resolve(null),
             can('log.view') ? rows(sb.from('activity_log').select('*').order('created_at', { ascending: false }).limit(ACTIVITY_LIMIT)).catch(() => null) : Promise.resolve([]),
-            can('leads.zoho') ? rows(sb.from('zoho_leads').select('*').order('created_at', { ascending: false }).limit(ZOHO_LIMIT)).catch(() => null) : Promise.resolve([])
+            can('leads.zoho') ? rows(sb.from('zoho_leads').select('*').order('created_at', { ascending: false }).limit(ZOHO_LIMIT)).catch(() => null) : Promise.resolve([]),
+            // The SKUs' photos from Zoho Inventory, and when they were last copied (null until schema.sql adds them)
+            costs ? allRows(() => sb.from('sku_photos').select('sku, url').order('sku')).catch(() => null) : Promise.resolve(null),
+            costs ? rows(sb.from('sku_photo_sync').select('*').eq('id', 1).maybeSingle()).catch(() => null) : Promise.resolve(null),
+            // Every Zoho Inventory item (no prices), and the photos added here for SKUs Zoho has none for
+            // with their stock once schema.sql has added it (before that, without)
+            costs ? allRows(() => sb.from('zoho_items').select('sku, name, category, unit, has_photo, available_stock, stock_on_hand, reorder_level').order('sku'))
+                .catch(() => allRows(() => sb.from('zoho_items').select('sku, name, category, unit, has_photo').order('sku')))
+                .catch(() => null) : Promise.resolve(null),
+            costs ? allRows(() => sb.from('sku_site_photos').select('sku, url').order('sku')).catch(() => null) : Promise.resolve(null),
+            // The team's stock sheet: per-branch stock, in transit and remarks (null until schema.sql adds it)
+            costs ? allRows(() => sb.from('stock_sheet').select('sku, cebu, manila, sta_rosa, total, in_transit, remark, movement').order('sku')).catch(() => null) : Promise.resolve(null)
         ]);
-        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads };
+        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads, skuPhotos, skuPhotoSync, zohoItems, skuSitePhotos, stockSheet };
     });
     const sections = ADMIN_SECTIONS.map(([group, items]) => [group, items.filter(([, , p]) => !p || can(p))]).filter(([, items]) => items.length);
     const allowed = sections.flatMap(([, items]) => items.map(([id]) => id));
@@ -2290,15 +2631,28 @@ function bundleGroupName(b) {
 }
 
 // The tab shows the bundles, or the USD SKU list the bundles' costs come from
-// --- Photos on SKUs and bundle lines (2026-11-11). "Add photo" uploads at once and fills the form's hidden photo field;
-// Save stores it. A bundle line without its own photo shows its SKU's ---
-function skuPhoto(sku) {
-    const s = sku && (pageData.skuUsd || []).find(x => x.sku === sku && x.photo);
-    return s ? s.photo : '';
+// --- Photos on SKUs and bundle lines (2026-11-12): from Zoho Inventory, by SKU (sku_photos, copied by the email
+// script). A SKU Zoho has no photo for can get one here, for the website (sku_site_photos); failing both, what the
+// website already has for it ---
+const skuIndexes = new WeakMap();
+
+// A row of one of the SKU lists, by SKU (each list indexed once; a changed list is a new array)
+function bySku(list, sku) {
+    if (!list || !sku) return null;
+    let map = skuIndexes.get(list);
+    if (!map) { map = new Map(list.map(x => [x.sku, x])); skuIndexes.set(list, map); }
+    return map.get(String(sku).trim()) || null;
 }
 
+function zohoPhoto(sku) { return (bySku(pageData && pageData.skuPhotos, sku) || {}).url || ''; }
+function ownPhoto(sku) { return (bySku(pageData && pageData.skuSitePhotos, sku) || {}).url || ''; }
+function zohoItem(sku) { return bySku(pageData && pageData.zohoItems, sku); }
+
+// Who may add a photo for a SKU (as for the site's other photos, plus the price manager)
+function canAddSkuPhotos() { return ['master', 'marketing', 'pricing'].includes((currentAdmin() || {}).role); }
+
 function bundleLinePhoto(b) {
-    return b.photo || skuPhoto(b.sku) || siteSkuPhoto(b.sku) || bundleOptionPhoto(b);
+    return zohoPhoto(b.sku) || ownPhoto(b.sku) || siteSkuPhoto(b.sku) || bundleOptionPhoto(b);
 }
 
 // Body, Seat and Canopy lines: a real photo of their colour. Body: Club Car's close-up of the front panel in that
@@ -2320,7 +2674,7 @@ function bundleOptionPhoto(b) {
     return canopy ? `image/Options/canopy-${canopy.toLowerCase()}.jpg` : '';
 }
 
-// Until a photo is uploaded, the list shows what the website already has (2026-11-11): the accessory's photo on the
+// Until Zoho Inventory has a photo for the SKU, the list shows what the website already has (2026-11-11): the accessory's photo on the
 // site, matched by SKU, or for a Body, Seat or Canopy line, its colour as on the site's colour picker
 // Bundle SKUs matched by hand to the real photos in image/Options (from the team's Drive folders; three added
 // 2026-11-11: the overhead console, the AGM battery and the Nokken chrome wheel). The item's name on the site
@@ -2382,60 +2736,251 @@ function linePhotoThumb(url, swatch = '') {
     return `<span class="line-photo">${inner}</span>`;
 }
 
-function linePhotoField(url, folder, span, note = '') {
-    return `<div class="field ${span}"><span class="text-sm">Photo</span>
+// The photo in a SKU or bundle line form: filled in from Zoho as the SKU is typed (previewSkuPhoto). When Zoho has
+// none, Add photo puts one in for the website straight away (no Save needed)
+function skuPhotoField(sku, span) {
+    sku = String(sku || '').trim();
+    const zoho = zohoPhoto(sku), own = zoho ? '' : ownPhoto(sku), standIn = zoho || own ? {} : skuStandIn(sku);
+    const note = !sku ? 'Fill in the SKU: its photo comes from Zoho Inventory.'
+        : zoho ? 'From Zoho Inventory.'
+        : !pageData.skuPhotos ? 'Photos from Zoho Inventory aren\'t set up yet.'
+        : own ? 'Added here, for the website: Zoho Inventory has no photo for this SKU. A photo added to the item in Zoho replaces it.'
+        : `No photo in Zoho Inventory for this SKU${standIn.photo || standIn.swatch ? ': showing the website\'s for now' : ''}.${canAddSkuPhotos() ? ' Add one here for the website, or to the item in Zoho.' : ''}`;
+    return `<div class="field ${span}" data-sku-photo="${span}" data-sku="${escapeHtml(sku)}"><span class="text-sm">Photo</span>
         <div class="flex flex-wrap items-center gap-4 mt-1">
-            ${linePhotoThumb(url).replace('line-photo', 'line-photo line-photo-lg')}
-            <input type="hidden" name="photo" value="${escapeHtml(url || '')}">
-            <label class="btn btn-outline min-h-[2.5rem] px-4 text-sm cursor-pointer"><span>${url ? 'Replace photo' : 'Add photo'}</span><input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseLinePhoto(this, '${folder}')"></label>
-            <button type="button" onclick="clearLinePhoto(this)" class="link text-xs"${url ? '' : ' hidden'}>Remove photo</button>
+            ${linePhotoThumb(zoho || own || standIn.photo, standIn.swatch).replace('line-photo', 'line-photo line-photo-lg')}
+            ${sku && !zoho && canAddSkuPhotos() ? skuPhotoButtons(sku, own, 'btn btn-outline min-h-[2.5rem] px-4 text-sm') : ''}
+            <p class="text-xs text-mute basis-full">${note}</p>
         </div>
-        ${note ? `<p class="text-xs text-mute mt-1">${note}</p>` : ''}
     </div>`;
 }
 
-async function chooseLinePhoto(input, folder) {
-    const file = input.files && input.files[0];
-    if (!file) return;
-    const field = input.closest('.field'), label = input.previousElementSibling, form = input.closest('form');
-    const submit = form.querySelector('button[type="submit"]');
-    label.textContent = 'Uploading…';
-    submit.disabled = true;
-    try {
-        const url = await uploadSitePhoto(file, folder);
-        field.querySelector('input[name="photo"]').value = url;
-        field.querySelector('.line-photo').innerHTML = `<img src="${escapeHtml(url)}" alt="">`;
-        field.querySelector('button[onclick^="clearLinePhoto"]').hidden = false;
-        label.textContent = 'Replace photo';
-        showToast('Photo uploaded. Save to keep it.');
-    } catch (err) {
-        label.textContent = field.querySelector('input[name="photo"]').value ? 'Replace photo' : 'Add photo';
-        showToast(`Not uploaded: ${err.message}.`);
-    }
-    submit.disabled = false;
-    input.value = '';
+// Add photo (or Replace photo, and Remove photo) for a SKU's website photo
+function skuPhotoButtons(sku, own, style) {
+    return `<label class="${style} cursor-pointer"><span>${own ? 'Replace photo' : 'Add photo'}</span><input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" data-sku="${escapeHtml(sku)}" onchange="chooseSkuPhoto(this)"></label>
+        ${own ? `<button type="button" data-sku="${escapeHtml(sku)}" onclick="removeSkuPhoto(this)" class="link text-xs">Remove photo</button>` : ''}`;
 }
 
-function clearLinePhoto(button) {
-    const field = button.closest('.field');
-    field.querySelector('input[name="photo"]').value = '';
-    field.querySelector('.line-photo').innerHTML = '';
-    field.querySelector('label span').textContent = 'Add photo';
-    button.hidden = true;
+// Typing a SKU: its photo, and (when the description is still empty) the Zoho item's name
+function previewSkuPhoto(input) {
+    const form = input.form;
+    const field = form && form.querySelector('[data-sku-photo]');
+    if (field) field.outerHTML = skuPhotoField(input.value, field.dataset.skuPhoto);
+    const item = zohoItem(input.value), description = form && form.querySelector('[name="description"]');
+    if (item && description && !description.value.trim()) description.value = item.name;
+}
+
+async function chooseSkuPhoto(input) {
+    const file = input.files && input.files[0], sku = input.dataset.sku;
+    if (!file || !sku) return;
+    input.previousElementSibling.textContent = 'Uploading…';
+    try {
+        const url = await uploadSitePhoto(file, 'skus');
+        const { data: saved, error } = await sb.from('sku_site_photos').upsert({ sku, url, updated_at: new Date().toISOString() }).select('sku, url').single();
+        if (error) throw error;
+        pageData.skuSitePhotos = [...(pageData.skuSitePhotos || []).filter(p => p.sku !== sku), saved];
+        showToast(`Photo added for ${sku}.`);
+    } catch (err) {
+        showToast(`Not added: ${err.message}.`);
+    }
+    refreshSkuPhoto(input);
+}
+
+async function removeSkuPhoto(button) {
+    const sku = button.dataset.sku;
+    if (!confirm(`Remove the photo added for ${sku}?`)) return;
+    const { error } = await sb.from('sku_site_photos').delete().eq('sku', sku);
+    if (error) { showToast(`Not removed: ${error.message}.`); return; }
+    pageData.skuSitePhotos = (pageData.skuSitePhotos || []).filter(p => p.sku !== sku);
+    showToast(`Photo removed for ${sku}.`);
+    refreshSkuPhoto(button);
+}
+
+// After a photo is added or removed: the form's photo field (the rest of an open form is left as typed), or the
+// Zoho items list; the other lists follow when the form is saved or closed
+function refreshSkuPhoto(el) {
+    const field = el.closest('[data-sku-photo]');
+    if (field) field.outerHTML = skuPhotoField(field.dataset.sku, field.dataset.skuPhoto);
+    else refreshZohoItems();
+}
+
+// Above the lists: where the items and photos come from, when they were last copied, and a way to copy them now
+function renderSkuPhotoSync({ skuPhotoSync: s }) {
+    if (!s) return '<p class="text-sm text-mute mb-6">Items and photos from Zoho Inventory aren\'t set up yet: re-run supabase/schema.sql, then follow "Zoho Inventory" in the email script\'s setup notes.</p>';
+    const time = t => new Date(t).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+    const copying = s.requested_at && (!s.synced_at || new Date(s.requested_at) > new Date(s.synced_at));
+    const count = (n, word) => `${(n || 0).toLocaleString('en-PH')} ${word}${n === 1 ? '' : 's'}`;
+    // A partial copy is progress, not a failure: amber, like copying
+    const partial = /^Copied part/.test(s.error || '');
+    // Class names written out in full, so the CSS build keeps them
+    const dot = s.error && !partial ? 'adm-dot-bad' : copying || partial || !s.synced_at ? 'adm-dot-wait' : 'adm-dot-good';
+    return `<div class="adm-status">
+        <div>
+            <p><span class="adm-dot ${dot}" aria-hidden="true"></span>Zoho Inventory, copied every hour:
+                ${s.synced_at ? `last copied ${time(s.synced_at)} · ${count(s.items, 'item')} · ${count(s.photos, 'photo')}` : 'not copied yet'}${copying ? ' · copying now…' : ''}</p>
+            ${s.error ? `<p class="${partial ? 'text-mute' : 'golfer-error'} mt-1">${escapeHtml(s.error)}</p>` : ''}
+            ${'sheet_rows' in s ? `<p class="mt-1">Stock sheet (the stock check): ${s.sheet_synced_at ? `last copied ${time(s.sheet_synced_at)} · ${count(s.sheet_rows, 'SKU')}` : 'not copied yet'}</p>
+            ${s.sheet_error ? `<p class="golfer-error mt-1">${escapeHtml(s.sheet_error)}</p>` : ''}` : '<p class="text-mute mt-1">Stock sheet: not set up yet (run supabase/schema.sql)</p>'}
+        </div>
+        <button type="button" onclick="requestSkuPhotos(this)" class="adm-btn">Get items from Zoho now</button>
+    </div>`;
+}
+
+async function requestSkuPhotos(button) {
+    button.disabled = true;
+    const { error } = await sb.rpc('request_sku_photos');
+    button.disabled = false;
+    if (error) { showToast(`Not asked: ${error.message}.`); return; }
+    if (pageData.skuPhotoSync) pageData.skuPhotoSync.requested_at = new Date().toISOString();
+    renderApp();
+    showToast('Asked Zoho for the items and photos. They take a few minutes; reload the page to see them.');
+}
+
+// --- The Zoho items tab: every active Zoho Inventory item, to add to the USD SKU list or a bundle, and to give a
+// photo when Zoho has none ---
+let zohoQuery = '';
+const ZOHO_ITEMS_SHOWN = 60; // rows drawn at once; searching narrows the rest
+
+// --- Stock from Zoho Inventory (2026-11-12): each item's available stock (all locations), against what a quotation
+// needs (qty x carts). Information only: nothing is blocked by it ---
+const STOCK_CLASS = { ok: 'stock-ok', short: 'stock-short', out: 'stock-out', none: 'stock-none' };
+
+function stockNumber(n) {
+    return Number(n).toLocaleString('en-PH', { maximumFractionDigits: 2 });
+}
+
+function sheetStock(sku) { return bySku(pageData && pageData.stockSheet, sku); }
+
+// { kind, text } for a SKU (needed: how many this quotation needs), or null before any stock is copied. The quantity
+// is the team's stock sheet's total on hand (2026-11-12: the sheet is the stock check); Zoho's available stock only for
+// a SKU the sheet doesn't have. Just whether it's in stock: in stock, not enough for this quotation, or out of stock
+function stockStatus(sku, needed = 0) {
+    const zohoReady = pageData && pageData.zohoItems && pageData.zohoItems.some(i => 'available_stock' in i);
+    const sheetReady = pageData && pageData.stockSheet && pageData.stockSheet.length;
+    if (!zohoReady && !sheetReady) return null;
+    const item = zohoItem(sku), sheet = sheetStock(sku);
+    if (!sku || (!item && !sheet)) return { kind: 'none', text: 'Not on the stock sheet' };
+    const figure = sheet && sheet.total != null ? sheet.total : item && item.available_stock != null ? item.available_stock : null;
+    if (figure == null) return { kind: 'none', text: 'No stock figure' };
+    const have = Number(figure);
+    if (have <= 0) return { kind: 'out', text: 'Out of stock' };
+    if (needed && have < needed) return { kind: 'short', text: `Not enough · ${stockNumber(have)} of ${stockNumber(needed)}` };
+    return { kind: 'ok', text: `In stock · ${stockNumber(have)}` };
+}
+
+function stockBadge(status) {
+    return status ? `<span class="stock-badge ${STOCK_CLASS[status.kind]}">${escapeHtml(status.text)}</span>` : '';
+}
+
+// What a quotation line needs: its qty for each cart
+function stockNeeded(qt, l) {
+    return Number(l.qty == null ? 1 : l.qty) * Number(qt.units || 1);
+}
+
+// "2 lines short, 1 out of stock · as of 2:00 PM", over the quotation's lines
+function stockSummary(qt) {
+    const statuses = qt.lines.map(l => stockStatus(l.sku, stockNeeded(qt, l))).filter(Boolean);
+    if (!statuses.length) return '';
+    const count = kind => statuses.filter(s => s.kind === kind).length;
+    const parts = [[count('short'), 'not enough'], [count('out'), 'out of stock'], [count('none'), 'not on the stock sheet']]
+        .filter(([n]) => n).map(([n, word]) => `${n} line${n === 1 ? '' : 's'} ${word}`);
+    const time = d => new Date(d).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+    const s = pageData.skuPhotoSync || {};
+    const when = s.sheet_synced_at ? ` · stock sheet as of ${time(s.sheet_synced_at)}` : s.synced_at ? ` · Zoho as of ${time(s.synced_at)}` : '';
+    const bad = count('short') + count('out');
+    return `<p class="text-sm mt-4"><span class="stock-badge ${bad ? STOCK_CLASS.short : STOCK_CLASS.ok}">Stock</span> ${parts.length ? escapeHtml(parts.join(', ')) : 'Everything in stock'}${escapeHtml(when)}</p>`;
+}
+
+let zohoInStock = false; // the Items tab: only items with stock
+
+function renderZohoItems({ zohoItems }) {
+    if (!zohoItems) return '<p class="measure">Zoho items aren\'t set up yet: re-run supabase/schema.sql, then follow "Zoho Inventory" in the email script\'s setup notes.</p>';
+    if (!zohoItems.length) return '<p class="measure">No Zoho items copied yet. Press "Get items from Zoho now", or wait for the next hourly copy.</p>';
+    const hasStock = zohoItems.some(i => 'available_stock' in i) || !!(pageData.stockSheet && pageData.stockSheet.length);
+    return `
+        <div class="adm-toolbar">
+            <div class="field adm-grow"><label for="zi-q">Search SKU, name or category</label><input id="zi-q" type="search" value="${escapeHtml(zohoQuery)}" oninput="setZohoQuery(this.value)"></div>
+            ${hasStock ? `<label class="flex items-center gap-2 text-sm pb-2"><input type="checkbox"${zohoInStock ? ' checked' : ''} onchange="zohoInStock = this.checked; refreshZohoItems()"> In stock only</label>` : ''}
+        </div>
+        <div id="zoho-item-results">${renderZohoItemRows(zohoItems)}</div>`;
+}
+
+function setZohoQuery(value) {
+    zohoQuery = value;
+    refreshZohoItems();
+}
+
+function refreshZohoItems() {
+    const box = document.getElementById('zoho-item-results');
+    if (box && pageData && pageData.zohoItems) box.innerHTML = renderZohoItemRows(pageData.zohoItems);
+}
+
+function renderZohoItemRows(list) {
+    const words = zohoQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const matches = list.filter(i => words.every(w => `${i.sku} ${i.name} ${i.category}`.toLowerCase().includes(w))
+        && (!zohoInStock || Number((sheetStock(i.sku) || {}).total != null ? sheetStock(i.sku).total : i.available_stock) > 0));
+    const shown = matches.slice(0, ZOHO_ITEMS_SHOWN);
+    const inUsd = sku => bySku(pageData.skuUsd, sku);
+    if (!matches.length) return '<p class="measure">No Zoho items match.</p>';
+    return `
+        <p class="adm-count-line">${matches.length} item${matches.length === 1 ? '' : 's'}${matches.length > shown.length ? `, showing the first ${shown.length}: search to find the rest` : ''}</p>
+        <div class="admin-table-wrap"><table class="admin-table bundle-table">
+            <thead><tr><th>Photo</th><th>SKU</th><th>Name</th><th>Category</th><th>Stock</th><th><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody>${shown.map(i => {
+                const zoho = zohoPhoto(i.sku), own = zoho ? '' : ownPhoto(i.sku);
+                const sku = escapeHtml(i.sku);
+                return `<tr>
+                    <td><div class="flex items-center gap-3">${linePhotoThumb(zoho || own)}
+                        ${!zoho && canAddSkuPhotos() ? `<span class="flex flex-col items-start gap-1">${skuPhotoButtons(i.sku, own, 'link text-xs')}</span>` : ''}</div>
+                        ${own ? '<p class="text-xs text-mute mt-1">Added here</p>' : ''}</td>
+                    <td class="whitespace-nowrap">${sku}</td>
+                    <td>${escapeHtml(i.name)}${i.unit ? `<p class="text-xs text-mute mt-1">Unit: ${escapeHtml(i.unit)}</p>` : ''}</td>
+                    <td>${escapeHtml(i.category)}</td>
+                    <td class="whitespace-nowrap">${stockBadge(stockStatus(i.sku))}</td>
+                    <td class="whitespace-nowrap">
+                        ${inUsd(i.sku) ? '<span class="text-xs text-mute mr-3">In the USD list</span>' : `<button type="button" data-sku="${sku}" onclick="addZohoItemTo('usd', this.dataset.sku)" class="link text-xs mr-3">Add to USD list</button>`}
+                        <button type="button" data-sku="${sku}" onclick="addZohoItemTo('bundles', this.dataset.sku)" class="link text-xs">Add to bundle</button>
+                    </td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table></div>`;
+}
+
+// Opens a new USD SKU list row, or a new bundle line (in the build the filters show), filled in with the item
+let skuUsdPrefill = null;
+
+function addZohoItemTo(where, sku) {
+    const item = zohoItem(sku) || { sku, name: '' };
+    bundleEditing = skuUsdEditing = skuUsdPrefill = null;
+    if (where === 'usd') {
+        bundleView = 'usd';
+        skuUsdEditing = 'new';
+        skuUsdPrefill = { sku: item.sku, description: item.name };
+    } else {
+        bundleView = 'bundles';
+        bundleEditing = { group: { product: bundleFilter.product || '', config: bundleFilter.config || '', type: bundleFilter.type || '', sku: item.sku, description: item.name } };
+    }
+    renderApp();
+    const next = document.getElementById(where === 'usd' ? 'se-usd' : 'be-product');
+    if (next) { next.scrollIntoView({ block: 'center' }); next.focus(); }
 }
 
 function renderAdminBundles(data) {
-    const views = [['bundles', 'Bundles'], ['usd', 'USD SKU list']];
+    const views = [['bundles', 'Bundles'], ['usd', 'USD SKU list'], ['zoho', 'Items']];
+    const counts = { bundles: data.bundles && data.bundles.length, usd: data.skuUsd && data.skuUsd.length, zoho: data.zohoItems && data.zohoItems.length };
     return `
-        <div class="bundle-parts mb-8" role="group" aria-label="Show">
-            ${views.map(([id, label]) => `<button type="button" aria-pressed="${bundleView === id}" onclick="showBundleView('${id}')">${label}</button>`).join('')}
+        ${renderSkuPhotoSync(data)}
+        <!-- The SKU fields suggest Zoho items: type a SKU or part of a name -->
+        <datalist id="zoho-skus">${(data.zohoItems || []).map(i => `<option value="${escapeHtml(i.sku)}" label="${escapeHtml(i.name)}"></option>`).join('')}</datalist>
+        <div class="bundle-parts mb-5" role="group" aria-label="Show">
+            ${views.map(([id, label]) => `<button type="button" aria-pressed="${bundleView === id}" onclick="showBundleView('${id}')">${label}${counts[id] != null ? `<small>${counts[id].toLocaleString('en-PH')}</small>` : ''}</button>`).join('')}
         </div>
-        ${bundleView === 'usd' ? renderSkuUsd(data) : renderBundles(data)}`;
+        ${bundleView === 'usd' ? renderSkuUsd(data) : bundleView === 'zoho' ? renderZohoItems(data) : renderBundles(data)}`;
 }
 
 function showBundleView(view) {
     bundleView = view;
-    bundleEditing = skuUsdEditing = null;
+    bundleEditing = skuUsdEditing = skuUsdPrefill = null;
     renderApp();
 }
 
@@ -2446,7 +2991,10 @@ function renderSkuUsd({ skuUsd }) {
     if (!skuUsd) return '<p class="measure">The USD SKU list isn\'t in the database yet. Re-run supabase/schema.sql in the Supabase SQL Editor, then supabase/private/bundles-data.sql.</p>';
     if (!skuUsd.length) return '<p class="measure">No USD SKU list loaded yet. Run supabase/private/bundles-data.sql in the Supabase SQL Editor.</p>';
     return `
-        <div class="field max-w-md mb-6"><label for="su-q">Search description or SKU</label><input id="su-q" type="search" value="${escapeHtml(skuUsdQuery)}" oninput="setSkuUsdQuery(this.value)"></div>
+        <div class="adm-toolbar">
+            <div class="field adm-grow"><label for="su-q">Search description or SKU</label><input id="su-q" type="search" value="${escapeHtml(skuUsdQuery)}" oninput="setSkuUsdQuery(this.value)"></div>
+            <button type="button" onclick="editSkuUsd('new')" class="btn btn-primary adm-toolbar-end">Add a SKU</button>
+        </div>
         <div id="sku-usd-results">${renderSkuUsdRows(skuUsd)}</div>`;
 }
 
@@ -2465,16 +3013,13 @@ function renderSkuUsdRows(list) {
     const q = skuUsdQuery.trim().toLowerCase();
     const shown = list.filter(s => !q || `${s.description || ''} ${s.sku || ''}`.toLowerCase().includes(q));
     return `
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <p class="text-sm">${shown.length} SKU${shown.length === 1 ? '' : 's'}</p>
-            <button type="button" onclick="editSkuUsd('new')" class="btn btn-outline min-h-[2.5rem] px-4 text-sm">Add a SKU</button>
-        </div>
+        <p class="adm-count-line">${shown.length} SKU${shown.length === 1 ? '' : 's'}</p>
         ${shown.length || skuUsdEditing === 'new' ? `<div class="admin-table-wrap"><table class="admin-table bundle-table">
             <thead><tr><th>Photo</th><th>SKU</th><th>Description</th><th class="text-right">USD</th><th><span class="sr-only">Actions</span></th></tr></thead>
             <tbody>
-                ${skuUsdEditing === 'new' ? renderSkuUsdForm({}) : ''}
+                ${skuUsdEditing === 'new' ? renderSkuUsdForm(skuUsdPrefill || {}) : ''}
                 ${shown.map(s => skuUsdEditing === s.sheet_row ? renderSkuUsdForm(s) : `<tr>
-                    <td>${s.photo ? linePhotoThumb(s.photo) : (st => linePhotoThumb(st.photo, st.swatch))(skuStandIn(s.sku))}</td>
+                    <td>${zohoPhoto(s.sku) || ownPhoto(s.sku) ? linePhotoThumb(zohoPhoto(s.sku) || ownPhoto(s.sku)) : (st => linePhotoThumb(st.photo, st.swatch))(skuStandIn(s.sku))}</td>
                     <td class="whitespace-nowrap">${escapeHtml(s.sku)}</td>
                     <td>${escapeHtml(s.description)}${s.source === 'admin' || s.updated_by ? `<p class="text-xs text-mute mt-1">${s.source === 'admin' ? 'added' : 'edited'}${s.updated_by ? ` by ${escapeHtml(adminName(s.updated_by))}` : ''}</p>` : ''}</td>
                     <td class="text-right whitespace-nowrap">${formatUsd(s.usd)}</td>
@@ -2489,10 +3034,10 @@ function renderSkuUsdForm(s) {
     return `<tr class="bundle-editing"><td colspan="5">
         <form data-no-prefill onsubmit="saveSkuUsd(event, ${isNew ? 'null' : s.sheet_row})" class="grid sm:grid-cols-[12rem_1fr_10rem] gap-4 items-end">
             <p class="text-sm font-semibold text-ink sm:col-span-3">${isNew ? 'New SKU' : 'Edit SKU'}</p>
-            <div class="field"><label for="se-sku">SKU</label><input id="se-sku" name="sku" type="text" value="${escapeHtml(s.sku || '')}"></div>
+            <div class="field"><label for="se-sku">SKU</label><input id="se-sku" name="sku" type="text" list="zoho-skus" autocomplete="off" oninput="previewSkuPhoto(this)" value="${escapeHtml(s.sku || '')}"></div>
             <div class="field"><label for="se-description">Description</label><input id="se-description" name="description" type="text" value="${escapeHtml(s.description || '')}"></div>
             <div class="field"><label for="se-usd">USD</label><input id="se-usd" name="usd" type="text" inputmode="decimal" value="${s.usd == null ? '' : Math.round(Number(s.usd) * 100) / 100}"></div>
-            ${linePhotoField(s.photo, 'skus', 'sm:col-span-3')}
+            ${skuPhotoField(s.sku, 'sm:col-span-3')}
             <p class="text-xs text-mute sm:col-span-3">Changing a USD cost here doesn't change the bundles' costs; those are edited on the Bundles list.</p>
             <p id="sku-usd-error" class="golfer-error sm:col-span-3" role="alert"></p>
             <div class="flex gap-4 items-center sm:col-span-3">
@@ -2504,6 +3049,7 @@ function renderSkuUsdForm(s) {
 }
 
 function editSkuUsd(sheetRow) {
+    if (sheetRow !== 'new') skuUsdPrefill = null;
     skuUsdEditing = sheetRow;
     refreshSkuUsd();
     const first = document.getElementById('se-sku');
@@ -2515,8 +3061,6 @@ async function saveSkuUsd(e, sheetRow) {
     const data = new FormData(e.target);
     const text = key => { const v = String(data.get(key) || '').trim(); return v === '' ? null : v; };
     const row = { sku: text('sku'), description: text('description'), usd: parseAmount(String(data.get('usd') || '')) };
-    // Once schema.sql has added the photo column
-    if (!pageData.skuUsd.length || 'photo' in pageData.skuUsd[0]) row.photo = String(data.get('photo') || '');
     if (Number.isNaN(row.usd)) { document.getElementById('sku-usd-error').textContent = 'USD must be a number.'; return; }
     if (!row.sku && !row.description) { document.getElementById('sku-usd-error').textContent = 'Enter a SKU or a description.'; return; }
     const button = e.target.querySelector('button[type="submit"]');
@@ -2529,7 +3073,7 @@ async function saveSkuUsd(e, sheetRow) {
     if (error) { document.getElementById('sku-usd-error').textContent = `Not saved: ${error.message}`; return; }
     if (sheetRow == null) pageData.skuUsd.unshift(saved);
     else pageData.skuUsd = pageData.skuUsd.map(s => s.sheet_row === sheetRow ? saved : s);
-    skuUsdEditing = null;
+    skuUsdEditing = skuUsdPrefill = null;
     refreshSkuUsd();
     showToast(sheetRow == null ? 'SKU added.' : 'SKU saved.');
 }
@@ -2556,11 +3100,12 @@ function renderBundles({ bundles }) {
     };
     // Build: a product, config and type together, as the groups are headed (e.g. Golfcarts · 4 seater · Golfer)
     return `
-        <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-6">
+        <div class="adm-toolbar">
+            <div class="field adm-grow"><label for="bf-q">Search description or SKU</label><input id="bf-q" type="search" value="${escapeHtml(bundleFilter.q)}" oninput="setBundleFilter('q', this.value)"></div>
             ${options('build', 'Build', bundleGroupName)}${options('product', 'Product')}${options('config', 'Config')}${options('type', 'Type')}
-            <div class="field"><label for="bf-q">Search description or SKU</label><input id="bf-q" type="search" value="${escapeHtml(bundleFilter.q)}" oninput="setBundleFilter('q', this.value)"></div>
+            <button type="button" onclick="addBundleLine(null)" class="btn btn-primary adm-toolbar-end">Add a line</button>
         </div>
-        <div class="bundle-parts mb-6" role="group" aria-label="Part">
+        <div class="bundle-parts" role="group" aria-label="Part">
             ${BUNDLE_PARTS.map(([id, label]) => `<button type="button" aria-pressed="${bundleFilter.part === id}" onclick="setBundlePart('${id}')">${label}</button>`).join('')}
         </div>
         <div id="bundle-results">${renderBundleResults(bundles)}</div>`;
@@ -2600,10 +3145,7 @@ function renderBundleResults(bundles) {
     const cost = lines => lines.some(b => b.cost_usd != null) ? ` · ${formatUsd(lines.reduce((s, b) => s + (bundleLineUsd(b) || 0), 0))}` : '';
     const cols = 9;
     return `
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <p class="text-sm">${shown.length} line${shown.length === 1 ? '' : 's'} in ${groups.size} group${groups.size === 1 ? '' : 's'}${cost(shown)}</p>
-            <button type="button" onclick="addBundleLine(null)" class="btn btn-outline min-h-[2.5rem] px-4 text-sm">Add a line</button>
-        </div>
+        <p class="adm-count-line">${shown.length} line${shown.length === 1 ? '' : 's'} in ${groups.size} group${groups.size === 1 ? '' : 's'}${cost(shown)}</p>
         <div class="admin-table-wrap"><table class="admin-table bundle-table">
             ${[...groups].map(([name, { sample, lines }]) => `<tbody>
                 <tr class="bundle-group"><th colspan="${cols}">
@@ -2649,8 +3191,8 @@ function renderBundleForm(b, cols) {
         <form data-no-prefill onsubmit="saveBundleLine(event, ${isNew ? 'null' : b.sheet_row})" class="grid sm:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
             <p class="text-sm font-semibold text-ink sm:col-span-3 lg:col-span-6">${isNew ? 'New line' : 'Edit line'}</p>
             ${BUNDLE_FIELDS.map(([key, label]) => `<div class="field${key === 'description' ? ' sm:col-span-3 lg:col-span-3' : ''}"><label for="be-${key}">${label}</label>
-                <input id="be-${key}" name="${key}" type="text"${key === 'qty' || key === 'cost_usd' ? ' inputmode="decimal"' : ''} value="${escapeHtml(b[key] == null ? '' : key === 'cost_usd' ? Math.round(Number(b[key]) * 100) / 100 : key === 'qty' ? Number(b[key]) : b[key])}"></div>`).join('')}
-            ${linePhotoField(b.photo, 'bundles', 'sm:col-span-3 lg:col-span-6', !b.photo && skuPhoto(b.sku) ? 'Showing the SKU\'s photo. Add one to use a different photo for this line.' : '')}
+                <input id="be-${key}" name="${key}" type="text"${key === 'sku' ? ' list="zoho-skus" autocomplete="off" oninput="previewSkuPhoto(this)"' : ''}${key === 'qty' || key === 'cost_usd' ? ' inputmode="decimal"' : ''} value="${escapeHtml(b[key] == null ? '' : key === 'cost_usd' ? Math.round(Number(b[key]) * 100) / 100 : key === 'qty' ? Number(b[key]) : b[key])}"></div>`).join('')}
+            ${skuPhotoField(b.sku, 'sm:col-span-3 lg:col-span-6')}
             ${b.cost_usd_formula ? `<p class="text-xs text-mute sm:col-span-3 lg:col-span-6">In the sheet this cost came from ${escapeHtml(b.cost_usd_formula)}. Cost is per unit; the total is cost × qty.</p>` : ''}
             <p id="bundle-error" class="golfer-error sm:col-span-3 lg:col-span-6" role="alert"></p>
             <div class="flex gap-4 items-center sm:col-span-3 lg:col-span-6">
@@ -2693,7 +3235,6 @@ async function saveBundleLine(e, sheetRow) {
     const data = new FormData(e.target);
     const line = {};
     BUNDLE_FIELDS.forEach(([key]) => { const v = String(data.get(key) || '').trim(); line[key] = v === '' ? null : v; });
-    if (!pageData.bundles.length || 'photo' in pageData.bundles[0]) line.photo = String(data.get('photo') || '');
     for (const key of ['qty', 'cost_usd']) {
         line[key] = parseAmount(line[key] || '');
         if (Number.isNaN(line[key])) { document.getElementById('bundle-error').textContent = `${key === 'qty' ? 'Qty' : 'Cost'} must be a number.`; return; }
@@ -3054,7 +3595,7 @@ function renderQuotationEditor(data) {
         ${editable && qt.build_group ? `<p class="text-sm mt-3"><button type="button" onclick="rebuildQuotationLines()" class="link">Fill lines from this bundle again</button> <span class="text-mute">(replaces the lines below with the ones the request's build points at)</span></p>` : ''}
 
         <div class="admin-table-wrap mt-6"><table class="admin-table bundle-table">
-            <thead><tr><th>SKU</th><th>Part</th><th>Option</th><th>Description</th><th title="Shown with its own price in the PDF. The other lines are one package price.">Upgrade</th><th class="text-right">Qty</th><th class="text-right">Cost (USD)</th><th class="text-right">Cost (₱)</th><th class="text-right">Price (₱)</th><th class="text-right">Amount (₱)</th>${editable ? '<th><span class="sr-only">Remove</span></th>' : ''}</tr></thead>
+            <thead><tr><th>SKU</th><th>Part</th><th>Option</th><th>Description</th><th title="Shown with its own price in the PDF. The other lines are one package price.">Upgrade</th><th class="text-right">Qty</th><th title="Stock on hand on the team's stock sheet (all branches), against qty x number of carts">Stock</th><th class="text-right">Cost (USD)</th><th class="text-right">Cost (₱)</th><th class="text-right">Price (₱)</th><th class="text-right">Amount (₱)</th>${editable ? '<th><span class="sr-only">Remove</span></th>' : ''}</tr></thead>
             <tbody>${qt.lines.map((l, i) => `<tr>
                 <td class="whitespace-nowrap">${escapeHtml(l.sku)}</td>
                 <td>${escapeHtml(l.part)}</td>
@@ -3062,12 +3603,13 @@ function renderQuotationEditor(data) {
                 <td>${escapeHtml(l.description)}</td>
                 <td class="text-center">${editable ? `<input type="checkbox" onchange="setQuotationUpgrade(${i}, this.checked)" aria-label="Upgrade"${l.upgrade ? ' checked' : ''}>` : (l.upgrade ? 'Yes' : '')}</td>
                 <td class="text-right">${num(`setQuotationLine(${i}, 'qty', this.value)`, l.qty)}</td>
+                <td class="whitespace-nowrap">${stockBadge(stockStatus(l.sku, stockNeeded(qt, l)))}</td>
                 <td class="text-right whitespace-nowrap">${formatUsd(l.cost_usd)}</td>
                 <td class="text-right whitespace-nowrap text-mute">${formatPhp(quotationCostPhp(qt, l))}</td>
                 <td class="text-right whitespace-nowrap">${editable ? num(`setQuotationLine(${i}, 'price_php', this.value)`, l.price_php) : formatPhp(l.price_php)}${l.manual ? `<p class="text-xs text-mute">typed${editable ? ` · <button type="button" onclick="useFormulaPrice(${i})" class="link">use formula</button>` : ''}</p>` : ''}${l.price_php == null ? '<p class="golfer-error text-xs">No price</p>' : ''}</td>
                 <td class="text-right whitespace-nowrap">${formatPhp(Number(l.price_php || 0) * Number(l.qty == null ? 1 : l.qty))}</td>
                 ${editable ? `<td><button type="button" onclick="removeQuotationLine(${i})" class="link text-xs">Remove</button></td>` : ''}
-            </tr>`).join('') || `<tr><td colspan="11" class="text-mute">No lines yet.</td></tr>`}</tbody>
+            </tr>`).join('') || `<tr><td colspan="12" class="text-mute">No lines yet.</td></tr>`}</tbody>
         </table></div>
         ${editable && QUOTATION_ADD_LINES ? `<div class="flex flex-wrap gap-4 items-end mt-4">
             <div class="field grow max-w-2xl"><label for="qe-add">Add a line from the bundle</label>
@@ -3092,6 +3634,7 @@ function renderQuotationEditor(data) {
                 <div class="text-mute"><dt>Margin</dt><dd>${t.total ? `${t.margin.toFixed(1)}%` : ''}</dd></div>
             </dl>
         </div>
+        ${stockSummary(qt)}
         <p class="text-sm mt-4"><b>Approval:</b> ${escapeHtml(quotationApprovalText(qt, t))}</p>
         ${t.unpriced ? `<p class="golfer-error mt-4">${t.unpriced} line${t.unpriced === 1 ? ' has' : 's have'} no price yet.</p>` : ''}
 
@@ -3209,16 +3752,230 @@ function quotationContent(qt) {
 }
 
 // The PDF's pages 2 and 3 as they should be now (once schema.sql has added their columns): the model's specifications,
-// the warranty from the pricing settings, and upgrades the model can take. Not part of the content, so storing them
-// doesn't send an approved quotation back to draft; a sent one keeps what it was sent with.
-function quotationPdfFields(qt) {
+// the warranty from the pricing settings, and upgrades the model can take, with page 3 drawn as one picture
+// (pdf_extra.page3, below). Not part of the content, so storing them doesn't send an approved quotation back to draft;
+// a sent one keeps what it was sent with.
+async function quotationPdfFields(qt) {
     if (!('pdf_extra' in qt) || qt.status === 'sent') return {};
-    return { pdf_extra: quotationPdfExtra(qt), warranty: (pageData.pricing && pageData.pricing.warranty) || '' };
+    const pdf_extra = quotationPdfExtra(qt);
+    // Page 3's picture is drawn again only when what's on it changed; if it can't be drawn, the PDF has its plain page 3
+    // PAGE3_DESIGN: raise it when the page's design or the cart cut-outs change, so every page 3 is drawn again
+    const key = JSON.stringify([PAGE3_DESIGN, qt.reference, qt.photo, pdf_extra.offers.map(o => [o.group, o.name, o.image])]);
+    const before = qt.pdf_extra || {};
+    if (before.page3 && before.page3Key === key) Object.assign(pdf_extra, { page3: before.page3, page3Key: key });
+    else if (pdf_extra.offers.length) {
+        try {
+            pdf_extra.page3 = await saveQuotationPage3(qt, await drawQuotationPage3(qt, pdf_extra.offers));
+            pdf_extra.page3Key = key;
+        } catch (err) {
+            console.warn('Page 3 not drawn:', err);
+            showToast(`Page 3 picture not made (${err.message}); the PDF uses the plain page 3.`);
+        }
+    }
+    return { pdf_extra, warranty: (pageData.pricing && pageData.pricing.warranty) || '' };
+}
+
+// --- The quotation PDF's page 3 (2026-11-12), drawn here as one A4 picture, because the PDF converter in the email
+// script keeps text and pictures but drops every background. On the designer's background (image/pdf/page3-bg.jpg):
+// the logo and quotation number, the headline, the customer's cart standing on the golf course (its cut-out from
+// scripts/pdf-carts.mjs), the upgrades on eight white cards, the "More from" bubble and the company line. No date:
+// the picture is made when the quotation is saved, and page 1 carries the date it's sent ---
+const PAGE3_DESIGN = 2; // 2: cleaner cart cut-outs (2026-11-12)
+const PAGE3 = { w: 1240, h: 1754, margin: 70, slate: '#4E6276', ink: '#151714', mute: '#6B6C64', green: '#749E35' };
+
+function loadPageImage(src) {
+    return new Promise(resolve => {
+        if (!src) { resolve(null); return; }
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => { console.warn('Page 3: picture did not load:', src); resolve(null); };
+        img.src = src;
+    });
+}
+
+// The cart's cut-out, named as scripts/pdf-carts.mjs names it
+function cartCutoutPath(photo) {
+    const slug = String(photo || '').replace(/^\/?image\//i, '').replace(/\.[a-z0-9]+$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return slug ? `image/pdf/cart/${slug}.webp` : '';
+}
+
+// Words onto lines no wider than width
+function pageLines(ctx, text, width) {
+    const lines = [];
+    let line = '';
+    String(text || '').split(/\s+/).filter(Boolean).forEach(word => {
+        const next = line ? `${line} ${word}` : word;
+        if (line && ctx.measureText(next).width > width) { lines.push(line); line = word; } else line = next;
+    });
+    if (line) lines.push(line);
+    return lines;
+}
+
+function pageRoundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+}
+
+// A picture inside a box, whole and centred (contain)
+function pageFit(ctx, img, x, y, w, h, align = 'center') {
+    const s = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+    const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+    ctx.drawImage(img, x + (w - dw) / 2, align === 'bottom' ? y + h - dh : y + (h - dh) / 2, dw, dh);
+}
+
+async function drawQuotationPage3(qt, offers) {
+    const { w: W, h: H, margin: M } = PAGE3;
+    const serif = '"Newsreader Variable", Georgia, serif', sans = '"Instrument Sans Variable", Arial, sans-serif';
+    await Promise.all([`800 64px ${serif}`, `700 36px ${sans}`, `400 20px ${sans}`].map(f => document.fonts.load(f).catch(() => null)));
+    const [bg, logo, cutout, photo, ...offerImages] = await Promise.all([
+        loadPageImage('image/pdf/page3-bg.jpg'), loadPageImage('image/GCPH_logo.png'), loadPageImage(cartCutoutPath(qt.photo)),
+        loadPageImage(qt.photo), ...offers.map(o => loadPageImage(o.image))]);
+    if (!bg) throw new Error('the page 3 background (image/pdf/page3-bg.jpg) did not load');
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    // The background, covering the sheet
+    const s = Math.max(W / bg.naturalWidth, H / bg.naturalHeight);
+    ctx.drawImage(bg, (W - bg.naturalWidth * s) / 2, 0, bg.naturalWidth * s, bg.naturalHeight * s);
+
+    // The header: logo, "UPGRADES & ACCESSORIES" and the quotation number, and a green rule
+    if (logo) pageFit(ctx, logo, M, 48, 150, 74);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = PAGE3.ink;
+    ctx.font = `700 25px ${sans}`;
+    ctx.letterSpacing = '2px';
+    ctx.fillText('UPGRADES & ACCESSORIES', W - M, 84);
+    ctx.letterSpacing = '0px';
+    ctx.font = `400 19px ${sans}`;
+    ctx.fillStyle = '#3D403B';
+    ctx.fillText(`Quotation ${qt.reference}`, W - M, 112);
+    ctx.fillStyle = PAGE3.green;
+    ctx.fillRect(M + 300, 132, W - 2 * M - 300, 5);
+
+    // The headline and its words
+    ctx.textAlign = 'left';
+    ctx.fillStyle = PAGE3.ink;
+    ctx.font = `800 70px ${serif}`;
+    ctx.fillText('ELEVATE YOUR RIDE', M, 238);
+    ctx.font = `700 38px ${sans}`;
+    ctx.fillText('TRANSFORM YOUR CART', M, 296);
+    ctx.fillText('INTO A MASTERPIECE', M, 340);
+    ctx.font = `400 20px ${sans}`;
+    ctx.fillStyle = '#2B2D29';
+    pageLines(ctx, 'Every journey deserves first-class comfort, style and performance. Make your Club Car yours with upgrades designed to turn heads. Tell us what you need: we\'ll price it and make it yours.', 470)
+        .forEach((line, i) => ctx.fillText(line, M, 388 + i * 29));
+
+    // The customer's cart on the golf course: its cut-out, or (without one) its photo on a white card
+    if (cutout) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+        ctx.shadowBlur = 24;
+        ctx.shadowOffsetY = 10;
+        pageFit(ctx, cutout, 590, 300, 590, 470, 'bottom');
+        ctx.restore();
+    } else if (photo) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 26;
+        pageRoundRect(ctx, 660, 330, 500, 380, 18);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+        ctx.restore();
+        pageFit(ctx, photo, 680, 350, 460, 340);
+    }
+
+    // Eight upgrades, two rows of four white cards
+    const gap = 22, cols = 4, cardW = (W - 2 * M - gap * (cols - 1)) / cols, cardH = 296, top = 880;
+    offers.slice(0, 8).forEach((o, i) => {
+        const x = M + (i % cols) * (cardW + gap), y = top + Math.floor(i / cols) * (cardH + gap);
+        ctx.save();
+        ctx.shadowColor = 'rgba(21, 23, 20, 0.28)';
+        ctx.shadowBlur = 22;
+        ctx.shadowOffsetY = 8;
+        pageRoundRect(ctx, x, y, cardW, cardH, 18);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+        ctx.restore();
+        pageRoundRect(ctx, x + 12, y + 12, cardW - 24, 168, 12);
+        ctx.fillStyle = '#F1F2EE';
+        ctx.fill();
+        if (offerImages[i]) {
+            ctx.save();
+            pageRoundRect(ctx, x + 12, y + 12, cardW - 24, 168, 12);
+            ctx.clip();
+            pageFit(ctx, offerImages[i], x + 18, y + 18, cardW - 36, 156);
+            ctx.restore();
+        }
+        ctx.textAlign = 'center';
+        ctx.fillStyle = PAGE3.mute;
+        ctx.font = `600 13px ${sans}`;
+        ctx.letterSpacing = '1.5px';
+        ctx.fillText(String(o.group || '').toUpperCase(), x + cardW / 2, y + 208);
+        ctx.letterSpacing = '0px';
+        ctx.fillStyle = PAGE3.ink;
+        ctx.font = `700 19px ${sans}`;
+        pageLines(ctx, o.name, cardW - 28).slice(0, 3).forEach((line, l) => ctx.fillText(line, x + cardW / 2, y + 236 + l * 23));
+    });
+
+    // "More from Golfcarts.ph": a white bubble with a green edge and a tail, then the company line
+    const bx = M, by = 1540, bw = W - 2 * M, bh = 120;
+    ctx.save();
+    ctx.shadowColor = 'rgba(21, 23, 20, 0.2)';
+    ctx.shadowBlur = 16;
+    pageRoundRect(ctx, bx, by, bw, bh, 16);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+    ctx.fill();
+    ctx.restore();
+    ctx.beginPath();
+    ctx.moveTo(bx + 40, by + bh - 2);
+    ctx.lineTo(bx + 40, by + bh + 34);
+    ctx.lineTo(bx + 82, by + bh - 2);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+    ctx.fill();
+    pageRoundRect(ctx, bx, by, bw, bh, 16);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = PAGE3.green;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bx + 40, by + bh);
+    ctx.lineTo(bx + 40, by + bh + 34);
+    ctx.lineTo(bx + 82, by + bh);
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = PAGE3.ink;
+    ctx.font = `700 22px ${sans}`;
+    ctx.fillText('More from Golfcarts.ph', bx + 30, by + 42);
+    ctx.font = `400 18px ${sans}`;
+    ctx.fillStyle = '#2B2D29';
+    pageLines(ctx, 'Golf carts, lifestyle carts, resort shuttles and utility carts, plus parts and service at our branches in Manila · Cebu · Laguna · Clark. See the full range at golfcarts.ph or call (02) 7745-5089.', bw - 60)
+        .slice(0, 2).forEach((line, i) => ctx.fillText(line, bx + 30, by + 72 + i * 26));
+    ctx.textAlign = 'center';
+    ctx.font = `400 15px ${sans}`;
+    ctx.fillStyle = '#2B2D29';
+    ctx.fillText('Golfcarts.ph by SJK Guahan Inc. · golfcarts.ph · info@golfcarts.ph · (02) 7745-5089', W / 2, H - 26);
+
+    return new Promise((resolve, reject) => canvas.toBlob(b => (b ? resolve(b) : reject(new Error('the picture could not be made'))), 'image/jpeg', 0.88));
+}
+
+// Saved in the site's photo storage (quotations/), where the email script fetches it for the PDF
+async function saveQuotationPage3(qt, blob) {
+    const path = `quotations/${String(qt.reference || 'quotation').replace(/[^\w-]+/g, '')}-${Date.now()}.jpg`;
+    const { error } = await sb.storage.from(SITE_PHOTO_BUCKET).upload(path, blob, { contentType: 'image/jpeg', cacheControl: '31536000' });
+    if (error) throw new Error(error.message);
+    return sb.storage.from(SITE_PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 
 // Stores them if they changed (before a preview), keeping any unsaved edits in the editor
 async function refreshQuotationPdfFields() {
-    const fields = quotationPdfFields(quotationDraft);
+    const fields = await quotationPdfFields(quotationDraft);
     const saved = pageData.quotations.find(x => x.id === quotationOpen);
     if (!saved || !Object.keys(fields).some(k => JSON.stringify(fields[k]) !== JSON.stringify(saved[k]))) return;
     const { data, error } = await sb.from('quotations').update(fields).eq('id', quotationOpen).select().single();
@@ -3227,7 +3984,7 @@ async function refreshQuotationPdfFields() {
     Object.assign(quotationDraft, fields, { updated_by: data.updated_by, updated_at: data.updated_at });
 }
 
-const PDF_OFFER_LIMIT = 9;
+const PDF_OFFER_LIMIT = 8; // two rows of four on page 3
 
 function quotationPdfExtra(qt) {
     const quote = pageData.quotes.find(q => q.id === qt.quote_id) || {};
@@ -3251,7 +4008,7 @@ function quotationPdfExtra(qt) {
 }
 
 async function writeQuotation(change, message) {
-    const { data: saved, error } = await sb.from('quotations').update({ ...quotationPdfFields(quotationDraft), ...change }).eq('id', quotationOpen).select().single();
+    const { data: saved, error } = await sb.from('quotations').update({ ...(await quotationPdfFields(quotationDraft)), ...change }).eq('id', quotationOpen).select().single();
     if (error) { showToast(`Not saved: ${error.message}`); return false; }
     pageData.quotations = pageData.quotations.map(x => x.id === saved.id ? saved : x);
     quotationDraft = JSON.parse(JSON.stringify(saved));
@@ -3292,7 +4049,7 @@ async function deleteQuotation() {
 // The Google Apps Script google-apps-script/golfcarts-mail.gs makes the PDF and sends the emails; it reads the
 // quotation with this sign-in, so the database decides whether this person may. Its web app address (ends in /exec),
 // the same as the Vault secret "mail_script_url"; empty until the script is deployed.
-const MAIL_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzDiEGgwlisk4dikiTy7svACFWwlowq37yMsBKL39rUACzHPDevVKcVvt_U8REKxOKhfg/exec';
+const MAIL_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwNA4eL7w0NfTsaZESEoG7b19GssWgHvaZGigk6dEGZLF4fDjlCOW-5g17rh46Bvk6WZA/exec'; // the gcph deployment (2026-11-12)
 const EMAIL_KINDS = { quotation_submitted: 'Approval request to Jerus or James', quotation_approved: 'Approved notice to the sales executive',
     quotation_returned: 'Returned notice to the sales executive', quotation_sent: 'Quotation to the customer' };
 const quotationEmails = {}; // quotation id -> its email_log rows
@@ -3453,13 +4210,13 @@ async function downloadPss() {
     const book = new ExcelJS.Workbook();
     book.creator = 'Golfcarts.ph admin';
     const ws = book.addWorksheet('PSS', { pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-    ws.columns = [{ width: 26 }, { width: 34 }, { width: 14 }, { width: 8 }, { width: 18 }, { width: 22 }, { width: 18 }];
+    ws.columns = [{ width: 26 }, { width: 34 }, { width: 14 }, { width: 8 }, { width: 18 }, { width: 22 }, { width: 18 }, { width: 34 }];
     const money = '#,##0.00';
     const thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
     const box = cell => { cell.border = { top: thin, left: thin, bottom: thin, right: thin }; };
     const section = title => {
         const r = ws.addRow([title]);
-        ws.mergeCells(r.number, 1, r.number, 7);
+        ws.mergeCells(r.number, 1, r.number, 8);
         r.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         r.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF151714' } };
         return r;
@@ -3502,7 +4259,7 @@ async function downloadPss() {
 
     section('COST ALLOCATION (internal use only)');
     pair('Sales order no.', '', '', '');
-    const costHead = ws.addRow(['Description', '', 'Part number', 'Qty', 'Landed cost', 'Local cost', 'Amount']);
+    const costHead = ws.addRow(['Description', '', 'Part number', 'Qty', 'Landed cost', 'Local cost', 'Amount', 'Stock (stock sheet)']);
     costHead.font = { bold: true };
     ws.mergeCells(costHead.number, 1, costHead.number, 2);
     const locals = ['PDI', 'Delivery', "Operator's training", 'Others'];
@@ -3512,9 +4269,17 @@ async function downloadPss() {
         const l = qt.lines[i];
         const cost = l ? quotationCostPhp(qt, l) : null;
         const qty = l ? Number(l.qty == null ? 1 : l.qty) * Number(qt.units || 1) : null;
-        const r = ws.addRow([l ? [l.part, l.option, l.description].filter(Boolean).join(' · ') : '', '', l ? l.sku : '', qty, cost == null || !l ? null : Math.round(cost * qty * 100) / 100, locals[i] || '', null]);
+        // the line's stock in Zoho against what the quotation needs, short or out marked in red
+        const stock = l ? stockStatus(l.sku, qty) : null;
+        const r = ws.addRow([l ? [l.part, l.option, l.description].filter(Boolean).join(' · ') : '', '', l ? l.sku : '', qty, cost == null || !l ? null : Math.round(cost * qty * 100) / 100, locals[i] || '', null,
+            stock ? stock.text : '']);
+        r.getCell(8).alignment = { wrapText: true, vertical: 'top' };
         ws.mergeCells(r.number, 1, r.number, 2);
         [5, 7].forEach(n => { r.getCell(n).numFmt = money; box(r.getCell(n)); });
+        if (stock && (stock.kind === 'short' || stock.kind === 'out')) {
+            r.getCell(8).font = { bold: true, color: { argb: 'FF8A2A1C' } };
+            r.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6E0DC' } };
+        }
     }
     const last = first + lineRows - 1;
     const totals = ws.addRow(['Total machine cost', '', '', '', { formula: `SUM(E${first}:E${last})` }, 'Total local cost', { formula: `SUM(G${first}:G${last})` }]);

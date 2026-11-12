@@ -537,6 +537,172 @@ end $$;
 revoke execute on function public.retry_zoho_lead(bigint) from public, anon;
 grant execute on function public.retry_zoho_lead(bigint) to authenticated;
 
+-- ---------- SKU photos from Zoho Inventory (2026-11-12) ----------
+-- The admin's USD SKU list and Bundles show each SKU's photo from Zoho Inventory; nobody uploads them by hand. The
+-- email script (syncZohoPhotos) copies each item's photo into a Google Drive folder every hour, and when staff press
+-- "Get photos from Zoho now" (request_sku_photos), then saves the links here by SKU with the shared secret
+-- (save_sku_photos). sku_photo_sync keeps when it last ran and what went wrong, for the admin.
+create table if not exists public.sku_photos (
+    sku text primary key,
+    url text not null,
+    zoho_item_id text not null default '',
+    updated_at timestamptz not null default now()
+);
+create table if not exists public.sku_photo_sync (
+    id int primary key default 1 check (id = 1),
+    synced_at timestamptz,
+    photos int not null default 0,
+    error text not null default '',
+    requested_at timestamptz
+);
+insert into public.sku_photo_sync (id) values (1) on conflict (id) do nothing;
+
+-- Callable without a sign-in, so the secret is required. complete: the script read every Zoho item, so a SKU that
+-- no longer has a photo in Zoho loses it here too
+create or replace function public.save_sku_photos(secret text, photos jsonb, error_text text default '', complete boolean default false)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+    if secret is null or secret is distinct from (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret' limit 1) then
+        raise exception 'Not allowed';
+    end if;
+    insert into public.sku_photos (sku, url, zoho_item_id)
+    select distinct on (p->>'sku') p->>'sku', p->>'url', coalesce(p->>'zoho_item_id', '')
+    from jsonb_array_elements(coalesce(photos, '[]'::jsonb)) p
+    where coalesce(p->>'sku', '') <> '' and coalesce(p->>'url', '') <> ''
+    on conflict (sku) do update set url = excluded.url, zoho_item_id = excluded.zoho_item_id, updated_at = now()
+        where public.sku_photos.url is distinct from excluded.url;
+    if complete then
+        delete from public.sku_photos where sku not in (select p->>'sku' from jsonb_array_elements(coalesce(photos, '[]'::jsonb)) p);
+    end if;
+    update public.sku_photo_sync set synced_at = now(), photos = (select count(*) from public.sku_photos),
+        error = left(coalesce(error_text, ''), 1000) where id = 1;
+end $$;
+revoke execute on function public.save_sku_photos(text, jsonb, text, boolean) from public;
+grant execute on function public.save_sku_photos(text, jsonb, text, boolean) to anon, authenticated;
+
+-- "Get photos from Zoho now" in the admin: asks the script to copy them at once
+create or replace function public.request_sku_photos() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+    if public.staff_role() is null then raise exception 'Not allowed'; end if;
+    update public.sku_photo_sync set requested_at = now() where id = 1;
+    perform public.notify_mail('sku_photos', 0);
+end $$;
+revoke execute on function public.request_sku_photos() from public, anon;
+grant execute on function public.request_sku_photos() to authenticated;
+
+-- Every active Zoho Inventory item (2026-11-12), copied by the same script run: the admin's Zoho items tab searches
+-- them, adds them to the USD SKU list or a bundle, and the SKU fields suggest them. No prices: costs stay in sku_usd
+create table if not exists public.zoho_items (
+    sku text primary key,
+    item_id text not null default '',
+    name text not null default '',
+    category text not null default '',
+    unit text not null default '',
+    has_photo boolean not null default false,
+    updated_at timestamptz not null default now()
+);
+alter table public.sku_photo_sync add column if not exists items int not null default 0;
+-- Stock (2026-11-12), copied with the items: available (on hand less what's committed to orders), on hand, and the
+-- reorder level set in Zoho, all locations together. Shown on quotation lines, the PSS and the Items tab
+alter table public.zoho_items add column if not exists available_stock numeric;
+alter table public.zoho_items add column if not exists stock_on_hand numeric;
+alter table public.zoho_items add column if not exists reorder_level numeric;
+
+create or replace function public.save_zoho_items(secret text, items jsonb, complete boolean default false)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+    if secret is null or secret is distinct from (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret' limit 1) then
+        raise exception 'Not allowed';
+    end if;
+    insert into public.zoho_items (sku, item_id, name, category, unit, has_photo, available_stock, stock_on_hand, reorder_level)
+    select distinct on (i->>'sku') i->>'sku', coalesce(i->>'item_id', ''), coalesce(i->>'name', ''), coalesce(i->>'category', ''),
+        coalesce(i->>'unit', ''), coalesce((i->>'has_photo')::boolean, false),
+        nullif(i->>'available_stock', '')::numeric, nullif(i->>'stock_on_hand', '')::numeric, nullif(i->>'reorder_level', '')::numeric
+    from jsonb_array_elements(coalesce(items, '[]'::jsonb)) i
+    where coalesce(i->>'sku', '') <> ''
+    on conflict (sku) do update set item_id = excluded.item_id, name = excluded.name, category = excluded.category,
+        unit = excluded.unit, has_photo = excluded.has_photo, available_stock = excluded.available_stock,
+        stock_on_hand = excluded.stock_on_hand, reorder_level = excluded.reorder_level, updated_at = now();
+    if complete then
+        delete from public.zoho_items where sku not in (select i->>'sku' from jsonb_array_elements(coalesce(items, '[]'::jsonb)) i);
+    end if;
+    update public.sku_photo_sync set items = (select count(*) from public.zoho_items) where id = 1;
+end $$;
+revoke execute on function public.save_zoho_items(text, jsonb, boolean) from public;
+grant execute on function public.save_zoho_items(text, jsonb, boolean) to anon, authenticated;
+
+-- The team's stock sheet (2026-11-12): "LIVE STOCK INVENTORY & REPLENISEMENT MONITORING - PARTS", tab "Live stock
+-- Monitoring", copied by the same script run (quantities and remarks only, never its cost tabs): stock per branch,
+-- in transit, and the team's remark and movement. Shown beside Zoho's stock on quotations, the PSS and the Items tab
+create table if not exists public.stock_sheet (
+    sku text primary key,
+    cebu numeric,
+    manila numeric,
+    sta_rosa numeric,
+    total numeric,
+    in_transit numeric,
+    remark text not null default '',
+    movement text not null default '',
+    updated_at timestamptz not null default now()
+);
+alter table public.sku_photo_sync add column if not exists sheet_synced_at timestamptz;
+alter table public.sku_photo_sync add column if not exists sheet_rows int not null default 0;
+alter table public.sku_photo_sync add column if not exists sheet_error text not null default '';
+
+-- The whole tab each time (a SKU taken off the sheet goes from here too). Callable without a sign-in, so the secret is required
+create or replace function public.save_stock_sheet(secret text, stock jsonb, error_text text default '')
+returns void language plpgsql security definer set search_path = public as $$
+begin
+    if secret is null or secret is distinct from (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret' limit 1) then
+        raise exception 'Not allowed';
+    end if;
+    if jsonb_array_length(coalesce(stock, '[]'::jsonb)) > 0 then
+        delete from public.stock_sheet where true;
+        insert into public.stock_sheet (sku, cebu, manila, sta_rosa, total, in_transit, remark, movement)
+        select distinct on (s->>'sku') s->>'sku', nullif(s->>'cebu', '')::numeric, nullif(s->>'manila', '')::numeric,
+            nullif(s->>'sta_rosa', '')::numeric, nullif(s->>'total', '')::numeric, nullif(s->>'in_transit', '')::numeric,
+            left(coalesce(s->>'remark', ''), 200), left(coalesce(s->>'movement', ''), 60)
+        from jsonb_array_elements(stock) s
+        where coalesce(s->>'sku', '') <> '';
+    end if;
+    update public.sku_photo_sync set sheet_synced_at = case when coalesce(error_text, '') = '' then now() else sheet_synced_at end,
+        sheet_rows = (select count(*) from public.stock_sheet), sheet_error = left(coalesce(error_text, ''), 1000) where id = 1;
+end $$;
+revoke execute on function public.save_stock_sheet(text, jsonb, text) from public;
+grant execute on function public.save_stock_sheet(text, jsonb, text) to anon, authenticated;
+
+alter table public.stock_sheet enable row level security;
+drop policy if exists stock_sheet_read on public.stock_sheet;
+create policy stock_sheet_read on public.stock_sheet for select to authenticated using (public.staff_role() is not null);
+
+alter table public.zoho_items enable row level security;
+drop policy if exists zoho_items_read on public.zoho_items;
+create policy zoho_items_read on public.zoho_items for select to authenticated using (public.staff_role() is not null);
+
+-- A photo added in the admin for a SKU Zoho Inventory has no photo for (2026-11-12), for the website only. Zoho's
+-- photo shows instead once the item has one; this one is kept, and the Zoho copy never touches it
+create table if not exists public.sku_site_photos (
+    sku text primary key,
+    url text not null,
+    added_by text not null default lower(coalesce(auth.jwt() ->> 'email', '')),
+    updated_at timestamptz not null default now()
+);
+alter table public.sku_site_photos enable row level security;
+drop policy if exists sku_site_photos_read on public.sku_site_photos;
+create policy sku_site_photos_read on public.sku_site_photos for select to authenticated using (public.staff_role() is not null);
+drop policy if exists sku_site_photos_change on public.sku_site_photos;
+create policy sku_site_photos_change on public.sku_site_photos for all to authenticated
+    using (public.staff_role() in ('master', 'marketing', 'pricing'))
+    with check (public.staff_role() in ('master', 'marketing', 'pricing'));
+
+alter table public.sku_photos enable row level security;
+drop policy if exists sku_photos_read on public.sku_photos;
+create policy sku_photos_read on public.sku_photos for select to authenticated using (public.staff_role() is not null);
+alter table public.sku_photo_sync enable row level security;
+drop policy if exists sku_photo_sync_read on public.sku_photo_sync;
+create policy sku_photo_sync_read on public.sku_photo_sync for select to authenticated using (public.staff_role() is not null);
+
 alter table public.zoho_leads enable row level security;
 drop policy if exists zoho_leads_read on public.zoho_leads;
 create policy zoho_leads_read on public.zoho_leads for select to authenticated
@@ -704,6 +870,11 @@ create policy site_photos_read on storage.objects for select to authenticated
 drop policy if exists site_photos_upload on storage.objects;
 create policy site_photos_upload on storage.objects for insert to authenticated
     with check (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing', 'pricing')); -- pricing: SKU and bundle photos
+-- Sales managers save each quotation's page 3 (drawn in the admin as one picture, account.js drawQuotationPage3), only
+-- in the quotations folder (2026-11-12)
+drop policy if exists site_photos_quotations on storage.objects;
+create policy site_photos_quotations on storage.objects for insert to authenticated
+    with check (bucket_id = 'site-photos' and (storage.foldername(name))[1] = 'quotations' and public.staff_role() in ('master', 'sales'));
 drop policy if exists site_photos_change on storage.objects;
 create policy site_photos_change on storage.objects for update to authenticated
     using (bucket_id = 'site-photos' and public.staff_role() in ('master', 'marketing'))

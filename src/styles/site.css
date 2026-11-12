@@ -1019,6 +1019,139 @@
         transition: border-color 0.25s var(--ease);
     }
     .svc-model:hover { border-color: var(--ink-2); }
+    .svc-card { transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease); }
+    .svc-card-chosen { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+    /* The booking summary beside the form, and the review before sending */
+    .svc-summary { background: var(--paper); border: 1px solid var(--line); padding: 1.25rem; }
+    .svc-summary ol { margin-top: 1rem; display: grid; gap: 1rem; }
+    .svc-summary li { display: grid; grid-template-columns: 1.75rem 1fr; gap: 0.75rem; align-items: start; }
+    .svc-summary [data-sum] { overflow-wrap: anywhere; }
+    .svc-summary [data-sum]:empty { display: none; }
+    .svc-step-mark { display: flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; border: 1px solid var(--line); border-radius: 999px; font-size: 0.8125rem; color: var(--mute); }
+    .svc-summary li.is-done .svc-step-mark { background: var(--ink); border-color: var(--ink); color: var(--paper); font-size: 0; }
+    .svc-summary li.is-done .svc-step-mark::after { content: '\2713'; font-size: 0.8125rem; }
+    .svc-review { display: grid; gap: 1.5rem; background: var(--paper); border: 1px solid var(--line); padding: 1.5rem; }
+    .svc-review-list { display: grid; grid-template-columns: minmax(8rem, auto) 1fr; gap: 0.5rem 1.5rem; font-size: 0.9375rem; }
+    .svc-review-list dt { color: var(--mute); }
+    .svc-review-list dd { color: var(--ink); overflow-wrap: anywhere; white-space: pre-line; }
+    #sr-fields[hidden], #sr-review[hidden], #sr-running[hidden], #sr-running-note[hidden], #sr-date-field[hidden] { display: none !important; }
+    .svc-urgent { padding: 0.875rem 1.125rem; border-left: 3px solid var(--ink); background: var(--stone); font-size: 0.9375rem; }
+
+    /* ---- Service page stage: the white Tempo on a light studio backdrop (the homepage stage's light), its pings,
+       and the team ring under it ---- */
+    .svc-stage {
+        background: radial-gradient(ellipse 70% 80% at 72% 55%, #FFFFFF 0%, var(--paper) 55%, var(--stone) 100%);
+        padding: clamp(2.5rem, 6vw, 5rem) 0 clamp(2rem, 5vw, 4rem);
+        overflow: hidden;
+    }
+    .svc-stage-grid { display: grid; gap: 2.5rem; align-items: center; }
+    @media (min-width: 1024px) { .svc-stage-grid { grid-template-columns: 5fr 7fr; gap: 3rem; } }
+    .svc-stage .svc-urgent { background: rgba(255, 255, 255, 0.6); }
+    .svc-stage .svc-ring-stage { margin-top: 1.5rem; }
+    @media (min-width: 640px) { .svc-stage .svc-ring-stage:not(.is-flat) { height: 480px; } }
+    /* The rows beside the ring (wide screens): the same white cards, moved by the ring's script so the photos run
+       in from the left, round the ring and out to the right */
+    .svc-film { display: none; }
+    @media (min-width: 1024px) {
+        .svc-film { display: block; position: absolute; top: 0; height: 480px; overflow: hidden; }
+        .svc-film-left { left: 0; right: calc(50% + 320px); -webkit-mask-image: linear-gradient(to right, transparent, #000 25%, #000 90%, transparent); mask-image: linear-gradient(to right, transparent, #000 25%, #000 90%, transparent); }
+        .svc-film-right { left: calc(50% + 320px); right: 0; -webkit-mask-image: linear-gradient(to left, transparent, #000 25%, #000 90%, transparent); mask-image: linear-gradient(to left, transparent, #000 25%, #000 90%, transparent); }
+    }
+    .svc-film-track { display: flex; align-items: flex-start; width: max-content; padding-top: 66px; will-change: transform; }
+    .svc-film-card { flex: 0 0 250px; height: 360px; margin: 0 18px 0 0; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 18px 40px -18px rgba(21, 23, 20, 0.45); }
+    .svc-film-card img { display: block; width: 100%; height: 280px; object-fit: cover; pointer-events: none; }
+    .svc-film-card[data-service] { cursor: pointer; }
+    .svc-film-card[data-service]:hover figcaption { text-decoration: underline; text-underline-offset: 3px; }
+    .svc-ring-stage.is-flat .svc-film { display: none; }
+    .svc-parts { background: radial-gradient(ellipse 55% 70% at 50% 62%, #FFFFFF 0%, var(--paper) 60%); }
+    .svc-cart { opacity: 0; transform: translateY(70px); transition: opacity 1.1s var(--ease), transform 1.6s cubic-bezier(0.16, 1, 0.3, 1); }
+    .svc-cart.is-in { opacity: 1; transform: none; }
+    .svc-cart-frame { position: relative; }
+    .svc-cart-img, .svc-cart-canvas { display: block; width: 100%; height: auto; mix-blend-mode: multiply; }
+    .svc-cart-canvas { position: absolute; inset: 0; height: 100%; opacity: 0; transition: opacity 0.4s; }
+    .svc-cart-frame.is-live .svc-cart-canvas { opacity: 1; }
+    .svc-cart-frame.is-live .svc-cart-img { opacity: 0; }
+    .svc-cart-hint { margin-top: 0.75rem; text-align: center; font-size: 0.8125rem; color: var(--mute); }
+    /* A ping: a green dot with a ring that grows and fades; the open one is ringed. Its label opens beside the cart */
+    .svc-ping { position: absolute; width: 2.75rem; height: 2.75rem; margin: -1.375rem 0 0 -1.375rem; z-index: 2; }
+    .svc-ping-btn { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .svc-ping-dot { position: relative; width: 0.875rem; height: 0.875rem; border-radius: 50%; background: var(--green, #749E35); box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.25); }
+    .svc-ping-dot::after { content: ''; position: absolute; inset: -0.5rem; border-radius: 50%; border: 2px solid var(--green, #749E35); animation: svc-ping 2.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite; }
+    .svc-ping:nth-of-type(2) .svc-ping-dot::after { animation-delay: 0.35s; }
+    .svc-ping:nth-of-type(3) .svc-ping-dot::after { animation-delay: 0.7s; }
+    .svc-ping:nth-of-type(4) .svc-ping-dot::after { animation-delay: 1.05s; }
+    .svc-ping:nth-of-type(5) .svc-ping-dot::after { animation-delay: 1.4s; }
+    .svc-ping:nth-of-type(6) .svc-ping-dot::after { animation-delay: 1.75s; }
+    @keyframes svc-ping { from { transform: scale(0.4); opacity: 0.9; } to { transform: scale(1.9); opacity: 0; } }
+    .svc-ping.is-open .svc-ping-dot { box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px var(--green, #749E35), 0 2px 8px rgba(0, 0, 0, 0.25); }
+    /* The parts stage (2026-11-12): the cart in the middle, and the open point's label (no box: its photo and words
+       on the page) in the space on that point's side, level with it. The line is drawn by drawServicePingLine */
+    .svc-parts-stage { --cart-w: min(36rem, 46%); --gap: 2.5rem; position: relative; margin-top: 2.5rem; }
+    .svc-parts-stage .svc-cart-frame { width: var(--cart-w); margin: 0 auto; }
+    .svc-part-card {
+        position: absolute; z-index: 3; top: var(--y); width: 15rem; text-align: left;
+        opacity: 0; visibility: hidden; transition: opacity 0.25s var(--ease), transform 0.4s var(--ease), visibility 0.25s;
+    }
+    .svc-part-card.is-left { right: calc(50% + var(--cart-w) / 2 + var(--gap)); transform: translate(-0.75rem, -30%); }
+    .svc-part-card.is-right { left: calc(50% + var(--cart-w) / 2 + var(--gap)); transform: translate(0.75rem, -30%); }
+    .svc-part-card.is-open { opacity: 1; visibility: visible; transform: translate(0, -30%); transition-delay: 0.15s; }
+    .svc-part-card img { display: block; width: 100%; height: 9rem; object-fit: cover; border-radius: 8px; box-shadow: 0 18px 36px -18px rgba(21, 23, 20, 0.45); }
+    .svc-part-lines { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; }
+    .svc-part-lines path { fill: none; stroke: var(--green, #749E35); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+    .svc-part-lines circle { fill: var(--green, #749E35); opacity: 0; }
+    .svc-part-lines.is-on { opacity: 1; }
+    .svc-part-lines.is-on path { stroke-dashoffset: 0; transition: stroke-dashoffset 0.4s var(--ease); }
+    .svc-part-lines.is-on circle { opacity: 1; transition: opacity 0.2s 0.35s; }
+    @media (min-width: 1024px) and (max-width: 1279px) {
+        .svc-parts-stage { --gap: 1.75rem; }
+        .svc-part-card { width: 13rem; }
+        .svc-part-card img { height: 7.5rem; }
+    }
+    /* Phones and tablets: no room beside the cart, so the open label shows under it, without the line */
+    @media (max-width: 1023px) {
+        .svc-parts-stage { --cart-w: 100%; }
+        .svc-part-lines { display: none; }
+        .svc-part-card { position: static; display: none; width: auto; max-width: 26rem; margin: 1rem auto 0; opacity: 1; visibility: visible; transform: none; }
+        .svc-part-card.is-left, .svc-part-card.is-right, .svc-part-card.is-open { transform: none; }
+        .svc-part-card.is-open { display: block; }
+        .svc-part-card img { height: 11rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .svc-part-card, .svc-part-lines.is-on path, .svc-part-lines.is-on circle { transition: none; }
+    }
+    .svc-ping-btn:focus-visible { outline: none; }
+    .svc-ping-btn:focus-visible .svc-ping-dot { box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px var(--ink); }
+
+    .svc-ring-stage { position: relative; height: 470px; margin-top: 2rem; perspective: 1500px; touch-action: pan-y; cursor: grab; user-select: none; }
+    .svc-ring-stage:active { cursor: grabbing; }
+    /* the floor the ring stands on */
+    .svc-ring-stage::after { content: ''; position: absolute; left: 50%; bottom: 18px; width: min(760px, 92%); height: 70px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, rgba(21, 23, 20, 0.16), transparent); }
+    .svc-ring { --a: 0deg; --r: 360px; position: absolute; left: 50%; top: 24px; width: 250px; height: 360px; margin-left: -125px; transform-style: preserve-3d; transform: translateZ(calc(var(--r) * -1)) rotateX(-7deg) rotateY(var(--a)); }
+    .svc-panel { position: absolute; inset: 0; margin: 0; transform: rotateY(calc(var(--i) * 45deg)) translateZ(var(--r)); transition: opacity 0.3s; backface-visibility: hidden; }
+    .svc-panel.is-back { pointer-events: none; }
+    .svc-panel-btn { display: block; width: 100%; height: 100%; padding: 0; text-align: left; background: var(--paper); border: 1px solid var(--line); box-shadow: 0 18px 40px -18px rgba(21, 23, 20, 0.45); cursor: pointer; }
+    .svc-panel-btn:disabled { cursor: default; }
+    .svc-panel-btn img { display: block; width: 100%; height: 280px; object-fit: cover; pointer-events: none; }
+    .svc-panel figcaption, .svc-film-card figcaption { padding: 0.625rem 0.75rem; font-size: 0.875rem; font-weight: 600; color: var(--ink); line-height: 1.3; }
+    .svc-panel figcaption small, .svc-film-card figcaption small { display: block; margin-top: 0.125rem; font-weight: 400; font-size: 0.75rem; color: var(--mute); }
+    .svc-panel-btn:not(:disabled):hover figcaption, .svc-panel-btn:focus-visible figcaption { text-decoration: underline; text-underline-offset: 3px; }
+    /* Phones: a strip to swipe through */
+    @media (max-width: 639px) {
+        .svc-ring-stage { height: auto; perspective: none; cursor: auto; touch-action: auto; }
+        .svc-ring-stage::after { display: none; }
+        .svc-ring { position: static; width: auto; height: auto; margin: 0; transform: none; display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory; padding: 0 1.25rem 1rem; }
+        .svc-panel { position: relative; flex: 0 0 72%; height: 360px; transform: none; opacity: 1 !important; scroll-snap-align: center; }
+        .svc-panel.is-back { pointer-events: auto; }
+    }
+    /* Reduced motion: a still grid */
+    .svc-ring-stage.is-flat { height: auto; perspective: none; cursor: auto; }
+    .svc-ring-stage.is-flat::after { display: none; }
+    .svc-ring-stage.is-flat .svc-ring { position: static; width: auto; height: auto; margin: 0 auto; max-width: 1100px; transform: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; padding: 0 1.25rem; }
+    .svc-ring-stage.is-flat .svc-panel { position: relative; height: 360px; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+        .svc-cart { opacity: 1; transform: none; transition: none; }
+        .svc-ping-dot::after { animation: none; }
+    }
     .svc-model:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
     .svc-model-photo {
         display: flex;
@@ -2959,8 +3092,12 @@
     .adm .bundle-table .bundle-editing td, .adm .bundle-table .bundle-editing:hover > td { background: var(--adm-canvas); }
     .adm .bundle-tag { border-radius: 6px; background: var(--adm-panel); font-size: 0.8125rem; }
     .adm .bundle-tag small { text-transform: none; letter-spacing: 0; font-size: 0.75rem; }
-    .adm .bundle-parts button { border-radius: 6px; background: var(--adm-panel); font-size: 0.8125rem; padding: 0.4375rem 0.875rem; }
-    .adm .bundle-parts button[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+    /* Tabs (the Bundles views, the Part filter): an underlined tab bar, each tab with its count */
+    .adm .bundle-parts { gap: 0; flex-wrap: nowrap; overflow-x: auto; border-bottom: 1px solid var(--line); }
+    .adm .bundle-parts button { flex: none; padding: 0.625rem 0.875rem; border: 0; border-radius: 0; background: none; font-size: 0.8125rem; font-weight: 600; color: var(--mute); white-space: nowrap; box-shadow: inset 0 -2px 0 transparent; }
+    .adm .bundle-parts button:hover { background: none; color: var(--ink); }
+    .adm .bundle-parts button[aria-pressed='true'] { background: none; color: var(--ink); box-shadow: inset 0 -2px 0 var(--green); }
+    .adm .bundle-parts button small { margin-left: 0.375rem; padding: 0 0.375rem; border-radius: 999px; background: var(--adm-canvas); font-size: 0.6875rem; font-weight: 600; color: var(--mute); }
     .adm .admin-card { border-radius: 8px; background: var(--adm-panel); }
     .adm .type-md { font-family: var(--font-text); font-size: 1rem; font-weight: 600; letter-spacing: 0; line-height: 1.3; }
     .adm .type-lg { font-family: var(--font-text); font-size: 1.375rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
@@ -2969,6 +3106,58 @@
     .adm .field input, .adm .field select, .adm .field textarea { border-radius: 6px; background: var(--adm-panel); font-size: 0.875rem; }
     .adm .field input, .adm .field select { min-height: 2.5rem; height: 2.5rem; padding-top: 0; padding-bottom: 0; }
     .adm .measure { font-size: 0.9375rem; }
+    /* Fields and buttons sized for a workspace (2026-11-12): 36px controls, small labels, outlined buttons that
+       lighten on hover instead of turning black */
+    .adm .field { gap: 0.375rem; }
+    .adm .field label { font-size: 0.75rem; font-weight: 600; color: var(--ink-2); }
+    .adm .field input, .adm .field select { min-height: 2.25rem; height: 2.25rem; padding: 0 0.625rem; }
+    .adm .field textarea { padding: 0.5rem 0.625rem; }
+    .adm .btn-outline { border-color: var(--field-border); background: var(--adm-panel); color: var(--ink); }
+    .adm .btn-outline:hover { border-color: var(--field-border); background: var(--adm-hover); color: var(--ink); }
+    /* A table's column heads stay in view while it scrolls; the long lists scroll inside their panel */
+    .adm .admin-table thead th, .adm .bundle-table .bundle-columns th { position: sticky; top: 0; z-index: 1; }
+    .adm .admin-table-wrap:has(> .bundle-table) { max-height: calc(100vh - 15rem); overflow: auto; }
+    /* A page's status bar: a dot for its state, the message, and its action on the right */
+    .adm-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; margin-bottom: 1.25rem; padding: 0.5rem 0.625rem 0.5rem 1rem; border: 1px solid var(--line); border-radius: 8px; background: var(--adm-panel); font-size: 0.8125rem; color: var(--ink-2); }
+    .adm-status > div { min-width: 0; }
+    .adm-status .golfer-error { font-size: 0.8125rem; }
+    .adm-dot { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.5rem; border-radius: 50%; background: var(--mute); vertical-align: 0.0625rem; }
+    .adm-dot-good { background: #5B8C2A; }
+    .adm-dot-wait { background: #C9A227; }
+    .adm-dot-bad { background: #B3261E; }
+    /* A list's toolbar: search, filters and its main action in one row */
+    .adm-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; margin-bottom: 1rem; }
+    .adm-toolbar .field { width: 10rem; }
+    .adm-toolbar .adm-grow { flex: 1 1 16rem; width: auto; max-width: 26rem; }
+    .adm-toolbar-end { margin-left: auto; }
+    .adm-count-line { margin: 0.75rem 0; font-size: 0.8125rem; color: var(--mute); }
+
+    /* Homepage text edited on the page (account.js, 2026-11-12): outlines on what can be edited, the panel beside the
+       chosen text, the bar to save, and the button to start (staff only) */
+    .page-editing [data-txt-key] { cursor: text; outline: 1px dashed transparent; outline-offset: 4px; transition: outline-color 0.15s; }
+    .page-editing [data-txt-key]:hover { outline-color: var(--green); }
+    .page-editing [data-txt-key].is-txt-selected { outline: 2px solid var(--green); }
+    .page-text-ui { font-family: var(--font-text); font-size: 0.8125rem; color: var(--ink); }
+    .page-text-start { position: fixed; left: 1rem; bottom: 1rem; z-index: 90; }
+    .page-text-start button, .page-text-bar button, .page-text-tools button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.25rem; padding: 0 0.875rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--paper); font-weight: 600; color: var(--ink); }
+    .page-text-start button { box-shadow: 0 10px 30px -10px rgba(21, 23, 20, 0.45); }
+    .page-text-bar { position: fixed; left: 50%; bottom: 1rem; z-index: 95; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; max-width: calc(100% - 2rem); padding: 0.5rem 0.5rem 0.5rem 1rem; transform: translateX(-50%); border-radius: 10px; background: var(--ink); color: var(--paper); box-shadow: 0 16px 40px -14px rgba(0, 0, 0, 0.5); }
+    .page-text-bar .page-text-quiet { border-color: rgba(246, 246, 242, 0.35); background: transparent; color: var(--paper); }
+    .page-text-bar .page-text-save { border-color: var(--green); background: var(--green); color: var(--on-green); }
+    .page-text-bar button:disabled { opacity: 0.45; cursor: default; }
+    .page-text-tools { position: fixed; z-index: 96; display: grid; gap: 0.75rem; width: 20rem; max-width: calc(100vw - 1rem); padding: 0.875rem 1rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); box-shadow: 0 24px 60px -24px rgba(21, 23, 20, 0.5); }
+    .page-text-tools label { display: grid; gap: 0.25rem; font-size: 0.75rem; font-weight: 600; color: var(--ink-2); }
+    .page-text-tools textarea, .page-text-tools select, .page-text-tools input[type="text"] { width: 100%; padding: 0.375rem 0.5rem; border: 1px solid var(--field-border); border-radius: 6px; background: var(--paper); font: inherit; font-size: 0.875rem; font-weight: 400; color: var(--ink); }
+    .page-text-tools textarea { resize: vertical; }
+    .page-text-tools input[type="range"] { width: 100%; accent-color: var(--green); }
+    .page-text-tools button { min-height: 2rem; min-width: 2rem; padding: 0 0.5rem; font-size: 0.8125rem; }
+    .page-text-tools button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+    .page-text-head { display: flex; align-items: center; justify-content: space-between; font-size: 0.875rem; }
+    .page-text-head button { min-height: 1.75rem; min-width: 1.75rem; border: 0; }
+    .page-text-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }
+    .page-text-row label { flex: 1 1 8rem; }
+    .page-text-label { font-size: 0.75rem; font-weight: 600; color: var(--ink-2); margin-right: 0.25rem; }
+    .page-text-end { justify-content: flex-end; }
 
     /* Signing in: one panel on the workspace canvas */
     .adm-signin { min-height: 100vh; display: grid; place-items: center; padding: 2rem 1rem; background: var(--adm-canvas); font-family: var(--font-text); }
@@ -3069,3 +3258,9 @@
         transform: none;
     }
 }
+
+/* Stock from Zoho Inventory on quotation lines and the Items tab (account.js stockBadge, 2026-11-12) */
+.stock-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+.stock-ok { background: var(--adm-good); color: var(--adm-on-good); }
+.stock-short, .stock-out { background: var(--adm-bad); color: var(--adm-on-bad); }
+.stock-none { background: var(--stone); color: var(--mute); }

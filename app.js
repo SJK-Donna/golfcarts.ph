@@ -2564,7 +2564,8 @@ function renderApp() {
     document.body.classList.toggle('admin-mode', currentPage === 'admin');
     // A logged-in golfer's name, email and number go into the page's quote and contact forms (account.js)
     prefillGolferForms(viewport);
-
+    // The page text edited on the page by staff, and its editing controls (account.js)
+    if (typeof applyPageText === 'function') applyPageText();
 }
 
 // --- PAGE RENDERING FUNCTIONS ---
@@ -3210,18 +3211,18 @@ function renderHomeStage() {
 
                 <div class="home-stage-copy">
                     <p class="home-stage-eyebrow">${product.name} · Club Car Tempo</p>
-                    <h2 id="home-stage-title" class="home-stage-title home-stage-swap">${buildLabelHtml(level)}</h2>
-                    <p id="home-stage-tagline" class="home-stage-tagline home-stage-swap">${level.tagline}</p>
-                    <p id="home-stage-desc" class="home-stage-desc home-stage-swap">${level.about || level.blurb}</p>
+                    <h2 id="home-stage-title" class="home-stage-title home-stage-swap" data-txt-scope="${level.id}">${buildLabelHtml(level)}</h2>
+                    <p id="home-stage-tagline" class="home-stage-tagline home-stage-swap" data-txt-scope="${level.id}">${level.tagline}</p>
+                    <p id="home-stage-desc" class="home-stage-desc home-stage-swap" data-txt-scope="${level.id}">${level.about || level.blurb}</p>
                     <div class="flex flex-wrap gap-3 pt-1">
-                        <button type="button" onclick="buildFromHomeStage()" class="btn btn-primary"><span id="home-stage-build">Build the ${buildLabelHtml(level)}</span></button>
+                        <button type="button" onclick="buildFromHomeStage()" class="btn btn-primary" data-txt-scope="${level.id}"><span id="home-stage-build">Build the ${buildLabelHtml(level)}</span></button>
                         <button type="button" onclick="quoteFromHomeStage()" class="btn btn-outline">Get a quote</button>
                     </div>
                 </div>
 
                 <div class="home-stage-models">
                     <p id="home-stage-models-label" class="home-stage-eyebrow">Choose a build</p>
-                    <div class="home-stage-cards" role="group" aria-labelledby="home-stage-models-label">
+                    <div class="home-stage-cards" role="group" aria-labelledby="home-stage-models-label" data-txt-pass>
                         ${builds.map((b, k) => `
                             <button type="button" class="home-stage-card" data-build="${k}" aria-pressed="${k === 0}">
                                 <img src="${b.photo}" alt="" loading="lazy">
@@ -3278,6 +3279,9 @@ function initHomeStage() {
         homeStageIndex = i;
         colorToken++; // drops a repaint of the previous build that's still on its way
         const build = homeStageBuilds()[i];
+        // The page-text editor's edits (account.js) come off before the new build's texts go in, and back on after
+        if (typeof releasePageText === 'function') releasePageText(section);
+        section.querySelectorAll('[data-txt-scope]').forEach(el => { el.dataset.txtScope = build.level.id; });
         swatches.innerHTML = homeStageSwatches(build);
         find('#home-stage-title').innerHTML = buildLabelHtml(build.level);
         find('#home-stage-tagline').textContent = build.level.tagline;
@@ -3287,6 +3291,7 @@ function initHomeStage() {
         section.querySelectorAll('.home-stage-card').forEach((c, k) => c.setAttribute('aria-pressed', String(k === i)));
         setBackdrop(build.backdrop);
         photo.src = build.photo;
+        if (typeof applyPageText === 'function') applyPageText();
     };
 
     // A build change: the cart drives off to the right (the carts face right), blurring with speed; then the next
@@ -6531,11 +6536,11 @@ function renderSolutionsPage() {
 // ==========================================
 const SERVICE_MODELS = [
     { name: 'Tempo', image: 'image/lineup/tempo.png' },
-    { name: 'Onward' },
+    { name: 'Onward', image: 'image/lineup/onward.png' },
     { name: 'Precedent' },
     { name: 'Carryall', image: 'image/lineup/carryall.png' },
     { name: 'Villager', image: 'image/lineup/villager.png' },
-    { name: 'Transporter', image: 'image/Products/Transporter 4.png' },
+    { name: 'Transporter', image: 'image/lineup/transporter.png' },
     { name: 'Minibus', image: 'image/lineup/minibus.png' }
 ];
 const SERVICE_POWER = ['Electric, lead-acid', 'Electric, lithium', 'Gas', 'Not sure'];
@@ -6574,7 +6579,83 @@ const SERVICE_GROUPS = [
     ] }
 ];
 const SERVICE_LIST = SERVICE_GROUPS.flatMap(g => g.items);
+
+// The hero's white Tempo Base (Golfer 2 · Golfer build photo, with its depth map in image/depth) and the parts of it
+// we service, as points on the photo (% of its width and height). Each opens the service that looks after that part
+const SERVICE_STAGE_PHOTO = 'image/Products/builds/golfer-2-golfer.jpg';
+const SERVICE_PINGS = [
+    { x: 51.3, y: 81.7, part: 'Wheels and tires', service: 'Mobile home service', photo: 'image/Service/wheel-service.jpg' },
+    { x: 32.5, y: 65.6, part: 'Battery', service: 'Lithium battery conversion', photo: 'image/Service/lithium-install.jpg' },
+    { x: 55.4, y: 36.7, part: 'Dash and wiring', service: 'Emergency breakdown and flatbed transport', photo: 'image/Service/dash-electrical.jpg' },
+    { x: 37.5, y: 41.0, part: 'Seats', service: 'Custom upholstery, paint and accessories', photo: 'image/Options/body-panel-sangria.jpg' }, // product photo for now
+    { x: 68.8, y: 61.7, part: 'Lights', service: 'Lights, signals and safety upgrades', photo: 'image/Options/light-gc-tempo.jpg' },     // product photo for now
+    { x: 22.5, y: 62.0, part: 'Frame and body', service: 'Major frame-up overhauls and restorations', photo: 'image/Service/front-end-check.jpg' }
+];
+
+// A ping's label: the photo and the service, beside the cart (never on it), joined to its point by a line drawn
+// when it opens. It opens on hover, keyboard focus or a tap, stays open while the pointer is on the label, and
+// closes on leaving both, a tap elsewhere or Escape. Phones show it under the cart, without the line
+let servicePingOpen = -1, servicePingTimer = 0;
+
+function showServicePing(index) {
+    clearTimeout(servicePingTimer);
+    if (index === servicePingOpen) return;
+    servicePingOpen = index;
+    document.querySelectorAll('.svc-ping').forEach((el, i) => {
+        el.classList.toggle('is-open', i === index);
+        el.querySelector('.svc-ping-btn').setAttribute('aria-expanded', String(i === index));
+    });
+    document.querySelectorAll('.svc-part-card').forEach((el, i) => el.classList.toggle('is-open', i === index));
+    drawServicePingLine(false);
+}
+
+function hideServicePingSoon() {
+    clearTimeout(servicePingTimer);
+    servicePingTimer = setTimeout(() => showServicePing(-1), 250);
+}
+
+// The line from the open point to its label's photo; still: just follow the point as the cart turns
+function drawServicePingLine(still) {
+    const svg = document.getElementById('svc-part-lines');
+    if (!svg) return;
+    const path = svg.querySelector('path'), end = svg.querySelector('circle');
+    const ping = document.querySelectorAll('.svc-ping')[servicePingOpen];
+    const card = document.querySelectorAll('.svc-part-card')[servicePingOpen];
+    if (!ping || !card || !card.offsetWidth) { svg.classList.remove('is-on'); return; }
+    const box = svg.getBoundingClientRect(), dot = ping.querySelector('.svc-ping-dot').getBoundingClientRect();
+    const photo = card.querySelector('img').getBoundingClientRect();
+    const left = card.classList.contains('is-left');
+    const x1 = dot.left + dot.width / 2 - box.left, y1 = dot.top + dot.height / 2 - box.top;
+    const x2 = (left ? photo.right + 8 : photo.left - 8) - box.left, y2 = photo.top + photo.height / 2 - box.top;
+    const bend = x2 + (left ? 28 : -28); // the last stretch runs level into the photo
+    svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
+    path.setAttribute('d', `M ${x1} ${y1} L ${bend} ${y2} L ${x2} ${y2}`);
+    end.setAttribute('cx', x2);
+    end.setAttribute('cy', y2);
+    if (still) return;
+    svg.classList.remove('is-on');
+    void svg.getBoundingClientRect(); // restart the drawing
+    svg.classList.add('is-on');
+}
+
+document.addEventListener('click', e => { if (servicePingOpen >= 0 && !e.target.closest('.svc-ping, .svc-part-card')) showServicePing(-1); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && servicePingOpen >= 0) showServicePing(-1); });
+window.addEventListener('resize', () => { if (servicePingOpen >= 0) drawServicePingLine(true); });
+
+// Our service team at work (photos from the team, 2026-11-12), in the turning ring under the hero
+const SERVICE_TEAM_PHOTOS = [
+    { src: 'image/Service/front-end-check.jpg', alt: 'Two technicians checking the front end of a black Club Car on a jack.', title: 'Front-end and suspension checks', service: 'Mobile home service' },
+    { src: 'image/Service/battery-test.jpg', alt: 'A multimeter reading 54.0 volts over a cart\'s open battery bay.', title: 'Battery health test', service: 'Lithium battery conversion' },
+    { src: 'image/Service/lithium-install.jpg', alt: 'A technician fitting a 51.2 V lithium battery pack under a cart\'s seat.', title: 'Lithium battery installs', service: 'Lithium battery conversion' },
+    { src: 'image/Service/dash-electrical.jpg', alt: 'A technician working on the wiring behind a cart\'s dash.', title: 'Electrical diagnosis', service: 'Emergency breakdown and flatbed transport' },
+    { src: 'image/Service/wheel-service.jpg', alt: 'A technician tightening a rear wheel with an impact driver.', title: 'Wheels and tires', service: 'Mobile home service' },
+    { src: 'image/Service/wiring-repair.jpg', alt: 'Hands repairing the wiring under a cart\'s dash, above the pedals.', title: 'Wiring repairs', service: 'Emergency breakdown and flatbed transport' },
+    { src: 'image/Service/wheel-removal.jpg', alt: 'A technician removing a rear wheel from a cart.', title: 'Tire changes', service: 'Mobile home service' },
+    { src: 'image/Service/service-report.jpg', alt: 'A technician filling in the digital service report on a tablet.', title: 'A digital report after every visit', service: '' }
+];
 let serviceAudience = 'owner'; // 'owner' or 'fleet': fleets see their services first
+let serviceChosen = null;      // the service picked on a card or in the form (its name), marked on its card
+let serviceQuery = '';         // the search over the service cards
 
 // The cart as described in the cart step
 function serviceCart() {
@@ -6594,21 +6675,26 @@ function serviceCartSummary(c) {
 function renderServiceCards() {
     const cart = serviceCart();
     const groups = serviceAudience === 'fleet' ? [SERVICE_GROUPS[2], ...SERVICE_GROUPS.filter(g => g.id !== 'fleet')] : SERVICE_GROUPS;
-    return groups.map(g => `
+    const words = serviceQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    const matches = item => words.every(w => [item.name, item.tag, item.text].join(' ').toLowerCase().includes(w));
+    const shown = groups.map(g => ({ ...g, items: g.items.filter(matches) })).filter(g => g.items.length);
+    if (!shown.length) return `<p class="py-10 border-t border-line">No service matches "${attrText(serviceQuery)}". Call us on <a href="tel:+63277455089" class="link">(02) 7745-5089</a> and we'll tell you if we can help.</p>`;
+    return shown.map(g => `
         <div class="grid lg:grid-cols-12 gap-6 py-10 border-t border-line">
             <h3 class="type-md text-ink lg:col-span-3">${g.title}</h3>
             <ul class="lg:col-span-9 grid sm:grid-cols-2 gap-4">
                 ${g.items.map(item => {
                     const note = item.note ? item.note(cart) : '';
+                    const chosen = item.name === serviceChosen;
                     return `
-                    <li class="bg-paper border border-line p-5 flex flex-col gap-3">
+                    <li class="svc-card bg-paper border border-line p-5 flex flex-col gap-3${chosen ? ' svc-card-chosen' : ''}">
                         <div>
                             <p class="font-semibold text-ink">${item.name}</p>
                             ${item.tag ? `<p class="text-sm text-mute">${item.tag}</p>` : ''}
                         </div>
                         <p class="text-sm text-ink-2">${item.text}</p>
                         ${note ? `<p class="text-sm text-ink border-l-2 border-ink pl-3">${note}</p>` : ''}
-                        <button type="button" onclick="pickService(${SERVICE_LIST.indexOf(item)})" class="link self-start mt-auto">Book this</button>
+                        <button type="button" onclick="pickService(${SERVICE_LIST.indexOf(item)})" aria-pressed="${chosen}" class="link self-start mt-auto">${chosen ? 'Chosen ✓ · Go to booking' : 'Book this'}</button>
                     </li>`;
                 }).join('')}
             </ul>
@@ -6630,10 +6716,256 @@ function updateService() {
     updateServiceForm();
 }
 
+// A ping or a team photo: that service's card, marked, in view (the booking form follows it)
+function focusServiceCard(index) {
+    const item = SERVICE_LIST[index];
+    if (!item) return;
+    serviceChosen = item.name;
+    const select = document.getElementById('sr-type');
+    if (select) { select.value = item.name; updateServiceForm(); }
+    const cards = document.getElementById('svc-cards');
+    if (cards) cards.innerHTML = renderServiceCards();
+    const card = document.querySelector('.svc-card-chosen');
+    if (card) card.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+}
+
+// The stage: the photo redrawn by WebGL with near parts shifted one way and far parts the other (its depth map),
+// turning with the scroll and, on a computer, the pointer. The pings follow the parts they sit on. Without WebGL,
+// or with reduced motion, the photo and pings simply stay put
+let serviceStage = null;
+
+function initServiceStage() {
+    if (serviceStage) serviceStage.stop();
+    serviceStage = null;
+    const stage = document.getElementById('svc-cart-stage'), img = document.getElementById('svc-cart-img');
+    if (!stage || !img) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (window.IntersectionObserver) {
+        const rise = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { stage.classList.add('is-in'); rise.disconnect(); } }, { threshold: 0.2 });
+        rise.observe(stage);
+    } else stage.classList.add('is-in');
+    if (reduce || !window.WebGLRenderingContext) return;
+    const frame = img.parentElement, section = stage.closest('section');
+    const pings = [...frame.querySelectorAll('.svc-ping')];
+    const canvas = document.createElement('canvas');
+    canvas.className = 'svc-cart-canvas';
+    canvas.setAttribute('aria-hidden', 'true');
+    const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
+    if (!gl) return;
+    img.after(canvas);
+    const compile = (type, source) => { const sh = gl.createShader(type); gl.shaderSource(sh, source); gl.compileShader(sh); return sh; };
+    const program = gl.createProgram();
+    gl.attachShader(program, compile(gl.VERTEX_SHADER, 'attribute vec2 at; varying vec2 uv; void main() { uv = at * 0.5 + 0.5; gl_Position = vec4(at, 0.0, 1.0); }'));
+    gl.attachShader(program, compile(gl.FRAGMENT_SHADER, `
+        precision mediump float;
+        uniform sampler2D photo, depth;
+        uniform vec2 shift;
+        varying vec2 uv;
+        void main() {
+            vec2 q = uv + shift * (texture2D(depth, uv).r - 0.5);
+            q = uv + shift * (texture2D(depth, q).r - 0.5);
+            bool outside = q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0;
+            gl_FragColor = outside ? vec4(1.0) : texture2D(photo, q);
+        }`));
+    gl.bindAttribLocation(program, 0, 'at');
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { canvas.remove(); return; }
+    gl.useProgram(program);
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    [0, 1].forEach(unit => {
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+        [gl.TEXTURE_WRAP_S, gl.TEXTURE_WRAP_T].forEach(w => gl.texParameteri(gl.TEXTURE_2D, w, gl.CLAMP_TO_EDGE));
+        [gl.TEXTURE_MIN_FILTER, gl.TEXTURE_MAG_FILTER].forEach(f => gl.texParameteri(gl.TEXTURE_2D, f, gl.LINEAR));
+    });
+    gl.uniform1i(gl.getUniformLocation(program, 'photo'), 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'depth'), 1);
+    const uShift = gl.getUniformLocation(program, 'shift');
+    const upload = (unit, source) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source); };
+
+    let photoReady = false, depthReady = false, stopped = false, running = false, onScreen = true;
+    const pingDepth = SERVICE_PINGS.map(() => 0.5);
+    const whenLoaded = image => (image.complete && image.naturalWidth ? Promise.resolve() : new Promise(r => { image.onload = r; }));
+    whenLoaded(img).then(() => { if (!stopped) { upload(0, img); photoReady = true; } });
+    const map = new Image();
+    map.onload = () => {
+        if (stopped) return;
+        upload(1, map);
+        // Each ping's depth, so it moves with the part it marks
+        const c = document.createElement('canvas');
+        c.width = map.naturalWidth; c.height = map.naturalHeight;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(map, 0, 0);
+        SERVICE_PINGS.forEach((p, i) => {
+            const px = ctx.getImageData(Math.round(p.x / 100 * (c.width - 1)), Math.round(p.y / 100 * (c.height - 1)), 1, 1).data;
+            pingDepth[i] = px[0] / 255;
+        });
+        depthReady = true;
+    };
+    map.src = 'image/depth/golfer-2-golfer.jpg';
+
+    const fine = window.matchMedia('(pointer: fine)').matches;
+    const pointer = { x: 0, y: 0 }, eased = { x: 0, y: 0 };
+    const onMove = e => {
+        const r = stage.getBoundingClientRect();
+        pointer.x = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / r.width));
+        pointer.y = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / r.height));
+    };
+    const onLeave = () => { pointer.x = pointer.y = 0; };
+    if (fine) { section.addEventListener('pointermove', onMove); section.addEventListener('pointerleave', onLeave); }
+
+    const loop = () => {
+        if (!running || stopped || !canvas.isConnected) { running = false; return; }
+        if (photoReady && depthReady) {
+            // The scroll turns the cart from its left side towards its right as the section passes through the screen
+            const r = section.getBoundingClientRect();
+            const p = Math.max(0, Math.min(1, (window.innerHeight - r.top) / Math.max(1, window.innerHeight + r.height)));
+            const tx = -0.6 + 1.2 * p + pointer.x * 0.55, ty = pointer.y * 0.5;
+            eased.x += (tx - eased.x) * 0.08;
+            eased.y += (ty - eased.y) * 0.08;
+            const w = frame.clientWidth, h = frame.clientHeight, ratio = Math.min(window.devicePixelRatio || 1, 2);
+            if (w && h) {
+                if (canvas.width !== Math.round(w * ratio) || canvas.height !== Math.round(h * ratio)) {
+                    canvas.width = Math.round(w * ratio);
+                    canvas.height = Math.round(h * ratio);
+                    gl.viewport(0, 0, canvas.width, canvas.height);
+                }
+                const sx = eased.x * 0.05, sy = eased.y * -0.03;
+                gl.uniform2f(uShift, sx, sy);
+                gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+                // A point shows where the photo's pixel moved: back by the shift, scaled by its depth
+                pings.forEach((el, i) => {
+                    const d = pingDepth[i] - 0.5;
+                    el.style.transform = `translate(${-sx * d * w}px, ${sy * d * h}px)`;
+                });
+                if (servicePingOpen >= 0) drawServicePingLine(true);
+                if (!frame.classList.contains('is-live')) frame.classList.add('is-live');
+            }
+        }
+        requestAnimationFrame(loop);
+    };
+    const update = () => {
+        const should = onScreen && !document.hidden && !stopped;
+        if (should && !running) { running = true; requestAnimationFrame(loop); }
+        if (!should) running = false;
+    };
+    const observer = new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; update(); });
+    observer.observe(stage);
+    document.addEventListener('visibilitychange', update);
+    canvas.addEventListener('webglcontextlost', () => { frame.classList.remove('is-live'); stopped = true; });
+    serviceStage = {
+        stop() {
+            stopped = true;
+            running = false;
+            observer.disconnect();
+            document.removeEventListener('visibilitychange', update);
+            section.removeEventListener('pointermove', onMove);
+            section.removeEventListener('pointerleave', onLeave);
+            frame.classList.remove('is-live');
+            canvas.remove();
+        }
+    };
+}
+
+// The team ring: eight photos around a slowly turning cylinder. It stops while hovered or dragged, turns by
+// dragging, and the panels facing away fade. Phones get a swipe strip, reduced motion a plain grid (both in CSS)
+let serviceRing = null;
+
+function initServiceRing() {
+    if (serviceRing) serviceRing.stop();
+    serviceRing = null;
+    const stage = document.getElementById('svc-ring-stage'), ring = document.getElementById('svc-ring');
+    if (!stage || !ring) return;
+    if (!window.matchMedia || !window.IntersectionObserver) return; // the build's pre-render has neither
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const narrow = window.matchMedia('(max-width: 639px)');
+    if (reduce) { stage.classList.add('is-flat'); return; }
+    const panels = [...ring.querySelectorAll('.svc-panel')];
+    const step = 360 / panels.length;
+    const films = [...stage.querySelectorAll('.svc-film-track')];
+    const filmShift = 290 * Math.PI / 180; // px of film per degree of turn: the ring's front speed, at the size of its sides
+    let angle = 0, hovered = false, dragging = false, dragX = 0, moved = 0, resumeAt = 0, last = performance.now();
+    let running = false, onScreen = false, stopped = false;
+    const place = () => {
+        ring.style.setProperty('--a', angle + 'deg');
+        films.forEach((track, i) => {
+            const set = track.children[SERVICE_TEAM_PHOTOS.length]?.offsetLeft; // the width of one run of photos
+            if (!set) return;
+            const offset = angle * filmShift + i * set / 2;
+            track.style.transform = `translateX(${((offset % set) + set) % set - set}px)`;
+        });
+        panels.forEach((p, i) => {
+            const facing = Math.cos(((angle + i * step) % 360) * Math.PI / 180);
+            p.style.opacity = String(0.25 + 0.75 * Math.max(0, facing));
+            p.classList.toggle('is-back', facing < 0.2);
+        });
+    };
+    const loop = now => {
+        if (!running || stopped || !ring.isConnected) { running = false; return; }
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        if (!narrow.matches) {
+            if (!hovered && !dragging && now > resumeAt) angle += dt * 7;
+            place();
+        }
+        requestAnimationFrame(loop);
+    };
+    const update = () => {
+        const should = onScreen && !document.hidden && !stopped;
+        if (should && !running) { running = true; last = performance.now(); requestAnimationFrame(loop); }
+        if (!should) running = false;
+    };
+    const down = e => {
+        if (narrow.matches || e.button > 0) return;
+        dragging = true; dragX = e.clientX; moved = 0;
+        stage.setPointerCapture(e.pointerId);
+    };
+    const move = e => {
+        if (!dragging) return;
+        const dx = e.clientX - dragX;
+        dragX = e.clientX;
+        moved += Math.abs(dx);
+        angle += dx * 0.25;
+    };
+    const up = () => { if (!dragging) return; dragging = false; resumeAt = performance.now() + 2500; };
+    // A drag isn't a tap on a photo
+    const click = e => { if (moved > 6) { e.preventDefault(); e.stopPropagation(); } moved = 0; };
+    const enter = () => { hovered = true; }, leave = () => { hovered = false; };
+    // A photo on the films opens its service, as on the ring
+    stage.addEventListener('click', e => { const photo = e.target.closest('[data-service]'); if (photo) focusServiceCard(Number(photo.dataset.service)); });
+    stage.addEventListener('pointerdown', down);
+    stage.addEventListener('pointermove', move);
+    stage.addEventListener('pointerup', up);
+    stage.addEventListener('pointercancel', up);
+    stage.addEventListener('click', click, true);
+    stage.addEventListener('pointerenter', enter);
+    stage.addEventListener('pointerleave', leave);
+    const observer = new IntersectionObserver(([entry]) => { onScreen = entry.isIntersecting; update(); });
+    observer.observe(stage);
+    document.addEventListener('visibilitychange', update);
+    place();
+    serviceRing = {
+        stop() {
+            stopped = true;
+            running = false;
+            observer.disconnect();
+            document.removeEventListener('visibilitychange', update);
+        }
+    };
+}
+
 // After the page renders: the cards, summary and form match the (empty) cart step
 function initServicePage() {
     serviceAudience = 'owner';
+    serviceChosen = null;
+    serviceQuery = '';
     updateService();
+    initServiceStage();
+    initServiceRing();
 }
 
 function setServiceAudience(audience) {
@@ -6664,12 +6996,100 @@ function updateServiceForm() {
     address.hidden = !atSite;
     address.querySelector('label').textContent = item.cart === false ? 'Where the carts are needed' : item.cart === 'buying' ? 'Where the cart is' : 'Address where the cart is';
     address.querySelector('textarea').required = atSite;
+    form.querySelector('#sr-date-field').hidden = !item.cart;
+    const date = form.querySelector('#sr-date');
+    const today = new Date();
+    date.min = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const running = form.querySelector('#sr-running');
+    running.hidden = item.cart !== 'own';
+    form.querySelector('#sr-running-note').hidden = running.hidden || form.querySelector('input[name="running"]:checked')?.value !== 'No';
+    updateServiceSummary();
+    if (!form.querySelector('#sr-review').hidden) renderServiceReview();
+}
+
+function chooseServiceInForm(select) {
+    serviceChosen = select.value;
+    const cards = document.getElementById('svc-cards');
+    if (cards) cards.innerHTML = renderServiceCards();
+}
+
+function searchServices(input) {
+    serviceQuery = input.value;
+    const cards = document.getElementById('svc-cards');
+    if (cards) cards.innerHTML = renderServiceCards();
+}
+
+// Everything the request says, as rows: shown in the review, then saved with the request
+function serviceRequestRows(form) {
+    const data = new FormData(form);
+    const value = name => String(data.get(name) || '').trim();
+    const item = SERVICE_LIST.find(i => i.name === value('service')) || SERVICE_LIST[0];
+    const cart = serviceCart();
+    const rows = [['Service', item.name], ['Customer', serviceAudience === 'fleet' ? 'Fleet' : 'Private owner']];
+    if (value('org')) rows.push(['Company', value('org')]);
+    if (item.cart) {
+        rows.push(['Cart', cart.model || 'Not given'], ['Power', cart.power || 'Not given'], ['Seats', cart.seats || 'Not given'],
+            ['Year', cart.year || 'Not given'], ['Serial number', cart.serial || 'Not given']);
+        if (item.cart === 'own') rows.push(['Bought from us', cart.ours || 'Not given'], ['Running', value('running') || 'Not given']);
+        if (cart.count) rows.push(['Carts in the fleet', cart.count]);
+        rows.push(['Preferred date', value('date') ? formatServiceDate(value('date')) : 'Any day']);
+    } else {
+        rows.push(['Carts needed', value('carts')], ['Dates', value('dates')]);
+    }
+    const atSite = item.onsite || value('where') === 'site';
+    rows.push(['Where', atSite ? 'At the customer\'s home or site' : 'Customer brings it to the branch']);
+    if (atSite) rows.push(['Address', value('address')]);
+    return { item, cart, rows, value };
+}
+
+function formatServiceDate(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return isNaN(d) ? iso : d.toLocaleDateString('en-PH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// The summary beside the form: each step, ticked once it's done, with a way back to it
+function updateServiceSummary() {
+    const box = document.getElementById('sr-summary'), form = document.getElementById('svc-book');
+    if (!box || !form) return;
+    const { item, cart, value } = serviceRequestRows(form);
+    const cartText = item.cart ? serviceCartSummary(cart) : 'Not needed: you\'re renting ours';
+    const atSite = item.onsite || value('where') === 'site';
+    const details = [value('name'), value('branch'), atSite ? 'At your home or site' : 'At the branch', item.cart && value('date') && formatServiceDate(value('date'))].filter(Boolean).join(' · ');
+    const set = (step, text, done) => {
+        const li = box.querySelector(`[data-step="${step}"]`);
+        li.classList.toggle('is-done', done);
+        li.querySelector('[data-sum]').textContent = text;
+    };
+    set('cart', cartText || 'Not described yet', !item.cart || !!cartText);
+    set('service', item.name, !!serviceChosen);
+    set('details', details, !!(value('name') && value('phone') && value('email')));
+}
+
+function renderServiceReview() {
+    const form = document.getElementById('svc-book');
+    const { rows, value } = serviceRequestRows(form);
+    const all = [...rows, ['Name', value('name')], ['Mobile', value('phone')], ['Email', value('email')], ['Nearest branch', value('branch')]];
+    if (value('notes')) all.push(['Notes', value('notes')]);
+    form.querySelector('#sr-review-list').innerHTML = all.map(([k, v]) => `<dt>${attrText(k)}</dt><dd>${attrText(v || 'Not given')}</dd>`).join('');
+}
+
+// Review first, send second: the form's fields give way to the review, and back again
+function showServiceReview(on) {
+    const form = document.getElementById('svc-book');
+    if (on) renderServiceReview();
+    form.querySelector('#sr-fields').hidden = on;
+    form.querySelector('#sr-review').hidden = !on;
+    form.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    if (on) form.querySelector('#sr-review-title').focus({ preventScroll: true });
 }
 
 function pickService(index) {
     const select = document.getElementById('sr-type');
     if (!select) return;
     select.value = SERVICE_LIST[index].name;
+    serviceChosen = SERVICE_LIST[index].name;
+    const cards = document.getElementById('svc-cards');
+    if (cards) cards.innerHTML = renderServiceCards();
     updateServiceForm();
     scrollToDetailSection('service-request');
 }
@@ -6677,31 +7097,24 @@ function pickService(index) {
 async function handleServiceRequestSubmit(e) {
     e.preventDefault();
     const form = e.target;
-    const data = new FormData(form);
-    const value = name => String(data.get(name) || '').trim();
-    const item = SERVICE_LIST.find(i => i.name === value('service')) || SERVICE_LIST[0];
-    const cart = serviceCart();
+    if (form.querySelector('#sr-review').hidden) { showServiceReview(true); return; }
+    const { item, cart, rows, value } = serviceRequestRows(form);
     const reference = 'SRV-' + Math.floor(100000 + Math.random() * 900000);
-    const rows = [['Service', item.name], ['Customer', serviceAudience === 'fleet' ? 'Fleet' : 'Private owner']];
-    if (value('org')) rows.push(['Company', value('org')]);
-    if (item.cart) {
-        rows.push(['Cart', cart.model || 'Not given'], ['Power', cart.power || 'Not given'], ['Seats', cart.seats || 'Not given'],
-            ['Year', cart.year || 'Not given'], ['Serial number', cart.serial || 'Not given']);
-        if (item.cart === 'own') rows.push(['Bought from us', cart.ours || 'Not given']);
-        if (cart.count) rows.push(['Carts in the fleet', cart.count]);
-    } else {
-        rows.push(['Carts needed', value('carts')], ['Dates', value('dates')]);
-    }
-    const atSite = item.onsite || value('where') === 'site';
-    rows.push(['Where', atSite ? 'At the customer\'s home or site' : 'Customer brings it to the branch']);
-    if (atSite) rows.push(['Address', value('address')]);
+    const send = form.querySelector('#sr-review button[type="submit"]');
+    send.disabled = true;
     const sent = await sendQuoteRequest(form, {
         reference, source: 'Service and support', name: value('name'), email: value('email'), phone: value('phone'),
         model: item.cart ? cart.model : '', quantity: item.cart ? cart.count : value('carts'), branch: value('branch'),
         notes: value('notes'), rows: JSON.stringify(rows)
     }, null);
+    send.disabled = false;
     if (!sent) return;
     form.reset();
+    serviceChosen = null;
+    const cards = document.getElementById('svc-cards');
+    if (cards) cards.innerHTML = renderServiceCards();
+    form.querySelector('#sr-fields').hidden = false;
+    form.querySelector('#sr-review').hidden = true;
     updateServiceForm();
     showToast(`Request sent. Your reference is ${reference}. We emailed you a confirmation; our service team will call you to set a schedule.`);
 }
@@ -6718,21 +7131,73 @@ function renderServicePage() {
     ];
 
     return `
-        <section class="relative">
-            <img src="image/Hero/hero-3.webp" alt="Golfcarts.ph technician working on a cart" fetchpriority="high" class="w-full aspect-[4/3] sm:aspect-[16/9] lg:aspect-[21/9] object-cover">
-        </section>
-
-        <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-16 lg:pt-24">
-                        <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mt-4">
-                <h1 class="type-xl text-ink lg:col-span-7">Service, parts and support.</h1>
-                <div class="lg:col-span-5 space-y-6">
-                    <p class="measure">Repairs, upgrades, fleet care, trade-ins and rentals from our service team, for Club Car and other brands, at your home, on your site or at our branches.</p>
-                    <div class="flex flex-wrap gap-3">
+        <!-- The hero: our team's photos on a slowly turning ring (a strip on phones, a grid with reduced motion) -->
+        <section class="svc-stage" aria-labelledby="service-title">
+            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
+                <div class="max-w-3xl mx-auto text-center space-y-6">
+                    <p class="text-sm text-mute">Service and support</p>
+                    <h1 id="service-title" class="type-xl text-ink">We keep you rolling.</h1>
+                    <p class="measure mx-auto">Repairs, upgrades, fleet care, trade-ins and rentals from our service team, for Club Car and other brands, at your home, on your site or at our branches.</p>
+                    <div class="flex flex-wrap justify-center gap-3">
                         <button type="button" onclick="scrollToDetailSection('service-request')" class="btn btn-primary">Book a service</button>
                         <button type="button" onclick="goToHomeSection('home-branches')" class="btn btn-outline">Find a branch</button>
                     </div>
                     <!-- Parts and Accessories lives under Service and Support (website review) -->
                     <a href="carts/?category=Accessories" onclick="event.preventDefault(); setCategoryAndNavigate('Accessories')" class="link inline-block">Shop parts and accessories</a>
+                    <div><p class="svc-urgent inline-block text-left"><b>Cart won't run, or need help today?</b> Call us: <a href="tel:+63277455089" class="link">(02) 7745-5089</a></p></div>
+                </div>
+            </div>
+            <div id="svc-ring-stage" class="svc-ring-stage">
+                <div id="svc-ring" class="svc-ring">
+                    ${SERVICE_TEAM_PHOTOS.map((ph, i) => {
+                        const index = SERVICE_LIST.findIndex(item => item.name === ph.service);
+                        return `
+                        <figure class="svc-panel" style="--i: ${i}">
+                            <button type="button" ${index >= 0 ? `onclick="focusServiceCard(${index})"` : 'disabled'} class="svc-panel-btn">
+                                <img src="${ph.src}" alt="${attrText(ph.alt)}" loading="lazy" decoding="async" draggable="false">
+                                <figcaption>${ph.title}${index >= 0 ? `<small>${attrText(ph.service)}</small>` : ''}</figcaption>
+                            </button>
+                        </figure>`;
+                    }).join('')}
+                </div>
+                ${['left', 'right'].map(side => `
+                <div class="svc-film svc-film-${side}" aria-hidden="true"><div class="svc-film-track">${[...SERVICE_TEAM_PHOTOS, ...SERVICE_TEAM_PHOTOS].map(ph => {
+                    const index = SERVICE_LIST.findIndex(item => item.name === ph.service);
+                    return `<figure class="svc-film-card"${index >= 0 ? ` data-service="${index}"` : ''}><img src="${ph.src}" alt="" loading="lazy" decoding="async" draggable="false"><figcaption>${ph.title}${index >= 0 ? `<small>${attrText(ph.service)}</small>` : ''}</figcaption></figure>`;
+                }).join('')}</div></div>`).join('')}
+            </div>
+            <p class="svc-cart-hint px-5">Our team at work, from diagnosis to a digital report. Tap a photo to see the service.</p>
+        </section>
+
+        <!-- The white Tempo rises in, turns a little as the page scrolls; hover or tap a ping for what we do there -->
+        <section class="home-section svc-parts" aria-labelledby="svc-parts-title">
+            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
+                <div class="max-w-2xl space-y-4">
+                    <p class="text-sm text-mute">Every part, looked after</p>
+                    <h2 id="svc-parts-title" class="type-lg text-ink">Point to a part to see how we look after it.</h2>
+                    <p class="measure">Wheels, battery, wiring, seats, lights and frame: each point shows what our team does there, with a photo from the workshop and a link to book it.</p>
+                </div>
+                <!-- The cart in the middle; a point's label opens in the space on its side, joined by a line -->
+                <div id="svc-cart-stage" class="svc-cart svc-parts-stage">
+                    <svg id="svc-part-lines" class="svc-part-lines" aria-hidden="true"><path pathLength="1"></path><circle r="3.5"></circle></svg>
+                    <div class="svc-cart-frame">
+                        <img id="svc-cart-img" src="${SERVICE_STAGE_PHOTO}" alt="A white Club Car Tempo." loading="lazy" class="svc-cart-img">
+                        ${SERVICE_PINGS.map((p, i) => `
+                            <div class="svc-ping" style="left: ${p.x}%; top: ${p.y}%" data-ping="${i}" onpointerenter="if (event.pointerType === 'mouse') showServicePing(${i})" onpointerleave="hideServicePingSoon()">
+                                <button type="button" class="svc-ping-btn" onclick="showServicePing(${i})" onfocus="showServicePing(${i})" aria-expanded="false" aria-controls="svc-part-card-${i}" aria-label="${p.part}: ${attrText(p.service)}"><span class="svc-ping-dot" aria-hidden="true"></span></button>
+                            </div>`).join('')}
+                    </div>
+                    ${SERVICE_PINGS.map((p, i) => {
+                        const index = SERVICE_LIST.findIndex(item => item.name === p.service);
+                        return `
+                        <div id="svc-part-card-${i}" class="svc-part-card ${p.x < 50 ? 'is-left' : 'is-right'}" style="--y: ${p.y}%" role="group" aria-label="${p.part}" onpointerenter="clearTimeout(servicePingTimer)" onpointerleave="hideServicePingSoon()">
+                            <img src="${p.photo}" alt="" loading="lazy" decoding="async">
+                            <p class="text-xs text-mute mt-3">${p.part}</p>
+                            <p class="font-semibold text-ink leading-snug">${attrText(p.service)}</p>
+                            <p class="text-sm text-ink-2 mt-1">${attrText(SERVICE_LIST[index].text)}</p>
+                            <button type="button" onclick="showServicePing(-1); pickService(${index})" class="link text-sm mt-2">Book this</button>
+                        </div>`;
+                    }).join('')}
                 </div>
             </div>
         </section>
@@ -6792,8 +7257,11 @@ function renderServicePage() {
         <section id="service-list" class="home-section bg-stone" aria-labelledby="service-list-title">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
                 <p class="text-sm text-mute">Step 2</p>
-                <h2 id="service-list-title" class="type-lg text-ink mb-8">What does it need?</h2>
-                <div id="svc-cards">${renderServiceCards()}</div>
+                <div class="flex flex-wrap items-end justify-between gap-6 mb-8">
+                    <h2 id="service-list-title" class="type-lg text-ink">What does it need?</h2>
+                    <div class="field w-full sm:w-80"><label for="svc-search">Search services</label><input id="svc-search" type="search" oninput="searchServices(this)" placeholder="e.g. battery, rust, wedding" autocomplete="off"></div>
+                </div>
+                <div id="svc-cards" aria-live="polite">${renderServiceCards()}</div>
             </div>
         </section>
 
@@ -6817,12 +7285,21 @@ function renderServicePage() {
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-12">
                 <div class="lg:col-span-4 space-y-5">
                     <p class="text-sm text-mute">Step 3</p>
-                    <h2 id="service-request-title" class="type-xl text-ink">Book a service.</h2>
-                    <p class="measure text-ink-2">Tell us what the cart needs. Our service team will call you to confirm a schedule.</p>
+                    <h2 id="service-request-title" class="type-lg text-ink">Book a service.</h2>
+                    <p class="measure text-ink-2">Check your booking, add your details and review it before sending. Our service team will call you to confirm a schedule.</p>
+                    <div id="sr-summary" class="svc-summary">
+                        <p class="font-semibold text-ink">Your booking</p>
+                        <ol>
+                            <li data-step="cart"><span class="svc-step-mark" aria-hidden="true">1</span><div><p class="text-sm text-mute">Cart</p><p data-sum class="text-ink">Not described yet</p><button type="button" onclick="scrollToDetailSection('service-cart')" class="link text-sm">Change</button></div></li>
+                            <li data-step="service"><span class="svc-step-mark" aria-hidden="true">2</span><div><p class="text-sm text-mute">Service</p><p data-sum class="text-ink"></p><button type="button" onclick="scrollToDetailSection('service-list')" class="link text-sm">Change</button></div></li>
+                            <li data-step="details"><span class="svc-step-mark" aria-hidden="true">3</span><div><p class="text-sm text-mute">Details</p><p data-sum class="text-ink"></p></div></li>
+                        </ol>
+                    </div>
                 </div>
-                <form id="svc-book" onsubmit="handleServiceRequestSubmit(event)" onchange="updateServiceForm()" class="lg:col-span-7 lg:col-start-6 grid sm:grid-cols-2 gap-x-6 gap-y-5">
+                <form id="svc-book" onsubmit="handleServiceRequestSubmit(event)" onchange="updateServiceForm()" oninput="updateServiceSummary()" class="lg:col-span-7 lg:col-start-6 scroll-mt-24">
+                    <div id="sr-fields" class="grid sm:grid-cols-2 gap-x-6 gap-y-5">
                     <div class="field sm:col-span-2"><label for="sr-type">Service</label>
-                        <select id="sr-type" name="service">
+                        <select id="sr-type" name="service" onchange="chooseServiceInForm(this)">
                             ${SERVICE_GROUPS.map(g => `<optgroup label="${g.title}">${g.items.map(i => `<option>${i.name}</option>`).join('')}</optgroup>`).join('')}
                         </select>
                     </div>
@@ -6846,8 +7323,26 @@ function renderServicePage() {
                         </div>
                     </fieldset>
                     <div id="sr-address-field" class="field sm:col-span-2" hidden><label for="sr-address">Address where the cart is</label><textarea id="sr-address" name="address" rows="2" autocomplete="street-address"></textarea></div>
+                    <fieldset id="sr-running" class="sm:col-span-2">
+                        <legend class="text-sm text-ink mb-2">Is the cart running?</legend>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="detail-trim svc-chip"><input type="radio" name="running" value="Yes" class="sr-only">Yes</label>
+                            <label class="detail-trim svc-chip"><input type="radio" name="running" value="No" class="sr-only">No, it won't move</label>
+                        </div>
+                        <p id="sr-running-note" class="text-sm text-ink-2 mt-2" hidden>No problem: we can fix it where it is, or take it to the branch on our flatbed. For help today, call <a href="tel:+63277455089" class="link">(02) 7745-5089</a>.</p>
+                    </fieldset>
+                    <div id="sr-date-field" class="field"><label for="sr-date">Preferred date (optional)</label><input id="sr-date" name="date" type="date"></div>
                     <div class="field sm:col-span-2"><label for="sr-notes">What's wrong, or what you'd like done</label><textarea id="sr-notes" name="notes" rows="4"></textarea></div>
-                    <div class="sm:col-span-2"><button type="submit" class="btn btn-primary">Send request</button></div>
+                    <div class="sm:col-span-2"><button type="submit" class="btn btn-primary">Review request</button></div>
+                    </div>
+                    <div id="sr-review" class="svc-review" hidden>
+                        <h3 id="sr-review-title" tabindex="-1" class="type-md text-ink">Check your request</h3>
+                        <dl id="sr-review-list" class="svc-review-list"></dl>
+                        <div class="flex flex-wrap gap-3">
+                            <button type="submit" class="btn btn-primary">Send request</button>
+                            <button type="button" onclick="showServiceReview(false)" class="btn btn-outline">Edit details</button>
+                        </div>
+                    </div>
                 </form>
             </div>
         </section>

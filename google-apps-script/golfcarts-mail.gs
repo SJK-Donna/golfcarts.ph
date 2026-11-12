@@ -8,6 +8,8 @@
 //   quotation_returned     the person who submitted it gets the master admin's note
 //   quotation_sent         the customer gets the quotation PDF
 //   quote_zoho             a lead that failed to reach Zoho CRM is sent again (Marketing's Send again in the admin)
+//   sku_photos             staff pressed "Get photos from Zoho now": the Zoho items and their photos are copied at
+//                          once (syncZohoPhotos)
 // Each new quote request also becomes a Lead in Zoho CRM (sendLead), and the result is logged through log_zoho.
 // Called from the admin with the staff member's own sign-in (their Supabase access token):
 //   preview                the quotation's PDF, to look at before sending
@@ -31,6 +33,14 @@
 //      and removes the code. The refresh token is like a password: it stays in Script Properties, nowhere else.
 //   If your Zoho account isn't on zoho.com (the address bar shows zoho.eu, zoho.in, zoho.com.au...), also add
 //   ZOHO_ACCOUNTS_URL, for example https://accounts.zoho.eu.
+//
+// Zoho Inventory (the SKU photos in the admin), once:
+//   a. In the same Self Client: Generate Code with both scopes, ZohoCRM.modules.leads.CREATE,ZohoInventory.items.READ,
+//      10 minutes. Put it in ZOHO_GRANT_CODE and Run > connectZoho again (the old refresh token only covers Leads).
+//   b. Run > setupZohoPhotos, and allow the Drive permission it asks for. It creates the Drive folder "Golfcarts.ph SKU
+//      photos (from Zoho Inventory)", shared so anyone with a link can view (the admin shows the photos from there),
+//      copies the photos, and from then on copies new or changed ones every hour.
+//   c. Deploy > Manage deployments > Edit > Version: New version, so the admin's "Get photos from Zoho now" works.
 
 const OWNER_EMAIL = 'donnavalonda@sjkguahan.com';
 // The site's Supabase project and its publishable key (the same as in account.js; safe to share)
@@ -52,6 +62,15 @@ const COMPANY = {
 // The site's colors (src/styles/tokens.css)
 const C = { ink: '#151714', green: '#749E35', greenText: '#4F6E22', stone: '#ECECE6', line: '#D6D6CE', mute: '#6B6C64' };
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Which copy of this script answered: the admin shows it after a PDF preview. Change it with each edit
+const SCRIPT_VERSION = '2026-11-12 stock-sheet';
+// What the last PDF's page 3 was made from, for that same message (set by quotationPdf)
+let lastPage3 = '';
+
+// Opening the web app's address in a browser shows which copy of this script that deployment runs
+function doGet() {
+  return json({ ok: true, version: SCRIPT_VERSION });
+}
 
 function doPost(e) {
   let body = {};
@@ -63,6 +82,7 @@ function doPost(e) {
       const staff = body.staff || {};
       if (body.event === 'quote_created') quoteCreated(body.record, staff);
       else if (body.event === 'quote_zoho') sendLead(body.record);
+      else if (body.event === 'sku_photos') syncZohoPhotos();
       else if (/^quotation_(submitted|approved|returned|sent)$/.test(body.event)) quotationEvent(body.record, body.event.slice(10), staff);
       else return json({ ok: false, error: 'Unknown event' });
       return json({ ok: true });
@@ -76,7 +96,7 @@ function doPost(e) {
     const found = supabase('/rest/v1/quotations?id=eq.' + id + '&select=*', token);
     if (!found || !found.length) return json({ ok: false, error: 'Quotation not found, or you do not have access to it' });
     const qt = found[0];
-    if (body.action === 'preview') return json({ ok: true, pdf: Utilities.base64Encode(quotationPdf(qt).getBytes()) });
+    if (body.action === 'preview') return json({ ok: true, pdf: Utilities.base64Encode(quotationPdf(qt).getBytes()), version: SCRIPT_VERSION, page3: lastPage3 });
     if (body.action === 'resend') {
       if (qt.status !== 'sent') return json({ ok: false, error: 'Only a sent quotation can be emailed again' });
       const result = sendQuotation(qt, user.email);
@@ -311,9 +331,16 @@ function siteImages(paths) {
 }
 
 function quotationPdf(qt) {
-  const offers = ((qt.pdf_extra || {}).offers || []).filter(function (o) { return o && o.name; });
-  const images = siteImages(['image/GCPH_logo.png', qt.photo].concat(offers.map(function (o) { return o.image; })));
-  return Utilities.newBlob(quotationHtml(qt, images[0], images[1], offers.map(function (o, i) { return { group: o.group, name: o.name, image: images[i + 2] }; })), MimeType.HTML)
+  // Up to 8 upgrades (two rows of four); quotations saved before 2026-11-12 may carry 9
+  const offers = ((qt.pdf_extra || {}).offers || []).filter(function (o) { return o && o.name; }).slice(0, 8);
+  // Page 3 as one picture, drawn by the admin when the quotation was saved (account.js drawQuotationPage3); without it,
+  // the plain page 3 below, with the upgrades' own photos
+  const picture = offers.length ? String((qt.pdf_extra || {}).page3 || '') : '';
+  const images = siteImages(['image/GCPH_logo.png', qt.photo, picture].concat(picture ? [] : offers.map(function (o) { return o.image; })));
+  const offerImages = images.slice(3);
+  lastPage3 = !offers.length ? 'none (no upgrades)' : !picture ? 'plain (no page 3 picture saved)'
+    : images[2] ? 'picture' : 'plain (the picture could not be fetched: ' + picture + ')';
+  return Utilities.newBlob(quotationHtml(qt, images[0], images[1], offers.map(function (o, i) { return { group: o.group, name: o.name, image: offerImages[i] }; }), images[2]), MimeType.HTML)
     .getAs(MimeType.PDF).setName('Quotation ' + qt.reference + '.pdf');
 }
 
@@ -327,7 +354,7 @@ function customerLines(qt, model, build) {
   return { t: t, rows: rows.concat(upgrades) };
 }
 
-function quotationHtml(qt, logo, photo, offers) {
+function quotationHtml(qt, logo, photo, offers, page3Picture) {
   const c = qt.customer || {};
   const extra = qt.pdf_extra || {};
   const rows = (qt.build_rows || []).filter(function (r) { return Array.isArray(r) && r.length === 2; }).map(function (r) { return [String(r[0]), String(r[1])]; });
@@ -355,6 +382,9 @@ function quotationHtml(qt, logo, photo, offers) {
   const footer = '<table style="width:100%;border-collapse:collapse;margin-top:18px"><tr><td style="background:' + C.ink + ';color:#ffffff;padding:10px 16px;font-size:10px">' +
     '<b>' + COMPANY.name + '</b> by ' + COMPANY.legal + ' &middot; ' + COMPANY.site + ' &middot; ' + COMPANY.email + ' &middot; ' + COMPANY.phone + '</td></tr></table>';
   const pageBreak = '<div style="page-break-before:always"></div>';
+  // Each page's margins (2026-11-12): the converter's own are turned off (@page, at the end) so page 3 can fill the
+  // whole sheet; pages 1 and 2 keep theirs as padding, about as wide as before
+  const PAGE_PAD = 'padding:38px 52px 30px';
   const specCell = 'padding:6px 9px;border:1px solid ' + C.green + ';vertical-align:top;font-size:11px';
   const specTable = function (title, list) {
     return '<table style="width:100%;border-collapse:collapse"><tr><td colspan="2" style="' + specCell + ';background:' + C.green + ';color:#ffffff;font-weight:bold">' + title + '</td></tr>' +
@@ -368,7 +398,7 @@ function quotationHtml(qt, logo, photo, offers) {
   };
 
   // ---- Page 1: the quotation
-  const page1 = '<table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle">' + logoHtml(44) + '</td>' +
+  const page1 = '<div style="' + PAGE_PAD + '"><table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle">' + logoHtml(44) + '</td>' +
     '<td style="text-align:right;vertical-align:middle"><div style="font-size:24px;font-weight:bold;letter-spacing:1px">QUOTATION</div>' +
     '<div style="font-size:11px">Quotation No: <b>' + esc(qt.reference) + '</b></div><div style="font-size:11px">Date: ' + date + '</div></td></tr></table>' +
     '<div style="border-bottom:3px solid ' + C.green + ';margin-top:8px"></div>' +
@@ -389,10 +419,10 @@ function quotationHtml(qt, logo, photo, offers) {
     (t.discount ? sum('Discount', '- ' + peso(t.discount)) : '') + sum('TOTAL', peso(t.total), true) + '</table>' +
     (qt.notes ? heading('Notes') + '<p style="font-size:11px;line-height:1.5;margin:0;white-space:pre-line">' + esc(qt.notes) + '</p>' : '') +
     (qt.terms ? heading('Terms') + '<p style="font-size:10px;line-height:1.5;margin:0;white-space:pre-line;color:' + C.mute + '">' + esc(qt.terms) + '</p>' : '') +
-    footer;
+    footer + '</div>';
 
   // ---- Page 2: specifications and warranty
-  const page2 = pageBreak + pageHead('SPECIFICATIONS & WARRANTY') +
+  const page2 = pageBreak + '<div style="' + PAGE_PAD + '">' + pageHead('SPECIFICATIONS & WARRANTY') +
     '<div style="font-size:20px;font-weight:bold;margin-top:16px">' + esc(model) + (build ? ' <span style="color:' + C.greenText + '">· ' + buildNameHtml(build) + '</span>' : '') + '</div>' +
     heading('Specifications') +
     (modelSpecs.length
@@ -401,29 +431,44 @@ function quotationHtml(qt, logo, photo, offers) {
       : specTable('YOUR BUILD', spec)) +
     heading('Warranty') +
     '<p style="font-size:11px;line-height:1.6;margin:0;white-space:pre-line">' + esc(qt.warranty || 'Warranty terms are confirmed with your order. Ask your sales consultant for the details for your cart.') + '</p>' +
-    footer;
+    footer + '</div>';
 
-  // ---- Page 3: upgrades the model can take
-  const cellsPerRow = 3;
+  // ---- Page 3: upgrades the model can take (2026-11-12). The converter drops backgrounds, so page 3 is a picture the
+  // admin draws (the designer's background, the customer's cart, the upgrade cards), across the whole sheet. Without
+  // it (a quotation saved before, or a picture that didn't load): a plain page with the headline and the cards
+  const SLATE = '#4E6276', MIST = '#F1F3EE', PAGE3_HEIGHT = '11.62in';
+  const cellsPerRow = 4;
   const offerRows = [];
   for (let i = 0; i < offers.length; i += cellsPerRow) offerRows.push(offers.slice(i, i + cellsPerRow));
-  const page3 = !offers.length ? '' : pageBreak + pageHead('UPGRADES & ACCESSORIES') +
-    '<div style="font-size:20px;font-weight:bold;margin-top:16px">Make your ' + esc(model) + ' yours</div>' +
-    '<p style="font-size:12px;line-height:1.5;margin:4px 0 12px;color:' + C.mute + '">Upgrades and accessories that fit your cart. Add any of them to your order: reply to this quotation or call us, and we will price them for you.</p>' +
-    '<table style="width:100%;border-collapse:separate;border-spacing:8px">' + offerRows.map(function (row) {
+  const page3 = !offers.length ? '' : page3Picture
+    ? pageBreak + '<img src="' + page3Picture + '" alt="Upgrades and accessories for your cart" style="display:block;width:100%;height:11.66in">'
+    : pageBreak +
+    '<div style="height:' + PAGE3_HEIGHT + ';overflow:hidden;background:' + SLATE + '">' +
+    '<div style="background:' + MIST + ';padding:30px 40px 0">' + pageHead('UPGRADES & ACCESSORIES') + '</div>' +
+    '<div style="background:' + MIST + ';padding:16px 40px 14px"><div style="font-family:Georgia,serif;font-size:30px;font-weight:bold">ELEVATE YOUR RIDE</div>' +
+      '<div style="font-size:15px;font-weight:bold;margin:2px 0 6px">TRANSFORM YOUR CART INTO A MASTERPIECE</div>' +
+      '<p style="font-size:11px;line-height:1.5;margin:0;color:' + C.mute + '">Upgrades and accessories that fit your ' + esc(model) + '. Tell us what you need: we\'ll price it and make it yours.</p></div>' +
+    '<div style="padding:10px 30px 0"><table style="width:100%;border-collapse:separate;border-spacing:10px">' + offerRows.map(function (row) {
       return '<tr style="page-break-inside:avoid">' + row.map(function (o) {
-        return '<td style="width:33%;vertical-align:top;background:' + C.stone + ';padding:10px;text-align:center">' +
-          (o.image ? '<img src="' + o.image + '" alt="" style="height:110px;max-width:100%">' : '<div style="height:110px"></div>') +
-          '<div style="font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:' + C.greenText + ';margin-top:6px">' + esc(o.group) + '</div>' +
-          '<div style="font-size:11px;font-weight:bold;margin-top:2px">' + esc(o.name) + '</div></td>';
-      }).join('') + new Array(cellsPerRow - row.length + 1).join('<td style="width:33%"></td>') + '</tr>';
-    }).join('') + '</table>' +
-    '<table style="width:100%;border-collapse:collapse;margin-top:14px"><tr><td style="border:2px solid ' + C.green + ';padding:12px 16px;font-size:12px;line-height:1.6">' +
-    '<b>More from ' + COMPANY.name + '</b><br>Golf carts, lifestyle carts, resort shuttles and utility carts, plus parts and service at our branches in ' + COMPANY.branches + '.' +
+        return '<td style="width:25%;vertical-align:top;background:#ffffff;padding:7px 7px 9px;text-align:center">' +
+          '<div style="background:#F1F2EE;height:124px;text-align:center">' +
+          (o.image ? '<img src="' + o.image + '" alt="" style="height:116px;max-width:100%;margin-top:4px">' : '') + '</div>' +
+          '<div style="font-size:8px;letter-spacing:1px;text-transform:uppercase;color:' + C.mute + ';margin-top:7px">' + esc(o.group) + '</div>' +
+          '<div style="font-size:10.5px;font-weight:bold;line-height:1.25;margin-top:2px">' + esc(o.name) + '</div></td>';
+      }).join('') + new Array(cellsPerRow - row.length + 1).join('<td style="width:25%"></td>') + '</tr>';
+    }).join('') + '</table></div>' +
+    // "More from Golfcarts.ph", white on the slate, with its speech-bubble tail; then the company line
+    '<div style="padding:18px 40px 0"><table style="width:100%;border-collapse:collapse"><tr><td style="border:2px solid ' + C.green + ';background:#44586B;color:#FFFFFF;padding:11px 16px;font-size:11px;line-height:1.6">' +
+    '<b style="font-size:12px">More from ' + COMPANY.name + '</b><br>Golf carts, lifestyle carts, resort shuttles and utility carts, plus parts and service at our branches in ' + COMPANY.branches + '.' +
     ' See the full range at <b>' + COMPANY.site + '</b> or call <b>' + COMPANY.phone + '</b>.</td></tr></table>' +
-    footer;
+    '<div style="width:0;height:0;margin-left:36px;border-top:16px solid ' + C.green + ';border-right:16px solid transparent"></div></div>' +
+    '<div style="padding:18px 40px 0;font-size:10px;color:#C9D3DC"><b style="color:#FFFFFF">' + COMPANY.name + '</b> by ' + COMPANY.legal + ' &middot; ' + COMPANY.site +
+    ' &middot; ' + COMPANY.email + ' &middot; ' + COMPANY.phone + '</div>' +
+    '</div>';
 
-  return '<html><body style="font-family:Arial,Helvetica,sans-serif;color:' + C.ink + ';margin:22px 32px">' + page1 + page2 + page3 + '</body></html>';
+  // @page: no margins from the converter (each page sets its own, above), on A4 as the quotations have always been
+  return '<html><head><style>@page { size: A4; margin: 0; }</style></head><body style="font-family:Arial,Helvetica,sans-serif;color:' + C.ink + ';margin:0">' +
+    page1 + page2 + page3 + '</body></html>';
 }
 
 // ---------- Zoho CRM ----------
@@ -504,6 +549,129 @@ function connectZoho() {
   CacheService.getScriptCache().remove('zoho_access');
   zohoAccess();
   console.log('Zoho CRM is connected. New quote requests will become Leads.');
+}
+
+// ---------- Zoho Inventory: the SKU photos in the admin ----------
+
+const ZOHO_ORG_ID = '768095675'; // SJK-GUAHAN INC.
+
+// The team's stock sheet (read only; this Google account needs view access): per-branch stock, in transit, remarks
+const STOCK_SHEET_ID = '1gBR4h9ccRGv12aomzjtC1jt6lGwaQmWdl1YhEvTs5co'; // LIVE STOCK INVENTORY & REPLENISEMENT MONITORING - PARTS
+const STOCK_SHEET_TAB = 'Live stock Monitoring';
+
+// Copies that tab's quantities and remarks by SKU (never the workbook's cost tabs). Columns are found by their
+// headings, so a column moved in the sheet still lands right
+function syncStockSheet() {
+  let stock = [], error = '';
+  try {
+    const tab = SpreadsheetApp.openById(STOCK_SHEET_ID).getSheetByName(STOCK_SHEET_TAB);
+    if (!tab) throw new Error('the tab "' + STOCK_SHEET_TAB + '" is not in the stock sheet');
+    const rows = tab.getDataRange().getValues();
+    const head = rows[0].map(function (h) { return String(h).toLowerCase().replace(/\s+/g, ' ').trim(); });
+    const col = function (re) { const i = head.findIndex(function (h) { return re.test(h); }); if (i < 0) throw new Error('no column matching ' + re + ' in the stock sheet'); return i; };
+    const c = { sku: col(/^sku/), cebu: col(/^cebu soh/), manila: col(/^manila soh/), staRosa: col(/^sta\.? ?rosa soh/), total: col(/^total current stock/),
+      transit: col(/^stock in transit/), remark: col(/^remarks?$/), movement: col(/^inventory movement/) };
+    const number = function (v) { return v === '' || v == null || isNaN(Number(v)) ? null : Number(v); };
+    stock = rows.slice(1).map(function (r) {
+      return { sku: String(r[c.sku] || '').trim(), cebu: number(r[c.cebu]), manila: number(r[c.manila]), sta_rosa: number(r[c.staRosa]),
+        total: number(r[c.total]), in_transit: number(r[c.transit]), remark: String(r[c.remark] || '').trim(), movement: String(r[c.movement] || '').trim() };
+    }).filter(function (s) { return s.sku; });
+  } catch (err) {
+    error = 'Stock sheet: ' + String((err && err.message) || err);
+  }
+  try { supabase('/rest/v1/rpc/save_stock_sheet', null, 'post', { secret: secret(), stock: stock, error_text: error }); }
+  catch (err) { console.error('Stock sheet not saved: ' + err); }
+  return error;
+}
+
+// Copies the list of active Zoho Inventory items (SKU, name, category, unit, stock; no prices) and each item's photo into
+// the Drive folder (once per photo: the file's name holds the SKU and Zoho's id for that photo, so only a new or
+// changed photo is copied), then saves both by SKU in the database. Stops copying photos after 4½ minutes, under Apps
+// Script's 6-minute limit; the next run picks up the rest
+function syncZohoPhotos() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return; // already running
+  const started = Date.now(), photos = [], items = [];
+  let complete = false, listed = false, error = '';
+  syncStockSheet(); // the team's stock sheet first: quick, and independent of Zoho
+  try {
+    const access = zohoAccess(), folder = zohoPhotoFolder(), files = {}, seen = {}, listedSku = {};
+    const all = folder.getFiles();
+    while (all.hasNext()) { const f = all.next(); files[f.getName()] = f; }
+    let page = 1, more = true, outOfTime = false;
+    while (more) {
+      const data = zohoInventory(access, '/items?organization_id=' + ZOHO_ORG_ID + '&per_page=200&page=' + page);
+      (data.items || []).forEach(item => {
+        const sku = String(item.sku || '').trim();
+        if (!sku || item.status === 'inactive') return;
+        if (!listedSku[sku]) {
+          listedSku[sku] = true;
+          // Stock, all locations together: available (on hand less what's committed), on hand, and Zoho's reorder level
+          const number = function (v) { return v === '' || v == null || isNaN(Number(v)) ? null : Number(v); };
+          items.push({ sku: sku, item_id: item.item_id, name: item.name || '', category: item.category_name || item.cf_item_category_1 || '',
+            unit: item.unit || '', has_photo: !!item.image_document_id,
+            available_stock: number(item.available_stock != null ? item.available_stock : item.actual_available_stock),
+            stock_on_hand: number(item.stock_on_hand), reorder_level: number(item.reorder_level) });
+        }
+        if (seen[sku] || !item.image_document_id) return;
+        const name = sku + '__' + item.image_document_id + '.' + (item.image_type || 'jpg');
+        let file = files[name];
+        if (!file) {
+          if (Date.now() - started > 270000) { outOfTime = true; return; }
+          const res = UrlFetchApp.fetch(access.api + '/inventory/v1/items/' + item.item_id + '/image?organization_id=' + ZOHO_ORG_ID,
+            { headers: { Authorization: 'Zoho-oauthtoken ' + access.token }, muteHttpExceptions: true });
+          if (res.getResponseCode() !== 200) return;
+          file = folder.createFile(res.getBlob().setName(name));
+          // The SKU's older photo
+          Object.keys(files).forEach(n => { if (n.indexOf(sku + '__') === 0) { files[n].setTrashed(true); delete files[n]; } });
+          files[name] = file;
+        }
+        seen[sku] = true;
+        photos.push({ sku: sku, url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w800', zoho_item_id: item.item_id });
+      });
+      more = !!(data.page_context && data.page_context.has_more_page);
+      page++;
+    }
+    listed = true;
+    complete = !outOfTime;
+    if (outOfTime) error = 'Copied part of the photos; the rest follow on the next run.';
+  } catch (err) {
+    error = String((err && err.message) || err);
+  } finally {
+    try { if (items.length) supabase('/rest/v1/rpc/save_zoho_items', null, 'post', { secret: secret(), items: items, complete: listed }); }
+    catch (err) { console.error('Zoho items not saved: ' + err); error = error || 'Zoho items not saved: ' + err; }
+    try { supabase('/rest/v1/rpc/save_sku_photos', null, 'post', { secret: secret(), photos: photos, error_text: error, complete: complete }); }
+    catch (err) { console.error('SKU photos not saved: ' + err); }
+    lock.releaseLock();
+  }
+}
+
+function zohoInventory(access, path) {
+  const res = UrlFetchApp.fetch(access.api + '/inventory/v1' + path, { headers: { Authorization: 'Zoho-oauthtoken ' + access.token }, muteHttpExceptions: true });
+  const body = JSON.parse(res.getContentText() || '{}');
+  if (res.getResponseCode() === 401) CacheService.getScriptCache().remove('zoho_access');
+  if (res.getResponseCode() !== 200 || body.code !== 0) {
+    throw new Error('Zoho Inventory: ' + (body.message || ('HTTP ' + res.getResponseCode())) + (res.getResponseCode() === 401 ? ' (run connectZoho with the ZohoInventory.items.READ scope)' : ''));
+  }
+  return body;
+}
+
+// The Drive folder the photos are kept in, made (and shared by link) the first time
+function zohoPhotoFolder() {
+  const p = PropertiesService.getScriptProperties(), id = p.getProperty('ZOHO_PHOTO_FOLDER');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (err) { /* deleted: make a new one */ } }
+  const folder = DriveApp.createFolder('Golfcarts.ph SKU photos (from Zoho Inventory)');
+  folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  p.setProperty('ZOHO_PHOTO_FOLDER', folder.getId());
+  return folder;
+}
+
+// Run once (Run > setupZohoPhotos): copies the photos now and every hour from then on
+function setupZohoPhotos() {
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'syncZohoPhotos').forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('syncZohoPhotos').timeBased().everyHours(1).create();
+  syncZohoPhotos();
+  console.log('SKU photos copied from Zoho Inventory; they will be copied again every hour.');
 }
 
 function json(obj) {
