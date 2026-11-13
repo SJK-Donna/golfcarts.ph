@@ -63,7 +63,7 @@ const COMPANY = {
 const C = { ink: '#151714', green: '#749E35', greenText: '#4F6E22', stone: '#ECECE6', line: '#D6D6CE', mute: '#6B6C64' };
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Which copy of this script answered: the admin shows it after a PDF preview. Change it with each edit
-const SCRIPT_VERSION = '2026-11-12 stock-sheet';
+const SCRIPT_VERSION = '2026-11-13 leads-to-admins';
 // What the last PDF's page 3 was made from, for that same message (set by quotationPdf)
 let lastPage3 = '';
 
@@ -165,7 +165,7 @@ function quoteCreated(q, staff) {
       rowsTable([['Model', q.model]].concat(rows.filter(function (r) { return r[0] !== 'Model'; }))) + nextSteps())
   });
   sendMail('request_staff', 'quotes', q.id, {
-    to: [OWNER_EMAIL].concat(staff.sales || []), replyTo: q.email,
+    to: [OWNER_EMAIL].concat(staff.sales || [], staff.admins || []), replyTo: q.email,
     subject: 'New quotation request ' + q.reference + ' from ' + q.name,
     html: emailPage('New quotation request', 'From the website (' + esc(q.source) + '). Reply to this email to answer ' + esc(q.name) + ' directly, or prepare the quotation in the admin.',
       rowsTable([['Name', q.name], ['Email', q.email], ['Mobile', q.phone], ['Model', q.model]].concat(rows.filter(function (r) { return r[0] !== 'Model'; }))) + adminLink('Open the admin'))
@@ -183,7 +183,7 @@ function serviceCreated(q, rows, staff) {
       rowsTable(rows))
   });
   sendMail('request_staff', 'quotes', q.id, {
-    to: [OWNER_EMAIL].concat(staff.sales || []), replyTo: q.email,
+    to: [OWNER_EMAIL].concat(staff.sales || [], staff.admins || []), replyTo: q.email,
     subject: 'New service request ' + q.reference + ' from ' + q.name,
     html: emailPage('New service request', 'From the Service and support page. Reply to this email to answer ' + esc(q.name) + ' directly.',
       rowsTable([['Name', q.name], ['Email', q.email], ['Mobile', q.phone]].concat(rows)) + adminLink('Open the admin'))

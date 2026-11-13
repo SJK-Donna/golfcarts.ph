@@ -2247,7 +2247,7 @@ function renderFinder() {
         cards = finderModels(finder.use).map(m => finderCard({ value: m.key, image: m.image, title: m.label, badge: m.badge, detail: m.product.seating }));
     } else {
         const product = PRODUCTS_DATA.find(p => p.slug === model.slug);
-        title = `Choose your ${model.name} build`;
+        title = 'Choose your build';
         cards = TEMPO_LINES[product.version].levels.map(level => finderCard({
             value: level.id, image: (product.buildPhotos && product.buildPhotos[level.id]) || product.image,
             title: buildLabelHtml(level), detail: level.tagline, text: level.about || level.blurb || ''
@@ -2257,7 +2257,7 @@ function renderFinder() {
     dialog.innerHTML = `
         <div class="finder-head">
             <ol class="finder-steps" aria-label="Step ${finder.step} of 3">
-                ${['Use', 'Seats', 'Build'].map((s, i) => `<li${i + 1 === finder.step ? ' aria-current="step"' : ''}${i + 1 < finder.step ? ' class="is-done"' : ''}>${s}</li>`).join('')}
+                ${['Use', 'Seats', 'Build'].map((s, i) => `<li${i + 1 === finder.step ? ' aria-current="step"' : ''}${i + 1 < finder.step ? ' class="is-done"' : ''}><span class="finder-step-num" aria-hidden="true">${i + 1 < finder.step ? '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M3.5 8.5l3 3 6-7"/></svg>' : i + 1}</span>${s}</li>`).join('')}
             </ol>
             <button type="button" onclick="closeFinder()" aria-label="Close" class="auth-close">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>

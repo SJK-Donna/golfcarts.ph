@@ -437,7 +437,9 @@ begin
             'staff', jsonb_build_object(
                 -- "master": who approves (super admins and the price manager), so the script asks them
                 'master', coalesce((select jsonb_agg(email order by email) from public.staff where role in ('master', 'pricing')), '[]'::jsonb),
-                'sales', coalesce((select jsonb_agg(email order by email) from public.staff where role = 'sales'), '[]'::jsonb)))
+                'sales', coalesce((select jsonb_agg(email order by email) from public.staff where role = 'sales'), '[]'::jsonb),
+                -- "admins": the super admins only (2026-11-13: they also get each new quote request and service booking)
+                'admins', coalesce((select jsonb_agg(email order by email) from public.staff where role = 'master'), '[]'::jsonb)))
     );
 exception when others then
     raise warning 'mail script not notified: %', sqlerrm;
