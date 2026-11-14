@@ -43,6 +43,9 @@
 //   c. Deploy > Manage deployments > Edit > Version: New version, so the admin's "Get photos from Zoho now" works.
 
 const OWNER_EMAIL = 'donnavalonda@sjkguahan.com';
+// The address the emails come from (2026-11-13). It must be a "Send mail as" address of the Google account that
+// deploys this script (Gmail > Settings > Accounts > Send mail as); until it is, the emails come from that account
+const FROM_EMAIL = 'info@golfcarts.ph';
 // The site's Supabase project and its publishable key (the same as in account.js; safe to share)
 const SUPABASE_URL = 'https://xcmkkvzxstzxqefhhgxa.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_zEHyhUcCcO14meqwN3uPuQ_3jLs4-CM';
@@ -63,7 +66,7 @@ const COMPANY = {
 const C = { ink: '#151714', green: '#749E35', greenText: '#4F6E22', stone: '#ECECE6', line: '#D6D6CE', mute: '#6B6C64' };
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Which copy of this script answered: the admin shows it after a PDF preview. Change it with each edit
-const SCRIPT_VERSION = '2026-11-13 leads-to-admins';
+const SCRIPT_VERSION = '2026-11-13 from-info';
 // What the last PDF's page 3 was made from, for that same message (set by quotationPdf)
 let lastPage3 = '';
 
@@ -135,11 +138,11 @@ function sendMail(kind, refTable, refId, mail) {
   let status = 'sent', error = '';
   try {
     if (!to.length) throw new Error('No one to send to');
-    const options = { to: to.join(','), name: COMPANY.name, subject: mail.subject, htmlBody: mail.html };
+    const options = { name: COMPANY.name, htmlBody: mail.html };
     if (mail.replyTo && VALID_EMAIL.test(mail.replyTo)) options.replyTo = mail.replyTo;
     if (mail.bcc && mail.bcc.length) options.bcc = mail.bcc.join(',');
     if (mail.attachments) options.attachments = mail.attachments;
-    MailApp.sendEmail(options);
+    deliver(to.join(','), mail.subject, options);
   } catch (err) {
     status = 'failed';
     error = String(err && err.message || err);
@@ -150,6 +153,20 @@ function sendMail(kind, refTable, refId, mail) {
     console.error('Not logged: ' + err);
   }
   return { status: status, error: error };
+}
+
+// Sends from FROM_EMAIL when it's set up as a "Send mail as" address here; otherwise from this account, as before
+function deliver(to, subject, options) {
+  if (sendAsReady()) options.from = FROM_EMAIL;
+  GmailApp.sendEmail(to, subject, 'This email needs an email app that shows HTML.', options);
+}
+
+let sendAs = null;
+function sendAsReady() {
+  if (sendAs === null) {
+    try { sendAs = GmailApp.getAliases().indexOf(FROM_EMAIL) >= 0; } catch (err) { sendAs = false; }
+  }
+  return sendAs;
 }
 
 // ---------- The events ----------
@@ -685,7 +702,8 @@ function testMail() {
     quantity: '1', branch: 'Manila', notes: 'Test request', rows: [['Model', 'Golfer 2+2'], ['Build', 'Scratch'], ['Body color', 'Sapphire'], ['Seat', 'Beige']] };
   const qt = { id: 0, reference: 'QT-SAMPLE', title: 'Golfer 2+2 · Scratch', customer: { name: 'Test Customer', email: OWNER_EMAIL, phone: '+63 900 000 0000' },
     build_rows: q.rows, units: 1, lines: [{ part: 'Cart', option: 'Golfer 2+2 Scratch', qty: 1, price_php: 650000 }], photo: 'image/Products/builds/golfer-2-2-scratch.jpg' };
-  MailApp.sendEmail({ to: OWNER_EMAIL, name: COMPANY.name, subject: 'Sample: quotation request ' + q.reference,
+  deliver(OWNER_EMAIL, 'Sample: quotation request ' + q.reference, { name: COMPANY.name,
     htmlBody: emailPage('Thank you, ' + esc(q.name) + '!', 'This is a sample of the acknowledgement customers get.', rowsTable(requestRows(q)) + nextSteps()),
     attachments: [quotationPdf(qt)] });
+  console.log(sendAsReady() ? 'Sent from ' + FROM_EMAIL : FROM_EMAIL + ' is not a "Send mail as" address of this account yet, so the sample came from ' + Session.getEffectiveUser().getEmail());
 }
