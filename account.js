@@ -1335,7 +1335,7 @@ function renderAdminHome(data) {
                 homeTile(open.length, 'Requests not priced yet', '', stage('quotes', 'open'))
             ])}
             <div class="adm-home">
-                ${homeList('Waiting for approval', waiting.map(qt => quotationRow(qt, `margin ${quotationTotals(qt).margin.toFixed(1)}% · ${escapeHtml(approverNames(qt.approvers || []))}`, 'Open')),
+                ${homeList('Waiting for approval', waiting.map(qt => quotationRow(qt, `GP ${quotationTotals(qt).margin.toFixed(1)}% · ${escapeHtml(approverNames(qt.approvers || []))}`, 'Open')),
                     'Nothing waiting. Jerus or James approve submitted quotations, by margin.')}
                 <section class="adm-panel">
                     <div class="adm-panel-head"><h2>Pricing now</h2><button type="button" onclick="${tab('quotations')}" class="link text-sm">Change</button></div>
@@ -1383,7 +1383,7 @@ function renderAdminHome(data) {
             homeTile(sentThisMonth.length, 'Sent this month', formatPhp(sentThisMonth.reduce((s, q) => s + quotationTotals(q).total, 0)), stage('quotations', 'sent'))
         ])}
         <div class="adm-home">
-            ${homeList('Waiting for approval', at('submitted').map(qt => quotationRow(qt, `margin ${quotationTotals(qt).margin.toFixed(1)}% · from ${who(qt.submitted_by)}`, 'Review')), 'Nothing waiting for approval.')}
+            ${homeList('Waiting for approval', at('submitted').map(qt => quotationRow(qt, `GP ${quotationTotals(qt).margin.toFixed(1)}% · from ${who(qt.submitted_by)}`, 'Review')), 'Nothing waiting for approval.')}
             ${homeList('New requests', open.map(requestRow), 'Every open request has a quotation.')}
             <section class="adm-panel">
                 <div class="adm-panel-head"><h2>Team</h2><button type="button" onclick="${tab('users')}" class="link text-sm">Manage</button></div>
@@ -3270,7 +3270,8 @@ async function deleteBundleLine(sheetRow) {
 // PDF by the email script (google-apps-script/golfcarts-mail.gs), as are the notices for each step. The database's workflow trigger decides
 // which step each role may take ---
 const QUOTATION_STATUS_LABELS = { draft: 'Draft', submitted: 'Waiting for approval', approved: 'Approved', returned: 'Returned', sent: 'Sent' };
-const QUOTATION_TERMS = 'Prices are in Philippine pesos (PHP). This quotation is valid for 15 days from its date. Delivery lead time is confirmed on order.';
+const QUOTATION_VAT = 0.12; // prices include 12% VAT; costs are net of it
+const QUOTATION_TERMS = 'Prices are in Philippine pesos (PHP) and include 12% VAT. This quotation is valid for 15 days from its date. Delivery lead time is confirmed on order.';
 // The builder's categories as the bundles name them
 const BUNDLE_PRODUCTS = { 'The Golfer': 'Golfcarts', 'Lifestyle & Private Use': 'Lifestyle' };
 // Parts a build always carries, whatever was chosen; and parts where exactly one choice applies, matched to a row of the request
@@ -3398,15 +3399,18 @@ function bundleToQuotationLine(b) {
         qty: b.qty == null ? 1 : Number(b.qty), cost_usd: b.cost_usd == null ? null : Number(b.cost_usd), price_php: null, manual: false };
 }
 
-// A line's peso cost (USD x rate x (1 + freight)), to the centavo, and its unit selling price (that x (1 + margin)),
-// rounded to the nearest hundred pesos (2026-11-11)
+// A line's peso cost (USD x rate x (1 + freight), net of VAT), to the centavo, and its unit selling price, VAT
+// inclusive (2026-11-16): the margin is the gross profit on the price net of VAT, so price = cost / (1 - margin) x 1.12,
+// to the centavo, as on the team's sheet (no rounding to hundreds, which moved the GP off the one entered); none at
+// 100% or more
 function quotationCostPhp(qt, line) {
     return line.cost_usd == null ? null : Math.round(Number(line.cost_usd) * Number(qt.exchange_rate) * (1 + Number(qt.freight_pct) / 100) * 100) / 100;
 }
 
 function quotationFormulaPrice(qt, line) {
     const cost = quotationCostPhp(qt, line);
-    return cost == null ? null : Math.round(cost * (1 + Number(qt.margin_pct) / 100) / 100) * 100;
+    const margin = Number(qt.margin_pct) / 100;
+    return cost == null || !(margin < 1) ? null : Math.round(cost / (1 - margin) * (1 + QUOTATION_VAT) * 100) / 100;
 }
 
 // Lines priced by the formula follow the quotation's rate, freight and margin; typed prices stay as typed
@@ -3415,12 +3419,20 @@ function repriceQuotation(qt) {
     return qt;
 }
 
+// The price per cart rounded up to the next hundred pesos (2026-11-16, the "Rounded" line on the team's sheet)
+function roundedPrice(exact) {
+    return Math.ceil(Math.round(exact * 100) / 10000 - 1e-9) * 100;
+}
+
 function quotationTotals(qt) {
-    const perCart = qt.lines.reduce((s, l) => s + Number(l.price_php || 0) * Number(l.qty == null ? 1 : l.qty), 0);
+    const perCartExact = qt.lines.reduce((s, l) => s + Number(l.price_php || 0) * Number(l.qty == null ? 1 : l.qty), 0);
     const cost = qt.lines.reduce((s, l) => s + Number(quotationCostPhp(qt, l) || 0) * Number(l.qty == null ? 1 : l.qty), 0);
-    const units = Number(qt.units || 1), discount = Number(qt.discount_php || 0);
-    const total = perCart * units - discount, totalCost = cost * units;
-    return { perCart, cost, units, discount, total, totalCost, margin: total ? (total - totalCost) / total * 100 : 0, unpriced: qt.lines.filter(l => l.price_php == null).length };
+    const units = Number(qt.units || 1), discount = Number(qt.discount_php || 0), totalCost = cost * units;
+    // As on the team's sheet: the exact total (VAT inclusive) and its GP, net of VAT; then the total the customer pays,
+    // the price per cart rounded up to the next hundred pesos. Approval goes by the exact GP, as the database does
+    const perCart = roundedPrice(perCartExact), exact = perCartExact * units - discount, total = perCart * units - discount;
+    const net = exact / (1 + QUOTATION_VAT), vat = exact - net, gp = net - totalCost;
+    return { perCart, perCartExact, cost, units, discount, exact, total, net, vat, totalCost, gp, margin: net ? gp / net * 100 : 0, unpriced: qt.lines.filter(l => l.price_php == null).length };
 }
 
 // Approval by margin (the margin hierarchy for carts, 2026-11-11): under 15%, the GM; 15 to 25%, the sales manager or
@@ -3590,7 +3602,7 @@ function renderQuotationEditor(data) {
                 </select></div>
             <div class="field"><span class="text-sm">Exchange rate</span><p>${qt.exchange_rate} <span class="text-xs text-mute">set by accounting</span></p></div>
             <div class="field"><span class="text-sm">Freight %</span><p>${qt.freight_pct} <span class="text-xs text-mute">set by accounting</span></p></div>
-            <div class="field"><label for="qe-margin">Margin %</label>${editable ? `<input id="qe-margin" type="text" inputmode="decimal" value="${qt.margin_pct}" onchange="setQuotationNumber('margin_pct', this.value)">` : `<p>${qt.margin_pct}</p>`}</div>
+            <div class="field"><label for="qe-margin">GP %</label>${editable ? `<input id="qe-margin" type="text" inputmode="decimal" value="${qt.margin_pct}" onchange="setQuotationNumber('margin_pct', this.value)">` : `<p>${qt.margin_pct}</p>`}</div>
         </div>
         ${editable && qt.build_group ? `<p class="text-sm mt-3"><button type="button" onclick="rebuildQuotationLines()" class="link">Fill lines from this bundle again</button> <span class="text-mute">(replaces the lines below with the ones the request's build points at)</span></p>` : ''}
 
@@ -3629,9 +3641,12 @@ function renderQuotationEditor(data) {
                 <div><dt>Price per cart</dt><dd>${formatPhp(t.perCart)}</dd></div>
                 <div><dt>Number of carts</dt><dd>${editable ? `<input type="text" inputmode="numeric" value="${qt.units}" onchange="setQuotationNumber('units', this.value)" class="quotation-num" aria-label="Number of carts">` : qt.units}</dd></div>
                 <div><dt>Discount</dt><dd>${editable ? `<input type="text" inputmode="decimal" value="${Number(qt.discount_php)}" onchange="setQuotationNumber('discount_php', this.value)" class="quotation-num" aria-label="Discount in pesos">` : `− ${formatPhp(qt.discount_php)}`}</dd></div>
-                <div class="quotation-total"><dt>Total</dt><dd>${formatPhp(t.total)}</dd></div>
                 <div class="text-mute"><dt>Landed cost</dt><dd>${formatPhp(t.totalCost)}</dd></div>
-                <div class="text-mute"><dt>Margin</dt><dd>${t.total ? `${t.margin.toFixed(1)}%` : ''}</dd></div>
+                <div class="text-mute"><dt>GP %</dt><dd>${t.total ? `${t.margin.toFixed(2)}% · ${formatPhp(t.gp)}` : ''}</dd></div>
+                <div class="text-mute"><dt>Net of VAT</dt><dd>${formatPhp(t.net)}</dd></div>
+                <div class="text-mute"><dt>Add VAT 12%</dt><dd>${formatPhp(t.vat)}</dd></div>
+                <div class="text-mute"><dt>Total (VAT inclusive)</dt><dd>${formatPhp(t.exact)}</dd></div>
+                <div class="quotation-total"><dt>Rounded</dt><dd>${formatPhp(t.total)}</dd></div>
             </dl>
         </div>
         ${stockSummary(qt)}
@@ -3662,7 +3677,7 @@ function renderQuotationEditor(data) {
 function quotationApprovalText(qt, t) {
     if (qt.status === 'draft' || qt.status === 'returned') {
         const list = quotationApprovers(t.margin);
-        return list.length ? `at ${t.margin.toFixed(1)}% margin, ${approverNames(list)} approves it.` : `over 25% margin: approved when you submit it.`;
+        return list.length ? `at ${t.margin.toFixed(1)}% gross profit, ${approverNames(list)} approves it.` : `over 25% gross profit: approved when you submit it.`;
     }
     if (qt.status === 'submitted') return `waiting for ${approverNames(qt.approvers || [])}.`;
     if (!(qt.approvers || []).length && qt.reviewed_by === qt.submitted_by) return `approved on submit by ${adminName(qt.reviewed_by)} (margin over 25%).`;

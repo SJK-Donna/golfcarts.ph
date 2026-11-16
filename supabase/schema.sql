@@ -223,7 +223,8 @@ create trigger sku_usd_stamp before insert or update on public.sku_usd
 -- Which model page a request came from, so its quotation can find the bundle for that model
 alter table public.quotes add column if not exists slug text;
 
--- How a USD cost becomes a peso price: USD x exchange rate x (1 + freight %) x (1 + margin %). One row, set by
+-- How a USD cost becomes a peso price: USD x exchange rate x (1 + freight %) is the landed cost, net of VAT; the price,
+-- VAT inclusive, is that / (1 - margin %) x 1.12 (2026-11-16, account.js quotationFormulaPrice). One row, set by
 -- master admins; each quotation keeps the figures it was priced with.
 create table if not exists public.pricing_settings (
     id int primary key default 1 check (id = 1),
@@ -279,8 +280,9 @@ create index if not exists quotations_quote_id on public.quotations (quote_id);
 -- is submitted; empty when it was approved on submit.
 alter table public.quotations add column if not exists approvers text[] not null default '{}';
 
--- A quotation's actual margin after any discount, as the admin shows it: (total - landed cost) / total, in %.
--- Landed cost is USD x rate x (1 + freight), to the centavo, per line
+-- A quotation's gross profit after any discount, as the admin and the PSS show it (2026-11-16): the total includes
+-- 12% VAT, so (total / 1.12 - landed cost) / (total / 1.12), in %. Landed cost is USD x rate x (1 + freight), to the
+-- centavo, per line
 create or replace function public.quotation_margin(q public.quotations) returns numeric
 language sql immutable as $$
     with per_cart as (
@@ -290,7 +292,7 @@ language sql immutable as $$
         from jsonb_array_elements(q.lines) as l
     )
     select case when price * q.units - q.discount_php = 0 then 0
-        else (price * q.units - q.discount_php - cost * q.units) / (price * q.units - q.discount_php) * 100 end
+        else ((price * q.units - q.discount_php) / 1.12 - cost * q.units) / ((price * q.units - q.discount_php) / 1.12) * 100 end
     from per_cart
 $$;
 

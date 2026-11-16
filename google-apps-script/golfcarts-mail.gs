@@ -66,7 +66,7 @@ const COMPANY = {
 const C = { ink: '#151714', green: '#749E35', greenText: '#4F6E22', stone: '#ECECE6', line: '#D6D6CE', mute: '#6B6C64' };
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Which copy of this script answered: the admin shows it after a PDF preview. Change it with each edit
-const SCRIPT_VERSION = '2026-11-13 from-info';
+const SCRIPT_VERSION = '2026-11-16 rounded';
 // What the last PDF's page 3 was made from, for that same message (set by quotationPdf)
 let lastPage3 = '';
 
@@ -308,15 +308,17 @@ function requestRows(q) {
   return rows;
 }
 
-// Each line's unit price times its qty; the per-cart subtotal; times the number of carts, less the discount
+// Each line's unit price times its qty; the per-cart subtotal, rounded up to the next hundred pesos (2026-11-16, as
+// account.js quotationTotals); times the number of carts, less the discount
 function totals(qt) {
   const lines = (qt.lines || []).map(function (l) {
     const qty = l.qty == null ? 1 : Number(l.qty), unit = l.price_php == null ? 0 : Number(l.price_php);
     return { item: [l.part, l.option].filter(Boolean).join(' · '), description: l.description || '', qty: qty, unit: unit, amount: unit * qty, upgrade: !!l.upgrade };
   });
-  const perCart = lines.reduce(function (s, l) { return s + l.amount; }, 0);
+  const exact = lines.reduce(function (s, l) { return s + l.amount; }, 0);
+  const perCart = Math.ceil(Math.round(exact * 100) / 10000 - 1e-9) * 100;
   const units = Number(qt.units || 1), discount = Number(qt.discount_php || 0);
-  return { lines: lines, perCart: perCart, units: units, discount: discount, total: perCart * units - discount };
+  return { lines: lines, perCart: perCart, rounding: perCart - exact, units: units, discount: discount, total: perCart * units - discount };
 }
 
 // ---------- The quotation PDF ----------
@@ -361,13 +363,15 @@ function quotationPdf(qt) {
     .getAs(MimeType.PDF).setName('Quotation ' + qt.reference + '.pdf');
 }
 
-// The price lines as the customer sees them: the build's own lines as one package, then the upgrades
+// The price lines as the customer sees them: the build's own lines as one package (carrying the rounding up to the
+// hundred pesos), then the upgrades
 function customerLines(qt, model, build) {
   const t = totals(qt);
   const upgrades = t.lines.filter(function (l) { return l.upgrade; });
-  const pkg = t.lines.filter(function (l) { return !l.upgrade; }).reduce(function (s, l) { return s + l.amount; }, 0);
+  const pkg = t.lines.filter(function (l) { return !l.upgrade; }).reduce(function (s, l) { return s + l.amount; }, 0) + t.rounding;
   const rows = t.lines.some(function (l) { return !l.upgrade; })
-    ? [{ item: model + (build ? ' · ' + buildName(build) : ''), description: 'Complete cart as specified on page 2', qty: 1, unit: pkg, amount: pkg }] : [];
+    ? [{ item: model + (build ? ' · ' + buildName(build) : ''), description: 'Complete cart as specified on page 2', qty: 1, unit: pkg, amount: pkg }]
+    : t.rounding ? [{ item: 'Rounding', description: '', qty: 1, unit: t.rounding, amount: t.rounding }] : [];
   return { t: t, rows: rows.concat(upgrades) };
 }
 
@@ -433,7 +437,7 @@ function quotationHtml(qt, logo, photo, offers, page3Picture) {
         '</td><td style="' + cell + ';text-align:center">' + l.qty + '</td><td style="' + cell + ';' + money + '">' + peso(l.unit) + '</td><td style="' + cell + ';' + money + '">' + peso(l.amount) + '</td></tr>';
     }).join('') +
     (t.units !== 1 || priced.rows.length > 1 ? sum('Price per cart', peso(t.perCart)) : '') + (t.units !== 1 ? sum('Number of carts', String(t.units)) : '') +
-    (t.discount ? sum('Discount', '- ' + peso(t.discount)) : '') + sum('TOTAL', peso(t.total), true) + '</table>' +
+    (t.discount ? sum('Discount', '- ' + peso(t.discount)) : '') + sum('Net of VAT', peso(t.total / 1.12)) + sum('Add VAT 12%', peso(t.total - t.total / 1.12)) + sum('TOTAL (VAT inclusive)', peso(t.total), true) + '</table>' +
     (qt.notes ? heading('Notes') + '<p style="font-size:11px;line-height:1.5;margin:0;white-space:pre-line">' + esc(qt.notes) + '</p>' : '') +
     (qt.terms ? heading('Terms') + '<p style="font-size:10px;line-height:1.5;margin:0;white-space:pre-line;color:' + C.mute + '">' + esc(qt.terms) + '</p>' : '') +
     footer + '</div>';
