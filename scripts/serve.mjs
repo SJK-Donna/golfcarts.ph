@@ -37,8 +37,8 @@ function resolveFile(urlPath) {
 function send(req, res, file, status) {
     const stat = fs.statSync(file);
     const type = TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream';
-    // Pages always revalidate so a deploy shows at once; assets can be cached for a day
-    const cache = type.startsWith('text/html') ? 'no-cache' : 'public, max-age=86400';
+    // Pages, scripts and styles always revalidate, so a rebuild shows at once (a cached app.js hid changes); photos are cached for a day
+    const cache = /^(text\/(html|css|javascript)|application\/(javascript|json))/.test(type) ? 'no-cache' : 'public, max-age=86400';
     const range = req.headers.range && /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
     if (range && status === 200) {
         // Video seeking needs byte ranges

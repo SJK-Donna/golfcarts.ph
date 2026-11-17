@@ -2743,7 +2743,7 @@ function renderHomeBanners() {
                     </div>
                     <div class="flex items-center gap-4">
                         <p class="text-sm text-mute tabular-nums hidden sm:block"><span id="home-banner-index">1</span> / ${total}</p>
-                        <div class="banner-progress" aria-hidden="true">
+                        <div class="banner-progress" aria-hidden="true" data-txt-pass>
                             ${HOME_BANNERS.map((_, i) => `<button type="button" tabindex="-1" class="banner-dot ${i === 0 ? 'is-active' : ''}" data-banner-go="${i}"><span></span></button>`).join('')}
                         </div>
                     </div>
@@ -2904,7 +2904,7 @@ const HOME_PROMO = [
 // The section's photos and effects. Marketing can change these, and each cart's photo, name, seats line, seat and
 // canopy, in the admin (site_edits row "promo", applied by account.js); the model, build, Sangria body and each cart's
 // place in the line-up stay as set here. What staff typed is escaped where it's drawn.
-const HOME_PROMO_SETTINGS = { cover: 'image/Promo/red-series-cover.jpg', coverAlt: 'Red Series', stage: 'image/Promo/red-series-stage.jpg', effects: true };
+const HOME_PROMO_SETTINGS = { cover: 'image/Promo/christmas-cover.jpg', coverAlt: 'Christmas Special Carts', stage: 'image/Promo/christmas-stage.jpg', effects: true };
 
 // A Red Series cart is one fixed cart, nothing to choose (the user's choice, 2026-11-07): the Scratch build in Sangria,
 // with the seats and canopy in its photo and the build's standard equipment. Its quote carries all of that, so the
@@ -3000,18 +3000,18 @@ function renderHomePromo() {
     const stage = new URL(s.stage, document.baseURI).href;
     return `
         <section class="rise home-section home-promo" aria-labelledby="home-promo-title">
-            <div class="promo-stage" style="--promo-stage-img:url(${attrText(JSON.stringify(stage))})">
+            <div class="promo-stage" style="--promo-stage-img:url(${attrText(JSON.stringify(stage))})" data-page-bg="${attrText(s.stage)}" data-page-bg-var="--promo-stage-img">
                 <h2 id="home-promo-title" class="sr-only">Red Series</h2>
                 ${fx}
                 <div class="promo-cover">
                     <img src="${attrText(s.cover)}" alt="${attrText(s.coverAlt || 'Red Series')}" loading="lazy" decoding="async">
                     ${fx}
-                    <button type="button" class="promo-arrow promo-open" onclick="togglePromoCover(true)">
-                        See the Red Series
+                    <button type="button" class="promo-arrow promo-open" onclick="togglePromoCover(true)" data-txt-pass>
+                        Open
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                     </button>
                 </div>
-                <button type="button" class="promo-arrow promo-back" onclick="togglePromoCover(false)" aria-label="Back to the Red Series banner" hidden>
+                <button type="button" class="promo-arrow promo-back" onclick="togglePromoCover(false)" data-txt-pass aria-label="Back to the Red Series banner" hidden>
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
                 </button>
                 <p class="promo-hint" hidden>Choose a cart to see it and get a quote</p>
@@ -3092,31 +3092,82 @@ function renderHomeUses() {
 // Warranty (2026-11-17; was "What's under the seat", with the battery, motor and charge figures and the animated
 // tour video): the heading on the left, the Club Car warranty in brief filling the right, and a link to Service and
 // support under it
-// The detailed warranty (2026-11-17), for carts in general for now: shown in a pop-up from the homepage Warranty
-// section's "Click for more info", and on the Service and support page (#warranty). [item, sub-items, coverage]
-const WARRANTY_ROWS = [
-    ['Vehicle mainframe', '', 'Limited lifetime'],
-    ['Suspension', 'Steering gearbox, steering column, shocks and leaf springs', '4 years'],
-    ['Electric powertrain', 'Electric motor, transaxle and MCOR', '3 years'],
-    ['FLA battery', 'Flooded lead acid battery', '4 years or 20,000 hrs'],
-    ['AGM batteries', 'Absorbent glass mat maintenance-free battery', '2 years or 8,000 hrs'],
-    ['Lithium batteries', 'LiFePO4 (lithium iron phosphate) battery', '5 years or 28,000 hrs'],
-    ['Lithium charger', '', '1.5 years or 14,000 hrs'],
-    ['Major electronics', 'Solid state speed controller and battery charger', '4 years'],
-    ['Pedal group', 'Pedal group mechanical assembly, brake cluster assemblies, brake cables and accelerator pedal position sensor (APPS)', '4 years'],
-    ['Seats', 'Seat bottom, seat back and armrests', '4 years'],
-    ['Canopy system', 'Canopy, rear canopy supports, drainage system and structural accessory module (SAM)', '4 years'],
-    ['Body group', 'Beauty panels and front / rear underbody', '3 years'],
-    ['All remaining components', 'Solenoid, limit switches, voltage regulator, F&R switch, and options and accessories supplied by Club Car, including components not specified otherwise', '2 years']
+// The detailed warranty (2026-11-17), Club Car's Tempo terms from "warranty for Version and models.docx": three tables
+// by model, picked with the buttons above the table. Shown in a pop-up from the homepage Warranty section's "Click for
+// more info", and on the Service and support page (#warranty). Rows: [item, sub-items, coverage]
+const WARRANTY_GROUPS = [
+    { label: 'Tempo', models: 'Tempo 2-seater golf carts', rows: [
+        ['Vehicle mainframe', '', 'Limited lifetime'],
+        ['Suspension', 'Steering gearbox, steering column, shocks and leaf springs', '4 years'],
+        ['Electric powertrain', 'Electric motor, transaxle and MCOR', '3 years'],
+        ['FLA battery', 'Flooded lead acid battery', '4 years or 20,000 hrs'],
+        ['AGM batteries', 'Absorbent glass mat maintenance-free battery', '2 years or 8,000 hrs'],
+        ['Lithium batteries', 'LiFePO4 (lithium iron phosphate) battery', '5 years or 28,000 hrs'],
+        ['Lithium charger', '', '1.5 years or 14,000 hrs'],
+        ['Major electronics', 'Solid state speed controller and battery charger', '4 years'],
+        ['Pedal group', 'Pedal group mechanical assembly, brake cluster assemblies, brake cables and accelerator pedal position sensor (APPS)', '4 years'],
+        ['Seats', 'Seat bottom, seat back and armrests', '4 years'],
+        ['Canopy system', 'Canopy, rear canopy supports, drainage system and structural accessory module (SAM)', '4 years'],
+        ['Body group', 'Beauty panels and front / rear underbody', '3 years'],
+        ['All remaining components', 'Solenoid, limit switches, voltage regulator, F&R switch, and options and accessories supplied by Club Car, including components not specified otherwise', '2 years']
+    ] },
+    { label: 'Tempo 2+2 and Handyman', models: 'Tempo 2+2 and Tempo Handyman', rows: [
+        ['Vehicle mainframe', '', 'Limited lifetime'],
+        ['Suspension', 'Steering gearbox, steering column, shocks and leaf springs', '4 years'],
+        ['Electric powertrain', 'Electric motor, transaxle and MCOR', '3 years'],
+        ['FLA battery', '20,000 amp-hours or four years', '4 years'],
+        ['AGM battery', '20,000 amp-hours or 2 years', '2 years'],
+        ['Lithium battery', '28,000 amp-hours or 5 years', '5 years'],
+        ['Lithium charger', '', '1.5 years or 14,000 hrs'],
+        ['Major electronics', 'Solid state speed controller and battery charger', '4 years or 16,000 amp-hrs'],
+        ['Pedal group', 'Pedal group mechanical assembly, brake cluster assemblies, brake cables and accelerator pedal position sensor (APPS)', '4 years'],
+        ['Seats', 'Seat bottom, seat back and armrests', '2 years or 2,000 hrs'],
+        ['Canopy system', 'Canopy, rear canopy supports, drainage system and structural accessory module (SAM)', '2 years or 2,000 hrs'],
+        ['Body group', 'Beauty panels and front / rear underbody', '3 years'],
+        ['All remaining components', 'Solenoid, limit switches, voltage regulator, F&R switch, and options and accessories supplied by Club Car, including components not specified otherwise', '2 years']
+    ] },
+    { label: 'Tempo 4 & 6, Carryall, Villager', models: 'Tempo 4 & 6 Handyman, 4+2, 6+2, Carryall, and Villager 6 & 8', rows: [
+        ['Vehicle mainframe', '', '2 years or 2,000 hrs'],
+        ['Suspension', 'Steering gearbox, steering column, shocks and leaf springs', '2 years or 2,000 hrs'],
+        ['Electric powertrain', 'Electric motor, transaxle and MCOR', '3 years or 2,000 hrs'],
+        ['FLA batteries', 'High-capacity deep cycle flooded lead acid', '4 years or 16,000 hrs'],
+        ['AGM batteries', 'Absorbent glass mat maintenance-free battery', '2 years or 8,000 hrs'],
+        ['Lithium batteries', 'LiFePO4 (lithium iron phosphate) battery', '5 years or 28,000 hrs'],
+        ['Lithium charger', '', '1.5 years or 14,000 hrs'],
+        ['Major electronics', 'Solid state speed controller and battery charger', '4 years or 16,000 hrs'],
+        ['Other electronics', 'VCM and DBR VCM', 'Not applicable'],
+        ['Pedal group', 'Pedal group assembly, brake cluster assemblies and brake cables', '2 years or 2,000 hrs'],
+        ['Seats', 'Seat bottom, seat back and armrests', '2 years or 2,000 hrs'],
+        ['Canopy system', 'Canopy, rear canopy supports, drainage system and structural accessory module (SAM)', '2 years or 2,000 hrs'],
+        ['Cab assembly', 'Cab assembly and doors (if equipped)', '2 years or 2,000 hrs']
+    ] }
 ];
+let warrantyGroup = 0; // the table shown, the same in the pop-up and on the Service page
 const WARRANTY_NOTE = 'Coverage by part. Warranty is subject to applicable operating-hour limits and Club Car\'s terms and conditions; ask our service team about your cart.';
 
+// The buttons to pick a table, then the table, in one box (.warranty-box) that redraws itself on a pick
 function renderWarrantyTable() {
+    const g = WARRANTY_GROUPS[warrantyGroup];
     return `
-        <div class="overflow-x-auto"><table class="warranty-table w-full min-w-[520px] text-left">
-            <thead><tr><th scope="col">Item</th><th scope="col">Covers</th><th scope="col">Coverage</th></tr></thead>
-            <tbody>${WARRANTY_ROWS.map(([item, sub, cover]) => `<tr><th scope="row">${item}</th><td>${sub || '—'}</td><td>${cover}</td></tr>`).join('')}</tbody>
-        </table></div>`;
+        <div class="warranty-box">
+            <div class="warranty-tabs" role="group" aria-label="Warranty by model">
+                ${WARRANTY_GROUPS.map((x, i) => `<button type="button" aria-pressed="${i === warrantyGroup}" onclick="pickWarrantyGroup(${i})">${attrText(x.label)}</button>`).join('')}
+            </div>
+            <p class="text-sm text-mute mt-3 mb-2">For: ${attrText(g.models)}</p>
+            <div class="overflow-x-auto"><table class="warranty-table w-full min-w-[520px] text-left">
+                <thead><tr><th scope="col">Item</th><th scope="col">Covers</th><th scope="col">Coverage</th></tr></thead>
+                <tbody>${g.rows.map(([item, sub, cover]) => `<tr><th scope="row">${attrText(item)}</th><td>${attrText(sub) || '—'}</td><td>${attrText(cover)}</td></tr>`).join('')}</tbody>
+            </table></div>
+        </div>`;
+}
+
+function pickWarrantyGroup(i) {
+    warrantyGroup = i;
+    document.querySelectorAll('.warranty-box').forEach(box => {
+        const focused = box.contains(document.activeElement);
+        box.outerHTML = renderWarrantyTable();
+        if (focused) { const b = document.querySelectorAll('.warranty-tabs button')[i]; if (b) b.focus(); }
+    });
 }
 
 let warrantyReturnFocus = null;
@@ -3160,11 +3211,12 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWarrant
 function renderHomeInside() {
     return `
         <section class="rise home-inside" aria-labelledby="home-inside-title">
-            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 py-12 lg:py-[4.5rem] grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
-                <h2 id="home-inside-title" class="type-xl text-ink lg:col-span-4">Warranty.</h2>
-                <div class="lg:col-span-8 space-y-8">
-                    <p class="text-xl lg:text-2xl leading-[1.6] text-ink-2">The Club Car Golf Carts comes with comprehensive warranty coverage for added peace of mind, including a limited lifetime warranty on the vehicle mainframe, up to 5 years on lithium batteries, 4 years on FLA batteries, suspension, electric components, seats, canopy, and other major parts, and 3 years on the electric powertrain and body group. AGM batteries and other remaining components are covered for 2 years, while the lithium charger has a 1.5-year warranty. Warranty coverage is subject to applicable operating-hour limits and Club Car's terms and conditions.</p>
-                    <button type="button" onclick="openWarrantyModal()" class="btn btn-outline">Click for more info</button>
+            <!-- Centred (2026-11-17): the heading, the warranty's small print and its button in one column -->
+            <div class="max-w-3xl mx-auto px-5 sm:px-8 py-12 lg:py-[4.5rem] text-center space-y-6">
+                <h2 id="home-inside-title" class="type-xl text-ink">Warranty.</h2>
+                <div class="space-y-6">
+                    <p class="text-[0.8125rem] leading-relaxed text-mute measure mx-auto">*The Club Car Golf Carts comes with comprehensive warranty coverage for added peace of mind, including a limited lifetime warranty on the vehicle mainframe, up to 5 years on lithium batteries, 4 years on FLA batteries, suspension, electric components, seats, canopy, and other major parts, and 3 years on the electric powertrain and body group. AGM batteries and other remaining components are covered for 2 years, while the lithium charger has a 1.5-year warranty. Warranty coverage is subject to applicable operating-hour limits and Club Car's terms and conditions.</p>
+                    <button type="button" onclick="openWarrantyModal()" class="btn btn-primary btn-sm">Click for more info</button>
                 </div>
             </div>
         </section>
@@ -3390,7 +3442,7 @@ function renderHomeStage() {
                     </div>
                 </div>
 
-                <ul class="home-stage-feats" aria-label="Features of this build">${homeStageFeats(level)}</ul>
+                <ul class="home-stage-feats" aria-label="Features of this build" data-txt-scope="${level.id}">${homeStageFeats(level)}</ul>
 
                 <div class="home-stage-models">
                     <p id="home-stage-models-label" class="home-stage-eyebrow">Choose a build</p>
@@ -3844,7 +3896,7 @@ function renderHomeEvents() {
                         <div id="home-events-more" class="space-y-4" hidden>
                             ${e.text.slice(1).map(p => `<p class="text-[0.9375rem] leading-relaxed text-ink-2">${attrText(p)}</p>`).join('')}
                         </div>
-                        <button type="button" class="link text-sm block" aria-expanded="false" aria-controls="home-events-more" onclick="toggleEventStory(this)">Read more</button>
+                        <button type="button" class="link text-sm block" aria-expanded="false" aria-controls="home-events-more" onclick="toggleEventStory(this)" data-txt-pass>Read more</button>
                         <a href="./#home-quote" onclick="event.preventDefault(); goToHomeSection('home-quote')" class="btn btn-primary">Bring carts to your event</a>
                     </div>
                     <div class="events-carousel" role="group" aria-label="${attrText(e.title)} photos">

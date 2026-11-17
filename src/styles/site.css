@@ -99,6 +99,12 @@
         white-space: nowrap;
         transition: background-color 0.25s var(--ease), color 0.25s var(--ease), border-color 0.25s var(--ease);
     }
+    /* A smaller button (2026-11-17), for one that sits under small print (the homepage's warranty) */
+    .btn.btn-sm {
+        min-height: 2.25rem;
+        padding: 0 1rem;
+        font-size: 0.8125rem;
+    }
     .btn-primary {
         background: var(--green);
         color: var(--on-green);
@@ -1995,9 +2001,64 @@
     .promo-stage {
         position: relative;
         overflow: hidden;
-        background: #B30F12 var(--promo-stage-img, url('../image/Promo/red-series-stage.jpg')) center / cover no-repeat;
+        /* No colour of its own (2026-11-17): the background photo, changed in the admin, is the whole look */
+        background: var(--paper) var(--promo-stage-img, url('../image/Promo/christmas-stage.jpg')) center / cover no-repeat;
+    }
+    /* The carts in holders (2026-11-17): each a card with a fixed photo frame and its name and seats under it, so any
+       cart photo fits and the background's own title above stays clear. Tablet and desktop: a row in the lower right */
+    .promo-stage .lineup-promo .lineup-cart {
+        display: flex;
+        flex-direction: column;
+        gap: 0.375rem;
+        height: auto;
+        padding: 0.5rem 0.5rem 0.625rem;
+        background: rgba(246, 246, 242, 0.92);
+        border-radius: 10px;
+        box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.6);
+    }
+    .promo-stage .lineup-promo .lineup-cart img {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 4 / 3;
+        object-fit: contain;
+        object-position: center bottom;
+    }
+    .promo-stage .lineup.lineup-promo .lineup-label,
+    .promo-stage .lineup.lineup-promo .lineup-cart:hover .lineup-label {
+        position: static;
+        opacity: 1;
+        transform: none;
+        justify-items: start;
+        text-align: left;
+        white-space: normal;
+        text-shadow: none;
+    }
+    .promo-stage .lineup-promo .lineup-name { color: var(--ink); font-size: 1.125rem; }
+    .promo-stage .lineup-promo .lineup-seats { color: var(--mute); font-size: 0.75rem; }
+    @media (max-width: 639px) { .promo-stage .lineup-promo .lineup-name { font-size: 0.9375rem; } }
+    @media (min-width: 640px) {
+        .promo-stage { aspect-ratio: 3.33 / 1; }
+        .lineup.lineup-promo {
+            position: absolute;
+            right: 3%;
+            bottom: 7%;
+            display: flex;
+            align-items: stretch;
+            gap: 0.875rem;
+            aspect-ratio: auto;
+        }
+        .lineup-promo .lineup-item {
+            position: static;
+            width: clamp(130px, 14vw, 260px);
+            height: auto;
+        }
+        .promo-stage .lineup-promo .lineup-cart { height: 100%; }
     }
     /* The detailed warranty table (pop-up and Service page) */
+    /* The warranty by model (2026-11-17): a row of buttons above the table, the chosen one filled */
+    .warranty-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .warranty-tabs button { min-height: 2.25rem; padding: 0 0.875rem; border: 1px solid var(--field-border); border-radius: 999px; background: var(--paper); font-size: 0.8125rem; font-weight: 600; color: var(--ink); }
+    .warranty-tabs button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
     .warranty-table { border-collapse: collapse; font-size: 0.875rem; line-height: 1.4; }
     .warranty-table thead th { padding: 0.5rem 0.75rem 0.5rem 0; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mute); border-bottom: 1px solid var(--ink); }
     .warranty-table tbody th, .warranty-table td { padding: 0.5rem 0.75rem 0.5rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -2108,7 +2169,7 @@
         justify-content: center;
         padding: 1.25rem 1.5rem 1rem;
         /* The background's right side: its left has the "Red Series" title */
-        background: #B30F12 var(--promo-stage-img, url('../image/Promo/red-series-stage.jpg')) right center / cover no-repeat;
+        background: #1E1A19 var(--promo-stage-img, url('../image/Promo/christmas-stage.jpg')) right center / cover no-repeat;
     }
     .red-series-photo img {
         height: 13rem;
@@ -3240,6 +3301,24 @@
     .page-text-row label { flex: 1 1 8rem; }
     .page-text-label { font-size: 0.75rem; font-weight: 600; color: var(--ink-2); margin-right: 0.25rem; }
     .page-text-end { justify-content: flex-end; }
+    /* The frame for dragging the chosen text (2026-11-17): lets clicks through, except on its handles */
+    .page-text-handles { position: fixed; z-index: 94; pointer-events: none; border: 1.5px solid var(--green); border-radius: 2px; }
+    .page-text-handles .pth { position: absolute; pointer-events: auto; touch-action: none; }
+    .pth-move { left: -1px; top: -1px; display: grid; place-items: center; width: 1.625rem; height: 1.625rem; transform: translate(-100%, 0); border-radius: 6px 0 0 6px; background: var(--green); color: var(--on-green); cursor: move; }
+    .pth-e { top: 0; right: -6px; bottom: 0; width: 12px; cursor: ew-resize; }
+    .pth-s { left: 0; right: 0; bottom: -6px; height: 12px; cursor: ns-resize; }
+    .pth-e::after, .pth-s::after { content: ''; position: absolute; left: 50%; top: 50%; border-radius: 3px; background: var(--green); transform: translate(-50%, -50%); }
+    .pth-e::after { width: 5px; height: 1.5rem; max-height: 70%; }
+    .pth-s::after { width: 1.5rem; max-width: 70%; height: 5px; }
+    .pth-se { right: -7px; bottom: -7px; width: 14px; height: 14px; border: 2px solid var(--green); border-radius: 3px; background: var(--paper); cursor: nwse-resize; }
+    .page-text-dragging, .page-text-dragging * { user-select: none; }
+    /* Photos (2026-11-17): a pointer and an inset outline (a photo fills its frame, so an outside one would be cut
+       off); the panel shows the photo and a Replace button that opens the file picker */
+    .page-editing img[data-txt-key], .page-editing [data-page-bg][data-txt-key] { cursor: pointer; outline-offset: -3px; }
+    .page-text-thumb { width: 100%; max-height: 8rem; object-fit: contain; border-radius: 6px; background: var(--stone, #EEE) repeating-conic-gradient(rgba(0,0,0,0.06) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+    .page-text-tools .page-text-file { position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 2rem; padding: 0 0.75rem; border-radius: 6px; background: var(--green); color: var(--on-green); font-size: 0.8125rem; cursor: pointer; }
+    .page-text-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .page-text-file:focus-within { outline: 2px solid var(--ink); outline-offset: 2px; }
     /* Deleted with the page-text editor: gone for visitors, faded and outlined in red while editing */
     body:not(.page-editing) .pt-deleted { display: none !important; }
     .page-editing .pt-deleted { opacity: 0.35; outline: 2px dashed #B3261E; outline-offset: 2px; }

@@ -727,10 +727,20 @@ async function saveSiteEdit(key, value, message) {
 // size, align, x, y, link, style } } }. key: the section (its id or heading's id) and the element's place among that
 // section's texts, plus "@<scope>" for a text that changes with a choice on the page (the cart stage's build: each build's
 // line is its own edit); orig: its text as shipped, so an edit only lands on the text it was made for: if the code's
-// text changes, the edit is skipped (and listed as out of date while editing). The banners, the Red Series and the
-// event story have their own editors and are left out, as are the forms, the stage's build cards, its color and its
-// specs (edited in the admin's Products). Text is set as plain text (never as HTML)
-const PAGE_TEXT_SKIP = '.home-banners, .home-promo, .home-stage-cards, .home-stage-swatches, .home-stage-shown > p, .home-stage-facts, [aria-labelledby="home-events-title"], form';
+// text changes, the edit is skipped (and listed as out of date while editing). Left out: the forms, the stage's build
+// cards, its color and its specs (edited in the admin's Products), and the parts that count or switch on their own (the
+// banners' counter, the event's Read more). The banners, the Red Series and the event (2026-11-17) are edited on the
+// page too; their admin editors (Site content) stay, and an edit made here goes out of date if the admin changes the
+// text or photo underneath. Text is set as plain text (never as HTML)
+const PAGE_TEXT_SKIP = '.home-stage-cards, .home-stage-swatches, .home-stage-shown > p, .home-stage-facts, .home-banners h1, .banner-bar .tabular-nums, #home-banner-status, #home-promo-title, [aria-controls="home-events-more"], form';
+// Photos (2026-11-17, the homepage): any photo is clicked and replaced (uploaded to site-photos/page-photos) and its
+// description changed. key: the section's name and "img<n>", n the place of the first photo with the same address (the
+// event's scrolling photos repeat, and both copies change together), plus "@<build>" in the stage's features; orig: the
+// photo's address as shipped; src: the new photo; alt: its description. A part with data-page-bg (the Red Series'
+// background) is a photo too: its "bg<n>" entry sets the CSS variable named in data-page-bg-var. Left out: the
+// stage's cart (it's recolored live) and its build cards
+const PAGE_IMG_SKIP = '.home-stage-cart, .home-stage-cards, .home-stage-swatches, form';
+const pageTextIsPhoto = el => el.tagName === 'IMG' || el.hasAttribute('data-page-bg');
 // Also editable (2026-11-17), numbered after a section's other texts so earlier edits keep their keys: the range
 // photo's names and seats, and a form's send button (the rest of a form stays out)
 const PAGE_TEXT_EXTRA = '.lineup-name, .lineup-seats, form button[type="submit"]';
@@ -781,6 +791,20 @@ function pageTextTargets() {
         [...section.querySelectorAll(PAGE_TEXT_EXTRA)]
             .filter(el => !el.closest(PAGE_TEXT_SKIP_EXTRA) && !el.querySelector('img, svg, input, select, textarea') && pageTextNorm(el.dataset.txtOrig || el.textContent))
             .forEach((el, i) => out.push({ el, key: `${name}/x${i}` }));
+        if (currentPage !== 'home') return;
+        const first = new Map();
+        [...section.querySelectorAll('img')].forEach((el, i) => {
+            if (el.closest(PAGE_IMG_SKIP)) return;
+            if (el.dataset.txtOrig == null) el.dataset.txtOrig = el.getAttribute('src') || '';
+            if (!first.has(el.dataset.txtOrig)) first.set(el.dataset.txtOrig, i);
+            const scoped = el.parentElement.closest('[data-txt-scope]');
+            if (scoped) el.dataset.txtScope = scoped.dataset.txtScope; else delete el.dataset.txtScope;
+            out.push({ el, key: `${name}/img${first.get(el.dataset.txtOrig)}${scoped ? '@' + scoped.dataset.txtScope : ''}` });
+        });
+        section.querySelectorAll('[data-page-bg]').forEach((el, i) => {
+            el.dataset.txtOrig = el.dataset.pageBg;
+            out.push({ el, key: `${name}/bg${i}` });
+        });
     });
     // Text and buttons on the page outside any section (a model page's section bar), after the sections'
     [...root.querySelectorAll(PAGE_TEXT_TAGS)]
@@ -802,6 +826,11 @@ function safePageLink(link) {
     return /^(#[\w-]+|tel:[+\d\s()-]+|mailto:\S+|https?:\/\/\S+|[\w./?=&%-]+)$/i.test(l) && !/^javascript:/i.test(l) ? l : '';
 }
 
+function safePagePhoto(src) {
+    const s = String(src || '').trim();
+    return /^(https:\/\/[^\s"'()<>]+|image\/[^\s"'()<>]+)$/i.test(s) ? s : '';
+}
+
 function followPageLink(link) {
     if (link.startsWith('#')) {
         const target = document.getElementById(link.slice(1));
@@ -815,14 +844,17 @@ function resetPageTextEl(el) {
     const o = pageTextOriginal.get(el);
     if (!o) return;
     // The selection outline and a stage text mid-swap (is-out) aren't part of the design: kept as they are
-    const keep = ['is-txt-selected', 'is-out'].filter(c => el.classList.contains(c));
-    el.innerHTML = o.html;
+    const keep = ['is-txt-selected', 'is-out', 'is-open'].filter(c => el.classList.contains(c));
+    // A photo's insides aren't its own (the Red Series' background holds the whole section): only its address changes
+    if (!pageTextIsPhoto(el)) el.innerHTML = o.html;
     if (o.style == null) el.removeAttribute('style'); else el.setAttribute('style', o.style);
-    ['btn-primary', 'btn-outline'].forEach(c => el.classList.toggle(c, o.cls.split(/s+/).includes(c)));
+    ['btn-primary', 'btn-outline'].forEach(c => el.classList.toggle(c, o.cls.split(/\s+/).includes(c)));
     keep.forEach(c => el.classList.add(c));
     if (o.href == null) el.removeAttribute('href'); else el.setAttribute('href', o.href);
     if (o.route == null) el.removeAttribute('data-route'); else el.setAttribute('data-route', o.route);
     el.onclick = o.onclick;
+    if (o.src != null && el.getAttribute('src') !== o.src) el.setAttribute('src', o.src);
+    if (o.alt != null) el.setAttribute('alt', o.alt);
 }
 
 // The link a text sits inside (a card), when the text isn't a link or button itself
@@ -842,17 +874,47 @@ function pageTextBox(el) {
 function applyPageTextEl(el, e) {
     if (!pageTextOriginal.has(el)) {
         pageTextOriginal.set(el, { html: el.innerHTML, style: el.getAttribute('style'), cls: el.className, href: el.getAttribute('href'),
-            route: el.getAttribute('data-route'), onclick: el.onclick });
+            route: el.getAttribute('data-route'), onclick: el.onclick, src: el.getAttribute('src'), alt: el.getAttribute('alt') });
     }
     resetPageTextEl(el);
     if (!e) return;
+    if (pageTextIsPhoto(el)) {
+        const src = safePagePhoto(e.src);
+        if (src && el.tagName === 'IMG') { el.setAttribute('src', src); el.removeAttribute('srcset'); }
+        else if (src) el.style.setProperty(el.dataset.pageBgVar, `url(${JSON.stringify(new URL(src, document.baseURI).href)})`);
+        if (e.alt != null && el.tagName === 'IMG') el.setAttribute('alt', e.alt);
+        return;
+    }
     if (e.text != null && pageTextNorm(e.text) && pageTextNorm(e.text) !== el.dataset.txtOrig) el.textContent = e.text;
     if (e.font) el.style.fontFamily = e.font === 'serif' ? 'var(--font-display)' : 'var(--font-text)';
     if (e.bold) el.style.fontWeight = e.bold === 'bold' ? '700' : '400';
     // A share of the size the page gives it at this screen width, so it still scales down on phones
+    // The box's width and height (2026-11-17): a share of its size as designed at this screen width, measured before
+    // the other changes; a wider box drops the designed line-length limit, and a button keeps its text centred
+    // Never wider than the window. A text's height only grows its box (a shorter box would spill the text over what
+    // follows it); a button's sets its height
+    const screenW = document.documentElement.clientWidth;
+    if ((e.w && e.w !== 100) || (e.h && e.h !== 100)) {
+        const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+        if (cs.display === 'inline') el.style.display = 'inline-block';
+        if (e.w && e.w !== 100) { el.style.width = `${Math.min(r.width * e.w / 100, screenW - 16)}px`; el.style.maxWidth = 'none'; el.style.boxSizing = 'border-box'; }
+        if (e.h && e.h !== 100) {
+            if (el.matches('a, button')) el.style.height = `${r.height * e.h / 100}px`;
+            else if (e.h > 100) el.style.minHeight = `${r.height * e.h / 100}px`;
+            el.style.boxSizing = 'border-box';
+        }
+    }
     if (e.size && e.size !== 100) el.style.fontSize = `${parseFloat(getComputedStyle(el).fontSize) * e.size / 100}px`;
     if (e.align) el.style.textAlign = e.align;
-    if (e.x || e.y) el.style.translate = `${e.x || 0}px ${e.y || 0}px`;
+    // A move (2026-11-17): across, a share of the window it was made at (ref), so it scales with the screen; and the
+    // box is kept inside the window, so a move made on a wide screen never pushes it off a narrower one
+    if (e.x || e.y) {
+        const { x, y } = pageTextShift(e);
+        el.style.translate = `${x}px ${y}px`;
+        const r = el.getBoundingClientRect();
+        const fix = r.left < 8 ? 8 - r.left : r.right > screenW - 8 ? Math.max(8 - r.left, screenW - 8 - r.right) : 0;
+        if (fix) el.style.translate = `${x + fix}px ${y}px`;
+    }
     if (e.style && el.classList.contains('btn')) {
         el.classList.remove('btn-primary', 'btn-outline');
         el.classList.add(e.style === 'green' ? 'btn-primary' : 'btn-outline');
@@ -948,7 +1010,7 @@ function renderPageTextBar() {
     const stale = stalePageTextKeys();
     const changed = JSON.stringify(pageTextDraft) !== JSON.stringify(pageTextSaved());
     pageTextUi('page-text-bar', `
-        <span>Editing ${currentPage === 'home' ? 'the homepage' : 'this page'}: click any text or button. ${Object.keys(pageTextDraft).length - stale.length} edited</span>
+        <span>Editing ${currentPage === 'home' ? 'the homepage' : 'this page'}: click any text, button${currentPage === 'home' ? ' or photo' : ''}; drag its frame to move or resize it. ${Object.keys(pageTextDraft).length - stale.length} edited</span>
         ${stale.length ? `<button type="button" onclick="removeStalePageText()" class="page-text-quiet">${stale.length} out of date: remove</button>` : ''}
         <button type="button" onclick="discardPageText()" class="page-text-quiet">${changed ? 'Discard' : 'Close'}</button>
         <button type="button" onclick="savePageText(this)" class="page-text-save"${changed ? '' : ' disabled'}>Save</button>`, 'page-text-bar');
@@ -958,6 +1020,8 @@ function startPageTextEditing() {
     pageTextDraft = clone(pageTextSaved());
     pageTextDraftKey = pageTextKey();
     document.body.classList.add('page-editing');
+    // The banners stop turning, so the one being edited stays (the lines under them still change banner)
+    if (typeof homeBanners !== 'undefined' && homeBanners) homeBanners.pause();
     applyPageText();
 }
 
@@ -969,6 +1033,7 @@ function endPageTextEditing() {
     document.body.classList.remove('page-editing');
     pageTextUi('page-text-bar', '');
     pageTextUi('page-text-tools', '');
+    pageTextUi('page-text-handles', '');
 }
 
 function discardPageText() {
@@ -1023,19 +1088,47 @@ function pageTextEntry() {
 
 // One change from the panel: kept in the draft (dropped again when everything is back to the original) and shown
 function setPageText(field, value) {
+    setPageTextFields({ [field]: value });
+}
+
+// quiet: during a drag, only the element, its handles and the bar are redrawn (the panel catches up on letting go)
+function setPageTextFields(fields, quiet) {
     const el = pageTextSelected;
     if (!el) return;
-    const e = { ...pageTextEntry(), [field]: value };
-    if (field === 'x' || field === 'y' || field === 'size') e[field] = Number(value) || 0;
+    const field = Object.keys(fields)[0];
+    const e = { ...pageTextEntry(), ...fields };
+    ['x', 'y', 'size', 'w', 'h'].forEach(k => { if (k in fields) e[k] = Number(fields[k]) || 0; });
+    // A move is set at this window's width (the values given are as shown here); the other way still gives the same y
+    if ('x' in fields || 'y' in fields) {
+        if (!('x' in fields)) e.x = Math.round(pageTextShift(e).x);
+        e.ref = document.documentElement.clientWidth;
+    }
     if (e.text != null && pageTextNorm(e.text) === e.orig) delete e.text;
     ['font', 'bold', 'align', 'link', 'style', 'del'].forEach(k => { if (!e[k]) delete e[k]; });
-    if (e.size === 100 || e.size === 0) delete e.size;
+    ['size', 'w', 'h'].forEach(k => { if (e[k] === 100 || e[k] === 0) delete e[k]; });
     ['x', 'y'].forEach(k => { if (!e[k]) delete e[k]; });
+    if (!e.x && !e.y) delete e.ref;
+    if (pageTextIsPhoto(el)) {
+        if (!e.src || e.src === e.orig) delete e.src;
+        if (e.alt != null && e.alt === ((pageTextOriginal.get(el) || {}).alt || '')) delete e.alt;
+    }
     const key = el.dataset.txtKey;
     if (Object.keys(e).length > 1) pageTextDraft[key] = e; else delete pageTextDraft[key];
+    if (pageTextIsPhoto(el)) {
+        applyPageText();
+        if (field !== 'alt') renderPageTextTools();
+        return;
+    }
     applyPageTextEl(el, pageTextDraft[key] || null);
     renderPageTextBar();
-    if (field !== 'text' && field !== 'link') renderPageTextTools();
+    placePageTextHandles();
+    if (quiet) return;
+    // A slider keeps its place while it's dragged: only its label changes
+    const slider = document.activeElement;
+    if (['size', 'w', 'h'].includes(field) && slider && slider.type === 'range' && slider.closest('#page-text-tools')) {
+        slider.parentElement.firstChild.nodeValue = `${{ size: 'Size', w: 'Width', h: 'Height' }[field]}: ${e[field] || 100}%`;
+        placePageTextTools();
+    } else if (field !== 'text' && field !== 'link') renderPageTextTools();
     else placePageTextTools();
 }
 
@@ -1047,9 +1140,15 @@ function setPageTextDelete(value) {
 }
 
 function nudgePageText(dx, dy) {
-    const e = pageTextEntry();
-    setPageText('x', (e.x || 0) + dx * PAGE_TEXT_STEP);
-    setPageText('y', (pageTextEntry().y || 0) + dy * PAGE_TEXT_STEP);
+    const { x, y } = pageTextShift(pageTextEntry());
+    setPageTextFields({ x: Math.round(x + dx * PAGE_TEXT_STEP), y: Math.round(y + dy * PAGE_TEXT_STEP) });
+}
+
+// A move as it shows at this window width: across scales with the window it was made at (an older move, with no ref,
+// as saved)
+function pageTextShift(e) {
+    const k = e.ref ? document.documentElement.clientWidth / e.ref : 1;
+    return { x: (e.x || 0) * k, y: e.y || 0 };
 }
 
 function resetPageTextItem() {
@@ -1063,11 +1162,14 @@ function closePageTextTools() {
     if (pageTextSelected) pageTextSelected.classList.remove('is-txt-selected');
     pageTextSelected = null;
     pageTextUi('page-text-tools', '');
+    pageTextUi('page-text-handles', '');
 }
 
 function renderPageTextTools() {
     const el = pageTextSelected;
+    renderPageTextHandles();
     if (!pageTextDraft || !el || !el.isConnected) { pageTextUi('page-text-tools', ''); return; }
+    if (pageTextIsPhoto(el)) { renderPagePhotoTools(el); return; }
     const e = pageTextEntry();
     const isButton = el.matches('a, button');
     const choice = (field, options) => `<select onchange="setPageText('${field}', this.value)">${options.map(([v, label]) => `<option value="${v}"${(e[field] || '') === v ? ' selected' : ''}>${label}</option>`).join('')}</select>`;
@@ -1080,6 +1182,10 @@ function renderPageTextTools() {
             <label>Weight${choice('bold', [['', 'As designed'], ['bold', 'Bold'], ['regular', 'Regular']])}</label>
         </div>
         <label>Size: ${e.size || 100}%<input type="range" min="50" max="200" step="5" value="${e.size || 100}" oninput="setPageText('size', this.value)"></label>
+        <div class="page-text-row">
+            <label>Width: ${e.w || 100}%<input type="range" min="30" max="250" step="5" value="${e.w || 100}" oninput="setPageText('w', this.value)"></label>
+            <label>Height: ${e.h || 100}%<input type="range" min="50" max="300" step="5" value="${e.h || 100}" oninput="setPageText('h', this.value)"></label>
+        </div>
         ${isButton ? '' : `<div class="page-text-row"><span class="page-text-label">Align</span>
             ${pressed('align', '', 'Auto', 'As designed')}${pressed('align', 'left', 'Left', 'Align left')}${pressed('align', 'center', 'Centre', 'Centre')}${pressed('align', 'right', 'Right', 'Align right')}</div>`}
         <div class="page-text-row"><span class="page-text-label">Move</span>
@@ -1100,6 +1206,66 @@ function renderPageTextTools() {
     placePageTextTools();
 }
 
+// A photo's panel: replace it, describe it, delete it. In the Red Series, buttons switch between the cover and the carts
+// (the cover hides the carts' background), and the cover's new photo can go behind the carts too
+let pagePhotoBusy = '';
+function renderPagePhotoTools(el) {
+    const e = pageTextEntry();
+    const bg = el.hasAttribute('data-page-bg');
+    const shown = bg ? safePagePhoto(e.src) || el.dataset.txtOrig : el.currentSrc || el.getAttribute('src');
+    const promo = el.closest('.home-promo');
+    const cover = el.closest('.promo-cover');
+    const what = bg ? 'background' : 'photo';
+    pageTextUi('page-text-tools', `
+        <div class="page-text-head"><b>${bg ? 'Background photo' : 'Photo'}</b><button type="button" onclick="closePageTextTools()" aria-label="Close">✕</button></div>
+        <img class="page-text-thumb" src="${escapeHtml(shown)}" alt="">
+        <div class="page-text-row">
+            <label class="page-text-file"><span>${pagePhotoBusy || 'Replace ' + what}</span><input type="file" accept="image/jpeg,image/png,image/webp" onchange="replacePagePhoto(this)"${pagePhotoBusy ? ' disabled' : ''}></label>
+            ${e.src ? `<button type="button" onclick="setPageText('src', '')">Use the original</button>` : ''}
+        </div>
+        ${bg ? '' : `<label>Description (for screen readers and search)<input type="text" value="${escapeHtml(e.alt != null ? e.alt : el.getAttribute('alt') || '')}" placeholder="What the photo shows" oninput="setPageText('alt', this.value)"></label>`}
+        ${cover && e.src ? '<button type="button" onclick="pagePhotoBehindCarts()">Use this photo behind the carts too</button>' : ''}
+        ${promo ? `<div class="page-text-row"><span class="page-text-label">Red Series</span>
+            <button type="button" onclick="togglePromoCover(true, true)">Show the carts</button>
+            <button type="button" onclick="togglePromoCover(false, true)">Show the cover</button></div>` : ''}
+        ${promo && !bg ? '<p class="page-text-label">For the background behind the carts: Show the carts, then click an empty part of it.</p>' : ''}
+        <div class="page-text-row page-text-delete"><span class="page-text-label">Delete</span>
+            ${e.del ? `<span class="page-text-label">${e.del === 'self' ? 'This ' + what : PAGE_TEXT_DELETE[e.del]} is deleted</span><button type="button" onclick="setPageTextDelete('')">Restore</button>`
+                : Object.entries(PAGE_TEXT_DELETE).filter(([v]) => (v !== 'box' || !bg) && (v !== 'section' || el.closest('section')))
+                    .map(([v, label]) => `<button type="button" onclick="setPageTextDelete('${v}')">${v === 'self' ? 'This ' + what : label}</button>`).join('')}</div>
+        <div class="page-text-row page-text-end"><button type="button" onclick="resetPageTextItem()">Reset this</button><button type="button" onclick="closePageTextTools()">Done</button></div>`, 'page-text-tools');
+    placePageTextTools();
+}
+
+async function replacePagePhoto(input) {
+    const file = input.files && input.files[0], el = pageTextSelected;
+    if (!file || !el) return;
+    // The wide photos (banners, the Red Series, the event's header) at the banners' size and as JPEG; the rest keep
+    // a PNG's see-through background (the cart cut-outs)
+    const wide = el.hasAttribute('data-page-bg') || !!el.closest('.banner-slide, .promo-cover') || (el.naturalWidth >= 1600 && el.naturalWidth > el.naturalHeight * 2.5);
+    pagePhotoBusy = 'Uploading…';
+    renderPageTextTools();
+    try {
+        const url = await uploadSitePhoto(file, 'page-photos', wide ? { max: BANNER_PHOTO_MAX, jpeg: true } : {});
+        pagePhotoBusy = '';
+        if (pageTextSelected === el) setPageText('src', url); else renderPageTextTools();
+    } catch (err) {
+        pagePhotoBusy = '';
+        renderPageTextTools();
+        alert(`The photo didn't upload: ${err.message || err}`);
+    }
+}
+
+function pagePhotoBehindCarts() {
+    const src = pageTextEntry().src;
+    const promo = pageTextSelected && pageTextSelected.closest('.home-promo');
+    const stage = promo && promo.querySelector('[data-page-bg]');
+    if (!src || !stage) return;
+    togglePromoCover(true, true);
+    selectPageText(stage);
+    setPageText('src', src);
+}
+
 // The panel sits beside the chosen text, inside the window
 function placePageTextTools() {
     const panel = document.getElementById('page-text-tools');
@@ -1112,7 +1278,63 @@ function placePageTextTools() {
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
 }
-window.addEventListener('scroll', () => { if (pageTextSelected) placePageTextTools(); }, { passive: true });
+window.addEventListener('scroll', () => { if (pageTextSelected) { placePageTextTools(); placePageTextHandles(); } }, { passive: true });
+
+// --- Dragging on the page (2026-11-17): the chosen text or button gets a frame with handles. The grip at its top left
+// moves it (x, y); the right edge changes its width, the bottom edge its height, and the corner both (w, h, as a share
+// of its size as designed, the same as the panel's sliders)
+function renderPageTextHandles() {
+    const el = pageTextSelected;
+    if (!pageTextDraft || !el || !el.isConnected || pageTextIsPhoto(el)) { pageTextUi('page-text-handles', ''); return; }
+    if (!document.getElementById('page-text-handles')) {
+        pageTextUi('page-text-handles', `
+            <span class="pth pth-move" data-drag="move" title="Drag to move">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></svg>
+            </span>
+            <span class="pth pth-e" data-drag="w" title="Drag to change the width"></span>
+            <span class="pth pth-s" data-drag="h" title="Drag to change the height"></span>
+            <span class="pth pth-se" data-drag="wh" title="Drag to change the width and height"></span>`, 'page-text-handles');
+    }
+    placePageTextHandles();
+}
+
+function placePageTextHandles() {
+    const box = document.getElementById('page-text-handles');
+    if (!box || !pageTextSelected) return;
+    const r = pageTextSelected.getBoundingClientRect();
+    Object.assign(box.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+}
+
+document.addEventListener('pointerdown', ev => {
+    const handle = ev.target.closest('#page-text-handles [data-drag]');
+    const el = pageTextSelected;
+    if (!handle || !el) return;
+    ev.preventDefault();
+    const mode = handle.dataset.drag, e0 = pageTextEntry(), r = el.getBoundingClientRect();
+    // The size as designed, from the size now and the share it is of it
+    const baseW = r.width / ((e0.w || 100) / 100), baseH = r.height / ((e0.h || 100) / 100);
+    const sx = ev.clientX, sy = ev.clientY;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    handle.setPointerCapture(ev.pointerId);
+    document.body.classList.add('page-text-dragging');
+    const move = m => {
+        const dx = m.clientX - sx, dy = m.clientY - sy, f = {};
+        if (mode === 'move') { const at = pageTextShift(e0); f.x = Math.round(at.x + dx); f.y = Math.round(at.y + dy); }
+        if (mode === 'w' || mode === 'wh') f.w = clamp(Math.round((r.width + dx) / baseW * 100), 20, 400);
+        if (mode === 'h' || mode === 'wh') f.h = clamp(Math.round((r.height + dy) / baseH * 100), 20, 500);
+        setPageTextFields(f, true);
+    };
+    const up = () => {
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', up);
+        handle.removeEventListener('pointercancel', up);
+        document.body.classList.remove('page-text-dragging');
+        renderPageTextTools();
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+});
 
 // --- Page builder (2026-11-16): sections added to any page, the WordPress way ---
 // Staff with the page builder permission (staff.page_builder in supabase/schema.sql; Donna for now) get "Build this
@@ -3154,7 +3376,7 @@ function renderPromoEditor() {
             <div onfocusin="contentPreviewChanged({ section: 'promo', open: true })">
                 ${photoRow('rp-stage', 'Background behind the carts', 'promoStage', s.stage, 'promo:stage', 'choosePromoPhoto(\'stage\', this)', true)}
             </div>
-            <label class="flex items-center gap-2 text-sm"><input type="checkbox"${s.effects !== false ? ' checked' : ''} onchange="setPromoSetting('effects', this.checked)"> Show the falling snow, holly and sparkles</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox"${s.effects !== false ? ' checked' : ''} onchange="setPromoSetting('effects', this.checked)"> Show the falling glitter and sparkles</label>
             <ol class="admin-banners">${d.carts.map((c, i) => {
                 const choice = promoChoices(i);
                 return `
