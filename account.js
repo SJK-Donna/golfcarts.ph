@@ -69,7 +69,7 @@ async function loadAccount(user) {
     account.golfer = account.staff = null;
     if (user) {
         try {
-            account.staff = (await rows(sb.from('staff').select('email, role').eq('email', user.email.toLowerCase()).maybeSingle())) || null;
+            account.staff = (await rows(sb.from('staff').select('*').eq('email', user.email.toLowerCase()).maybeSingle())) || null;
             if (!account.staff) account.golfer = (await rows(sb.from('golfers').select('*').eq('id', user.id).maybeSingle())) || null;
         } catch (err) { console.warn('Account could not be loaded:', err); }
     }
@@ -655,6 +655,9 @@ function applyAdminEdits() {
         else stories.set(slug, { ...clone(row.value), slug });
     });
     BLOGS_DATA.splice(0, BLOGS_DATA.length, ...stories.values());
+    // Pages made with the page builder: 'custom-page:<slug>' holds { title, intro, menu, menuLabel } (app.js CUSTOM_PAGES)
+    CUSTOM_PAGES.splice(0, CUSTOM_PAGES.length, ...Object.entries(siteEdits).filter(([key]) => key.startsWith('custom-page:'))
+        .map(([key, row]) => ({ ...clone(row.value), slug: key.slice(12) })).filter(c => c.title));
 }
 
 function siteEditsReady() {
@@ -727,7 +730,14 @@ async function saveSiteEdit(key, value, message) {
 // text changes, the edit is skipped (and listed as out of date while editing). The banners, the Red Series and the
 // event story have their own editors and are left out, as are the forms, the stage's build cards, its color and its
 // specs (edited in the admin's Products). Text is set as plain text (never as HTML)
-const PAGE_TEXT_SKIP = '.home-banners, .home-promo, .home-stage-cards, .home-stage-shown, .home-stage-facts, [aria-labelledby="home-events-title"], form';
+const PAGE_TEXT_SKIP = '.home-banners, .home-promo, .home-stage-cards, .home-stage-swatches, .home-stage-shown > p, .home-stage-facts, [aria-labelledby="home-events-title"], form';
+// Also editable (2026-11-17), numbered after a section's other texts so earlier edits keep their keys: the range
+// photo's names and seats, and a form's send button (the rest of a form stays out)
+const PAGE_TEXT_EXTRA = '.lineup-name, .lineup-seats, form button[type="submit"]';
+const PAGE_TEXT_SKIP_EXTRA = PAGE_TEXT_SKIP.replace(', form', '');
+// Deleting (2026-11-17): a text or button, its container, or its whole section is hidden from visitors (shown
+// faded while editing, so it can be restored). The entry's `del`: 'self', 'box' or 'section'
+const PAGE_TEXT_DELETE = { self: 'This text', box: 'Its container', section: 'The whole section' };
 const PAGE_TEXT_OFF = ['admin', 'not-found'];
 const pageTextKey = () => currentPage === 'home' ? 'home-text' : `page-text:${currentPage}${currentSlug ? '/' + currentSlug : ''}`;
 let pageTextDraftKey = null; // the page the draft belongs to
@@ -744,8 +754,12 @@ function pageTextItems() {
     return pageTextDraft || pageTextSaved();
 }
 
+// The header's and footer's texts (2026-11-17) are the same on every page: their edits (keys starting "~") are saved
+// once, under 'site-text', and shown with each page's own
+const SITE_TEXT_KEY = 'site-text';
+const SITE_TEXT_ROOTS = [['header', '#main-header'], ['footer', '.site-footer']];
 function pageTextSaved() {
-    return ((siteEdits[pageTextKey()] || {}).value || {}).items || {};
+    return { ...(((siteEdits[SITE_TEXT_KEY] || {}).value || {}).items || {}), ...(((siteEdits[pageTextKey()] || {}).value || {}).items || {}) };
 }
 
 function canEditPageText() {
@@ -759,10 +773,26 @@ function pageTextTargets() {
     const out = [];
     root.querySelectorAll('section').forEach((section, s) => {
         if (section.matches(PAGE_TEXT_SKIP) || section.closest(PAGE_TEXT_SKIP)) return;
-        const name = section.id || section.getAttribute('aria-labelledby') || `section-${s}`;
+        // As first drawn: the page builder stamps the name before it moves any section (data-pb-name)
+        const name = section.dataset.pbName || section.id || section.getAttribute('aria-labelledby') || `section-${s}`;
         [...section.querySelectorAll(PAGE_TEXT_TAGS)]
             .filter(el => !el.closest(PAGE_TEXT_SKIP) && !el.querySelector(PAGE_TEXT_INNER) && (el.dataset.txtOrig || pageTextNorm(el.textContent)))
             .forEach((el, i) => out.push({ el, key: `${name}/${i}${el.dataset.txtScope ? '@' + el.dataset.txtScope : ''}` }));
+        [...section.querySelectorAll(PAGE_TEXT_EXTRA)]
+            .filter(el => !el.closest(PAGE_TEXT_SKIP_EXTRA) && !el.querySelector('img, svg, input, select, textarea') && pageTextNorm(el.dataset.txtOrig || el.textContent))
+            .forEach((el, i) => out.push({ el, key: `${name}/x${i}` }));
+    });
+    // Text and buttons on the page outside any section (a model page's section bar), after the sections'
+    [...root.querySelectorAll(PAGE_TEXT_TAGS)]
+        .filter(el => !el.closest('section') && !el.closest('.page-text-ui, .pb-section') && !el.querySelector(PAGE_TEXT_INNER) && pageTextNorm(el.dataset.txtOrig || el.textContent))
+        .forEach((el, i) => out.push({ el, key: `page/${i}` }));
+    // The header and footer, site-wide: links and buttons with text only (not the icon buttons), and the footer's text
+    SITE_TEXT_ROOTS.forEach(([name, sel]) => {
+        const box = document.querySelector(sel);
+        if (!box) return;
+        [...box.querySelectorAll('a, button, h2, p')]
+            .filter(el => !el.querySelector('svg, img, ' + PAGE_TEXT_INNER) && pageTextNorm(el.dataset.txtOrig || el.textContent))
+            .forEach((el, i) => out.push({ el, key: `~${name}/${i}` }));
     });
     return out;
 }
@@ -788,11 +818,25 @@ function resetPageTextEl(el) {
     const keep = ['is-txt-selected', 'is-out'].filter(c => el.classList.contains(c));
     el.innerHTML = o.html;
     if (o.style == null) el.removeAttribute('style'); else el.setAttribute('style', o.style);
-    el.className = o.cls;
+    ['btn-primary', 'btn-outline'].forEach(c => el.classList.toggle(c, o.cls.split(/s+/).includes(c)));
     keep.forEach(c => el.classList.add(c));
     if (o.href == null) el.removeAttribute('href'); else el.setAttribute('href', o.href);
     if (o.route == null) el.removeAttribute('data-route'); else el.setAttribute('data-route', o.route);
     el.onclick = o.onclick;
+}
+
+// The link a text sits inside (a card), when the text isn't a link or button itself
+function pageTextCard(el) {
+    return el.matches('a, button') ? null : el.closest('a[href]');
+}
+const pageTextCards = new Map(); // card -> its original href, route and click handler
+
+// What "Its container" deletes: the card or list item the element is in, else its parent (never the whole section)
+function pageTextBox(el) {
+    const section = el.closest('section') || el.closest('#main-header, .site-footer, #app-viewport');
+    let box = el.closest('.lineup-item, li, article, figure') || el.closest('a[href]');
+    if (box === el || !box || !section || !section.contains(box)) box = el.parentElement;
+    return box && box !== section && section && section.contains(box) ? box : el;
 }
 
 function applyPageTextEl(el, e) {
@@ -814,7 +858,13 @@ function applyPageTextEl(el, e) {
         el.classList.add(e.style === 'green' ? 'btn-primary' : 'btn-outline');
     }
     const link = safePageLink(e.link);
-    if (link) {
+    const card = pageTextCard(el);
+    if (link && card) {
+        if (!pageTextCards.has(card)) pageTextCards.set(card, { href: card.getAttribute('href'), route: card.getAttribute('data-route'), onclick: card.onclick });
+        card.setAttribute('href', link);
+        card.removeAttribute('data-route');
+        card.onclick = ev => { if (pageTextDraft) return; ev.preventDefault(); followPageLink(link); };
+    } else if (link) {
         if (el.tagName === 'A') el.setAttribute('href', link);
         el.removeAttribute('data-route');
         el.onclick = ev => { ev.preventDefault(); followPageLink(link); };
@@ -827,12 +877,24 @@ function applyPageText() {
     if (pageTextDraft && pageTextDraftKey !== pageTextKey()) endPageTextEditing();
     if (PAGE_TEXT_OFF.includes(currentPage)) { endPageTextEditing(); renderPageTextButton(); return; }
     const items = pageTextItems();
+    // Cards' links and deleted parts go back as they were, then the edits are put on again
+    pageTextCards.forEach((o, card) => {
+        if (o.href == null) card.removeAttribute('href'); else card.setAttribute('href', o.href);
+        if (o.route == null) card.removeAttribute('data-route'); else card.setAttribute('data-route', o.route);
+        card.onclick = o.onclick;
+    });
+    pageTextCards.clear();
+    document.querySelectorAll('.pt-deleted').forEach(x => x.classList.remove('pt-deleted'));
+    const deleted = [];
     pageTextTargets().forEach(({ el, key }) => {
         if (!el.dataset.txtOrig) el.dataset.txtOrig = pageTextNorm(el.textContent);
         el.dataset.txtKey = key;
         const e = items[key];
-        applyPageTextEl(el, e && e.orig === el.dataset.txtOrig ? e : null);
+        const live = e && e.orig === el.dataset.txtOrig ? e : null;
+        applyPageTextEl(el, live);
+        if (live && live.del) deleted.push(live.del === 'section' ? el.closest('section') : live.del === 'box' ? pageTextBox(el) : el);
     });
+    deleted.forEach(x => x && x.classList.add('pt-deleted'));
     if (pageTextSelected && !pageTextSelected.isConnected) pageTextSelected = null;
     renderPageTextButton();
     renderPageTextBar();
@@ -873,9 +935,12 @@ function pageTextUi(id, html, cls) {
     return el;
 }
 
+// Edit this page (its text), and for the page builder, Build this page (its added sections); one at a time
 function renderPageTextButton() {
-    pageTextUi('page-text-start', canEditPageText() && !pageTextDraft
-        ? '<button type="button" onclick="startPageTextEditing()">Edit this page</button>' : '', 'page-text-start');
+    // Not in the page builder's phone preview, which shows the page as visitors will
+    const busy = pageTextDraft || pbDraft || PB_PREVIEW;
+    pageTextUi('page-text-start', busy ? '' : (canEditPageText() ? '<button type="button" onclick="startPageTextEditing()">Edit this page</button>' : '')
+        + (canBuildPages() ? '<button type="button" onclick="startPageBuilding()">Build this page</button>' : ''), 'page-text-start');
 }
 
 function renderPageTextBar() {
@@ -921,7 +986,12 @@ async function savePageText(button) {
     button.disabled = true;
     const items = pageTextDraft, key = pageTextDraftKey;
     endPageTextEditing();
-    const ok = await saveSiteEdit(key, Object.keys(items).length ? { items } : null, key === 'home-text' ? 'Homepage text saved.' : 'Page text saved.');
+    const own = Object.fromEntries(Object.entries(items).filter(([k]) => !k.startsWith('~')));
+    const site = Object.fromEntries(Object.entries(items).filter(([k]) => k.startsWith('~')));
+    const siteBefore = ((siteEdits[SITE_TEXT_KEY] || {}).value || {}).items || {};
+    let ok = true;
+    if (JSON.stringify(site) !== JSON.stringify(siteBefore)) ok = await saveSiteEdit(SITE_TEXT_KEY, Object.keys(site).length ? { items: site } : null, 'Header and footer saved.');
+    if (ok) ok = await saveSiteEdit(key, Object.keys(own).length ? { items: own } : null, key === 'home-text' ? 'Homepage text saved.' : 'Page text saved.');
     if (!ok) { pageTextDraft = items; pageTextDraftKey = key; document.body.classList.add('page-editing'); applyPageText(); }
 }
 
@@ -929,7 +999,7 @@ async function savePageText(button) {
 document.addEventListener('click', ev => {
     if (!pageTextDraft || ev.target.closest('.page-text-ui')) return;
     // A choice that changes the texts (the stage's build cards) still works, so each choice's texts can be edited
-    if (!ev.target.closest('#app-viewport') || ev.target.closest('[data-txt-pass]')) return;
+    if (!ev.target.closest('#app-viewport, #main-header, .site-footer') || ev.target.closest('[data-txt-pass]')) return;
     ev.preventDefault();
     ev.stopPropagation();
     const el = ev.target.closest('[data-txt-key]');
@@ -958,7 +1028,7 @@ function setPageText(field, value) {
     const e = { ...pageTextEntry(), [field]: value };
     if (field === 'x' || field === 'y' || field === 'size') e[field] = Number(value) || 0;
     if (e.text != null && pageTextNorm(e.text) === e.orig) delete e.text;
-    ['font', 'bold', 'align', 'link', 'style'].forEach(k => { if (!e[k]) delete e[k]; });
+    ['font', 'bold', 'align', 'link', 'style', 'del'].forEach(k => { if (!e[k]) delete e[k]; });
     if (e.size === 100 || e.size === 0) delete e.size;
     ['x', 'y'].forEach(k => { if (!e[k]) delete e[k]; });
     const key = el.dataset.txtKey;
@@ -967,6 +1037,13 @@ function setPageText(field, value) {
     renderPageTextBar();
     if (field !== 'text' && field !== 'link') renderPageTextTools();
     else placePageTextTools();
+}
+
+// Deletes the chosen text, its container or its section ('' restores it); the whole page's deletions are drawn again
+function setPageTextDelete(value) {
+    if (value === 'section' && !confirm('Delete this whole section from the page? You can restore it while editing.')) return;
+    setPageText('del', value);
+    applyPageText();
 }
 
 function nudgePageText(dx, dy) {
@@ -979,9 +1056,7 @@ function resetPageTextItem() {
     const el = pageTextSelected;
     if (!el) return;
     delete pageTextDraft[el.dataset.txtKey];
-    applyPageTextEl(el, null);
-    renderPageTextBar();
-    renderPageTextTools();
+    applyPageText();
 }
 
 function closePageTextTools() {
@@ -1015,7 +1090,12 @@ function renderPageTextTools() {
             <span class="page-text-label">${e.x || 0}, ${e.y || 0}</span></div>
         ${isButton ? `
             <label>Goes to<input type="text" value="${escapeHtml(e.link || '')}" placeholder="As designed (e.g. carts/, #home-quote, tel:+63277455089)" oninput="setPageText('link', this.value)"></label>
-            ${el.classList.contains('btn') ? `<label>Style${choice('style', [['', 'As designed'], ['green', 'Green'], ['outline', 'Outlined']])}</label>` : ''}` : ''}
+            ${el.classList.contains('btn') ? `<label>Style${choice('style', [['', 'As designed'], ['green', 'Green'], ['outline', 'Outlined']])}</label>` : ''}`
+        : pageTextCard(el) ? `<label>Card goes to<input type="text" value="${escapeHtml(e.link || '')}" placeholder="As designed (e.g. carts/, use/resort/)" oninput="setPageText('link', this.value)"></label>` : ''}
+        <div class="page-text-row page-text-delete"><span class="page-text-label">Delete</span>
+            ${e.del ? `<span class="page-text-label">${PAGE_TEXT_DELETE[e.del]} is deleted</span><button type="button" onclick="setPageTextDelete('')">Restore</button>`
+                : Object.entries(PAGE_TEXT_DELETE).filter(([v]) => v !== 'section' || el.closest('section')).map(([v, label]) => `<button type="button" onclick="setPageTextDelete('${v}')">${label}</button>`).join('')}</div>
+        ${el.dataset.txtKey.startsWith('~') ? '<p class="page-text-label">Header and footer changes show on every page.</p>' : ''}
         <div class="page-text-row page-text-end"><button type="button" onclick="resetPageTextItem()">Reset this</button><button type="button" onclick="closePageTextTools()">Done</button></div>`, 'page-text-tools');
     placePageTextTools();
 }
@@ -1033,6 +1113,781 @@ function placePageTextTools() {
     panel.style.top = `${top}px`;
 }
 window.addEventListener('scroll', () => { if (pageTextSelected) placePageTextTools(); }, { passive: true });
+
+// --- Page builder (2026-11-16): sections added to any page, the WordPress way ---
+// Staff with the page builder permission (staff.page_builder in supabase/schema.sql; Donna for now) get "Build this
+// page" beside "Edit this page". Phase 1: a "+ Add section" line between the page's sections inserts one of ten
+// ready-made sections, in the site's own type, colours and dark mode; the panel beside it fills it in, and its toolbar
+// moves, duplicates, hides or deletes it. Phase 2: the page's own sections move up and down and hide; Columns holds 2
+// or 3 columns of headings, text, photos and buttons; an added section drags onto any "+ Add section" line; and Phone
+// preview shows the draft at phone size. Phase 3: History lists the versions saved (each Save draft and Publish, kept
+// by the database in page_revisions) and loads one back into the editor; Pages makes a new page at p/<slug>/ (its
+// title and intro in 'custom-page:<slug>', optionally linked in the footer menu), changes its settings or deletes it.
+// Saved per page in site_edits under 'page-sections:<page>[/<slug>]' as { live: page, draft: page }, a page being
+// { sections, order, hidden }: visitors see live; Save draft keeps the work without showing it; Publish makes it live.
+//   sections: [{ id, type, after, hidden, data, look }]; after is the page's own section it follows, or '@top'; one
+//             whose section is gone goes to the end
+//   order:    the page's own sections by name, in the order chosen (any not listed keep their place)
+//   hidden:   the page's own sections hidden, by name
+// The page's own sections are named as the page text names them (its id, its aria-labelledby, or section-<n> by its
+// place as drawn), stamped on them (data-pb-name) before any moves, so the page text's keys never shift. The added
+// sections are <div>s, not <section>s, for the same reason. Text is set as text, never as HTML
+// Classes made from values, written out in full so the CSS build keeps them: pb-cards-1 pb-cards-2 pb-cards-3 pb-cards-4
+// pb-bg-paper pb-bg-stone pb-bg-band pb-space-s pb-space-m pb-space-l pb-gap-s pb-gap-m pb-gap-l pb-align-left
+// pb-align-center pb-cols-2 pb-cols-3
+const PB_PHOTOS = ['image/4.png', 'image/5.png', 'image/6.png', 'image/7.png'];
+const PB_TYPES = {
+    text: { label: 'Heading and text', hint: 'A headline with a paragraph or two',
+        data: () => ({ eyebrow: '', heading: 'A new heading', body: 'Write a few sentences here.', align: 'left' }) },
+    'image-text': { label: 'Image and text', hint: 'A photo beside a headline, text and a button',
+        data: () => ({ image: PB_PHOTOS[0], alt: '', heading: 'A photo and its story', body: 'Say what the photo shows and why it matters.', side: 'left', btnLabel: '', btnLink: '' }) },
+    columns: { label: 'Columns', hint: '2 or 3 columns, each with headings, text, photos and buttons',
+        data: () => ({ heading: '', count: '2', cols: ['First', 'Second', 'Third'].map(n => ({ blocks: [{ kind: 'heading', text: `${n} column` }, { kind: 'text', text: 'Some text for this column.' }] })) }) },
+    banner: { label: 'Banner', hint: 'A wide photo with a headline over it',
+        data: () => ({ image: 'image/Banners/golf.jpg', alt: '', heading: 'A headline over the photo', body: '', btnLabel: '', btnLink: '', height: 'm' }) },
+    cards: { label: 'Cards', hint: '2 to 4 cards, each with a photo, title, text and link',
+        data: () => ({ heading: 'Three things to know', cards: [1, 2, 3].map(n => ({ image: PB_PHOTOS[n], title: `Card ${n}`, text: 'A short description.', btnLabel: '', btnLink: '' })) }) },
+    gallery: { label: 'Photo gallery', hint: 'A grid of photos',
+        data: () => ({ heading: '', images: PB_PHOTOS.slice(0, 3).map(src => ({ src, alt: '' })) }) },
+    cta: { label: 'Call to action', hint: 'A headline and one or two buttons on a band', look: { bg: 'band' },
+        data: () => ({ heading: 'Ready to ride?', body: 'Tell us what you need and we\'ll send you a quotation.', btnLabel: 'Contact us', btnLink: 'contact/', btn2Label: '', btn2Link: '' }) },
+    faq: { label: 'Questions and answers', hint: 'Questions that open to show their answers',
+        data: () => ({ heading: 'Questions and answers', items: [{ q: 'A question customers ask?', a: 'Its answer.' }] }) },
+    quote: { label: 'Quote', hint: 'What a customer said, and who said it',
+        data: () => ({ quote: 'What a customer said about us.', name: 'Customer name', role: '' }) },
+    spacer: { label: 'Space or line', hint: 'Room between sections, with or without a line',
+        data: () => ({ size: 'm', line: 'yes' }) }
+};
+// What goes in a column, and a new one of each
+const PB_BLOCKS = {
+    heading: { label: 'Heading', make: () => ({ kind: 'heading', text: 'A heading' }) },
+    text: { label: 'Text', make: () => ({ kind: 'text', text: 'Some text.' }) },
+    image: { label: 'Photo', make: () => ({ kind: 'image', src: '', alt: '' }) },
+    button: { label: 'Button', make: () => ({ kind: 'button', label: 'Find out more', link: '', style: 'primary' }) }
+};
+// A new item in a section's list (the panel's "Add"), and how many a list may hold
+const PB_ITEMS = {
+    'data.cards': () => ({ image: '', title: 'New card', text: 'A short description.', btnLabel: '', btnLink: '' }),
+    'data.images': () => ({ src: '', alt: '' }),
+    'data.items': () => ({ q: 'A question?', a: 'Its answer.' })
+};
+const pbLimit = path => (path === 'data.cards' ? 4 : path === 'data.items' ? 20 : 12);
+
+// Phone preview: the page in a phone-sized frame named 'pb-preview' shows the draft handed over in sessionStorage
+const PB_PREVIEW = window.name === 'pb-preview';
+
+let pbDraft = null;     // while building: the page as edited so far ({ sections, order, hidden })
+let pbDraftKey = null;  // the page the draft belongs to
+let pbSelected = null;  // the added section open in the panel (its id)
+let pbAdding = null;    // where "+ Add section" was pressed: { anchor, index }
+let pbDragging = null;  // the added section being dragged (its id)
+let pbAnchorNames = []; // what the "+ Add section" lines point at, by number: '@top', the page's sections, '@end'
+let pbOwnNames = [];    // the page's own sections, by number, in the order shown
+
+const pageSectionsKey = () => `page-sections:${currentPage}${currentSlug ? '/' + currentSlug : ''}`;
+const pbEmpty = () => ({ sections: [], order: [], hidden: [] });
+
+function pbPage(v) {
+    if (!v || typeof v !== 'object') return null;
+    const list = x => (Array.isArray(x) ? x : []);
+    return { sections: list(v.sections), order: list(v.order), hidden: list(v.hidden) };
+}
+
+function pbSaved() {
+    if (PB_PREVIEW) {
+        try {
+            const preview = JSON.parse(sessionStorage.getItem('pb-preview') || 'null');
+            if (preview && preview.key === pageSectionsKey()) return { live: pbPage(preview.page) || pbEmpty(), draft: null };
+        } catch (err) { /* no preview: the published page */ }
+    }
+    const value = (siteEdits[pageSectionsKey()] || {}).value || {};
+    return { live: pbPage(value.live) || pbEmpty(), draft: pbPage(value.draft) };
+}
+
+function canBuildPages() {
+    const admin = currentAdmin();
+    return !PB_PREVIEW && !!(admin && admin.page_builder) && !PAGE_TEXT_OFF.includes(currentPage);
+}
+
+// ---- The sections as visitors see them ----
+const pbText = v => escapeHtml(String(v == null ? '' : v));
+// Paragraphs from blank lines, line breaks kept
+const pbParas = v => String(v || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => `<p>${pbText(p).replace(/\n/g, '<br>')}</p>`).join('');
+// A photo on the site (image/...) or uploaded (https://...)
+const pbSrc = v => (/^(https:\/\/|image\/)/i.test(String(v || '').trim()) ? String(v).trim() : '');
+
+// A photo not chosen yet shows as a grey box while building, and not at all to visitors
+let pbDrawingDraft = false;
+function pbImg(src, alt, cls = '') {
+    const url = pbSrc(src);
+    if (url) return `<img src="${escapeHtml(url)}" alt="${pbText(alt)}" loading="lazy" class="${cls}">`;
+    return pbDrawingDraft ? `<div class="pb-img-empty ${cls}">No photo yet</div>` : '';
+}
+
+function pbButton(label, link, kind) {
+    return String(label || '').trim() ? `<a href="${escapeHtml(safePageLink(link) || 'contact/')}" class="btn ${kind} pb-btn">${pbText(label)}</a>` : '';
+}
+
+function pbBlockHtml(k, second) {
+    if (k.kind === 'heading') return String(k.text || '').trim() ? `<h3 class="type-md">${pbText(k.text)}</h3>` : '';
+    if (k.kind === 'text') return `<div class="pb-body">${pbParas(k.text)}</div>`;
+    if (k.kind === 'image') return pbImg(k.src, k.alt, 'pb-col-img');
+    if (k.kind === 'button') return `<div>${pbButton(k.label, k.link, k.style === 'outline' ? second : 'btn-primary')}</div>`;
+    return '';
+}
+
+function pbSectionHtml(b, editing) {
+    pbDrawingDraft = editing;
+    const d = b.data || {}, look = { bg: 'paper', space: 'm', ...(b.look || {}) };
+    const second = look.bg === 'band' ? 'btn-on-dark' : 'btn-outline';
+    const wrap = inner => `<div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">${inner}</div>`;
+    const heading = (text, cls = 'type-lg') => (String(text || '').trim() ? `<h2 class="${cls}">${pbText(text)}</h2>` : '');
+    let inner = '';
+    if (b.type === 'text') {
+        inner = wrap(`<div class="pb-text pb-align-${d.align === 'center' ? 'center' : 'left'}">${d.eyebrow ? `<p class="pb-eyebrow">${pbText(d.eyebrow)}</p>` : ''}${heading(d.heading)}<div class="pb-body measure">${pbParas(d.body)}</div></div>`);
+    } else if (b.type === 'image-text') {
+        inner = wrap(`<div class="pb-split${d.side === 'right' ? ' pb-split-right' : ''}"><div class="pb-split-media">${pbImg(d.image, d.alt)}</div>
+            <div class="pb-split-text">${heading(d.heading)}<div class="pb-body">${pbParas(d.body)}</div>${pbButton(d.btnLabel, d.btnLink, 'btn-primary')}</div></div>`);
+    } else if (b.type === 'columns') {
+        const count = d.count === '3' ? 3 : 2;
+        inner = wrap(`${heading(d.heading, 'type-lg pb-head')}<div class="pb-cols pb-cols-${count}">${(d.cols || []).slice(0, count)
+            .map(c => `<div class="pb-col">${(c.blocks || []).map(k => pbBlockHtml(k, second)).join('')}</div>`).join('')}</div>`);
+    } else if (b.type === 'banner') {
+        inner = `<div class="pb-banner${d.height === 'l' ? ' pb-banner-l' : ''}">${pbImg(d.image, d.alt, 'pb-banner-img')}<div class="pb-banner-shade"></div>
+            ${wrap(`<div class="pb-banner-text">${heading(d.heading, 'type-xl')}${d.body ? `<div class="pb-body measure">${pbParas(d.body)}</div>` : ''}${pbButton(d.btnLabel, d.btnLink, 'btn-primary')}</div>`)}</div>`;
+    } else if (b.type === 'cards') {
+        const cards = (d.cards || []).slice(0, 4);
+        inner = wrap(`${heading(d.heading, 'type-lg pb-head')}<div class="pb-cards pb-cards-${cards.length}">${cards.map(c => `<article class="pb-card">
+            ${pbSrc(c.image) ? pbImg(c.image, c.title, 'pb-card-img') : ''}<h3 class="type-md">${pbText(c.title)}</h3><div class="pb-body">${pbParas(c.text)}</div>
+            ${String(c.btnLabel || '').trim() ? `<a href="${escapeHtml(safePageLink(c.btnLink) || 'contact/')}" class="link">${pbText(c.btnLabel)}</a>` : ''}</article>`).join('')}</div>`);
+    } else if (b.type === 'gallery') {
+        inner = wrap(`${heading(d.heading, 'type-lg pb-head')}<div class="pb-gallery">${(d.images || []).map(i => `<figure>${pbImg(i.src, i.alt)}</figure>`).join('')}</div>`);
+    } else if (b.type === 'cta') {
+        inner = wrap(`<div class="pb-cta">${heading(d.heading)}${d.body ? `<div class="pb-body measure">${pbParas(d.body)}</div>` : ''}
+            <div class="pb-actions">${pbButton(d.btnLabel, d.btnLink, 'btn-primary')}${pbButton(d.btn2Label, d.btn2Link, second)}</div></div>`);
+    } else if (b.type === 'faq') {
+        inner = wrap(`${heading(d.heading, 'type-lg pb-head')}<div class="pb-faq">${(d.items || []).map(i => `<details><summary>${pbText(i.q)}</summary><div class="pb-body">${pbParas(i.a)}</div></details>`).join('')}</div>`);
+    } else if (b.type === 'quote') {
+        inner = wrap(`<figure class="pb-quote"><blockquote class="type-md">“${pbText(d.quote)}”</blockquote><figcaption><b>${pbText(d.name)}</b>${d.role ? ` · ${pbText(d.role)}` : ''}</figcaption></figure>`);
+    } else if (b.type === 'spacer') {
+        inner = d.line === 'yes' ? wrap('<hr class="pb-rule">') : '';
+    }
+    const space = b.type === 'spacer' ? `pb-gap-${['s', 'm', 'l'].includes(d.size) ? d.size : 'm'}` : b.type === 'banner' ? '' : `pb-space-${['s', 'm', 'l'].includes(look.space) ? look.space : 'm'}`;
+    const bg = b.type === 'banner' || b.type === 'spacer' ? '' : ` pb-bg-${['paper', 'stone', 'band'].includes(look.bg) ? look.bg : 'paper'}`;
+    return `<div class="pb-section${bg} ${space}${b.hidden ? ' is-hidden' : ''}${editing && pbSelected === b.id ? ' is-selected' : ''}" data-pb-id="${escapeHtml(b.id)}">${editing ? pbToolbar(b) : ''}${inner}</div>`;
+}
+
+// The page's own sections (not those inside another), each stamped with its name and place as first drawn
+function pbOwn(root) {
+    const all = [...root.querySelectorAll('section')];
+    all.forEach((section, s) => {
+        if (!section.dataset.pbName) section.dataset.pbName = section.id || section.getAttribute('aria-labelledby') || `section-${s}`;
+    });
+    const own = all.filter(section => !(section.parentElement && section.parentElement.closest('section')));
+    own.forEach((section, i) => { if (section.dataset.pbPlace == null) section.dataset.pbPlace = String(i); });
+    return own.map(el => ({ name: el.dataset.pbName, el }));
+}
+
+// The order chosen, with any section it doesn't list kept after the one it followed as first drawn
+function pbOrder(base, order) {
+    const out = order.filter((name, i) => base.includes(name) && order.indexOf(name) === i);
+    base.forEach((name, i) => {
+        if (out.includes(name)) return;
+        const before = i ? out.indexOf(base[i - 1]) : -1;
+        out.splice(before + 1, 0, name);
+    });
+    return out;
+}
+
+// After each draw of a page (renderApp): the published page (or, while building, the draft with its controls)
+function applyPageSections() {
+    if (pbDraft && pbDraftKey !== pageSectionsKey()) endPageBuilding();
+    const root = document.getElementById('app-viewport');
+    if (!root) return;
+    root.querySelectorAll('.pb-section, .pb-insert, .pb-own-bar').forEach(el => el.remove());
+    root.querySelectorAll('.pb-own, [data-pb-off]').forEach(el => {
+        el.classList.remove('pb-own', 'pb-own-hidden');
+        if (el.dataset.pbOff != null) { el.style.display = ''; delete el.dataset.pbOff; }
+    });
+    if (PAGE_TEXT_OFF.includes(currentPage)) { renderPbBar(); return; }
+    const editing = !!pbDraft;
+    const page = editing ? pbDraft : pbSaved().live;
+
+    // The page's own sections in the order chosen: each moves into the place of the one shown there
+    const own = pbOwn(root);
+    const base = own.slice().sort((a, b) => a.el.dataset.pbPlace - b.el.dataset.pbPlace).map(a => a.name);
+    const order = pbOrder(base, page.order);
+    const byName = new Map(own.map(a => [a.name, a.el]));
+    const marks = own.map(a => { const m = document.createComment(''); a.el.before(m); return m; });
+    order.forEach((name, i) => marks[i].after(byName.get(name)));
+    marks.forEach(m => m.remove());
+    pbOwnNames = order;
+    order.forEach(name => {
+        const el = byName.get(name);
+        if (!page.hidden.includes(name)) return;
+        if (editing) el.classList.add('pb-own-hidden');
+        else { el.dataset.pbOff = ''; el.style.display = 'none'; }
+    });
+
+    // The added sections, each after the section it follows
+    pbAnchorNames = ['@top', ...order, '@end'];
+    const groups = {};
+    page.sections.forEach((b, i) => {
+        const anchor = b.after === '@top' || byName.has(b.after) ? b.after : '@end';
+        (groups[anchor] = groups[anchor] || []).push({ b, i });
+    });
+    const inserter = (anchor, index) => (editing ? `<div class="pb-insert page-text-ui" ondragover="pbDragOver(event)" ondragleave="this.classList.remove('is-over')" ondrop="pbDrop(event, ${pbAnchorNames.indexOf(anchor)}, ${index})">
+        <button type="button" onclick="pbOpenAdd(${pbAnchorNames.indexOf(anchor)}, ${index})">${pbDragging ? 'Drop here' : '+ Add section'}</button></div>` : '');
+    const html = anchor => {
+        const items = groups[anchor] || [];
+        return inserter(anchor, items.length ? items[0].i : page.sections.length)
+            + items.filter(({ b }) => editing || !b.hidden).map(({ b, i }) => pbSectionHtml(b, editing) + (editing ? inserter(anchor, i + 1) : '')).join('');
+    };
+    root.insertAdjacentHTML('afterbegin', html('@top'));
+    order.forEach((name, i) => {
+        const el = byName.get(name);
+        el.insertAdjacentHTML('afterend', html(name));
+        if (!editing) return;
+        el.classList.add('pb-own');
+        const hidden = page.hidden.includes(name);
+        el.insertAdjacentHTML('beforebegin', `<div class="pb-own-bar page-text-ui"><div class="pb-toolbar"><b>Page section${hidden ? ' · hidden' : ''}</b>
+            <button type="button" onclick="pbOwnMove(${i}, -1)" aria-label="Move up" title="Move up"${i ? '' : ' disabled'}>↑</button>
+            <button type="button" onclick="pbOwnMove(${i}, 1)" aria-label="Move down" title="Move down"${i < order.length - 1 ? '' : ' disabled'}>↓</button>
+            <button type="button" onclick="pbOwnHide(${i})">${hidden ? 'Show' : 'Hide'}</button></div></div>`);
+    });
+    if (groups['@end']) root.insertAdjacentHTML('beforeend', groups['@end'].filter(({ b }) => editing || !b.hidden).map(({ b }) => pbSectionHtml(b, editing)).join(''));
+    if (pbSelected && !(pbDraft ? pbDraft.sections : []).some(b => b.id === pbSelected)) pbSelected = null;
+    renderPbBar();
+    renderPbPanel();
+}
+
+// ---- Building ----
+function pbToolbar(b) {
+    const t = PB_TYPES[b.type] || { label: 'Section' };
+    const id = escapeHtml(b.id);
+    return `<div class="pb-toolbar page-text-ui"><b>${t.label}${b.hidden ? ' · hidden' : ''}</b>
+        <button type="button" draggable="true" ondragstart="pbDragStart(event, '${id}')" ondragend="pbDragEnd()" title="Drag onto a + Add section line" class="pb-drag">⠿ Drag</button>
+        <button type="button" onclick="pbMove('${id}', -1)" aria-label="Move up" title="Move up">↑</button>
+        <button type="button" onclick="pbMove('${id}', 1)" aria-label="Move down" title="Move down">↓</button>
+        <button type="button" onclick="pbSelect('${id}')">Edit</button>
+        <button type="button" onclick="pbDuplicate('${id}')">Duplicate</button>
+        <button type="button" onclick="pbToggleHidden('${id}')">${b.hidden ? 'Show' : 'Hide'}</button>
+        <button type="button" onclick="pbDelete('${id}')">Delete</button></div>`;
+}
+
+function startPageBuilding() {
+    if (pageTextDraft || !canBuildPages()) return;
+    const saved = pbSaved();
+    pbDraft = clone(saved.draft || saved.live);
+    pbDraftKey = pageSectionsKey();
+    pbSelected = null;
+    document.body.classList.add('page-building');
+    applyPageSections();
+    renderPageTextButton();
+    if (saved.draft) showToast('Continuing the draft saved for this page.');
+}
+
+function endPageBuilding() {
+    pbDraft = null;
+    pbDraftKey = null;
+    pbSelected = null;
+    pbAdding = null;
+    pbDragging = null;
+    document.body.classList.remove('page-building', 'pb-dragging');
+    ['pb-bar', 'pb-panel', 'pb-picker', 'pb-preview', 'pb-pages', 'pb-history'].forEach(id => pageTextUi(id, ''));
+}
+
+const pbSame = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+function pbChanged() {
+    const saved = pbSaved();
+    return !pbSame(pbDraft, saved.draft || saved.live);
+}
+
+function renderPbBar() {
+    if (!pbDraft) { pageTextUi('pb-bar', ''); return; }
+    const unpublished = !pbSame(pbDraft, pbSaved().live);
+    const changed = pbChanged();
+    const n = pbDraft.sections.length;
+    const moved = pbDraft.order.length || pbDraft.hidden.length ? ' · sections rearranged' : '';
+    pageTextUi('pb-bar', `
+        <span>Building: ${n} added section${n === 1 ? '' : 's'}${moved}${unpublished ? ' · not published' : ' · published'}</span>
+        <button type="button" onclick="pbOpenPages()" class="page-text-quiet">Pages</button>
+        <button type="button" onclick="pbOpenHistory()" class="page-text-quiet">History</button>
+        <button type="button" onclick="pbPhonePreview()" class="page-text-quiet">Phone preview</button>
+        <button type="button" onclick="closePageBuilding()" class="page-text-quiet">${changed ? 'Discard' : 'Close'}</button>
+        <button type="button" onclick="savePageSections(false, this)" class="page-text-quiet"${changed ? '' : ' disabled'}>Save draft</button>
+        <button type="button" onclick="savePageSections(true, this)" class="page-text-save"${unpublished ? '' : ' disabled'}>Publish</button>`, 'page-text-bar pb-bar');
+}
+
+function closePageBuilding() {
+    if (pbChanged() && !confirm('Discard the changes since your last save?')) return;
+    endPageBuilding();
+    applyPageSections();
+    renderPageTextButton();
+}
+
+// Save draft: kept, but visitors still see what's published. Publish: the draft becomes what visitors see
+async function savePageSections(publish, button) {
+    if (!pbDraft) return;
+    button.disabled = true;
+    const saved = pbSaved(), page = clone(pbDraft), key = pbDraftKey;
+    const empty = pbSame(page, pbEmpty());
+    const value = publish ? (empty ? null : { live: page }) : { live: saved.live, draft: page };
+    const ok = await saveSiteEdit(key, value, publish ? 'Published: visitors now see this page as built.' : 'Draft saved. Visitors still see the published page.');
+    if (!ok) button.disabled = false;
+}
+
+// The draft at phone size: the page in a 390px frame, handed the draft through sessionStorage
+function pbPhonePreview() {
+    try { sessionStorage.setItem('pb-preview', JSON.stringify({ key: pbDraftKey, page: pbDraft })); } catch (err) { showToast('The preview could not open in this browser.'); return; }
+    pageTextUi('pb-preview', `<div class="pb-preview-box" role="dialog" aria-label="Phone preview">
+        <div class="page-text-head"><b>Phone preview of your draft</b><button type="button" onclick="pbClosePreview()" aria-label="Close">✕</button></div>
+        <iframe name="pb-preview" src="${escapeHtml(location.href)}" title="This page at phone size, with your draft"></iframe></div>`, 'pb-picker pb-preview');
+}
+
+function pbClosePreview() {
+    pageTextUi('pb-preview', '');
+    try { sessionStorage.removeItem('pb-preview'); } catch (err) { /* nothing to clear */ }
+}
+
+function pbFind(id) {
+    return pbDraft ? pbDraft.sections.find(b => b.id === id) : null;
+}
+
+function pbRedraw(scrollTo) {
+    applyPageSections();
+    const el = scrollTo && document.querySelector(`[data-pb-id="${CSS.escape(scrollTo)}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function pbSelect(id) {
+    pbSelected = id || null;
+    pbRedraw();
+}
+
+function pbOpenAdd(anchorIndex, index) {
+    pbAdding = { anchor: pbAnchorNames[anchorIndex] || '@end', index };
+    pageTextUi('pb-picker', `<div class="pb-picker-box" role="dialog" aria-label="Add a section">
+        <div class="page-text-head"><b>Add a section</b><button type="button" onclick="pbCloseAdd()" aria-label="Close">✕</button></div>
+        <div class="pb-picker-grid">${Object.entries(PB_TYPES).map(([type, t]) => `<button type="button" onclick="pbAdd('${type}')"><b>${t.label}</b><span>${t.hint}</span></button>`).join('')}</div></div>`, 'pb-picker');
+}
+
+function pbCloseAdd() {
+    pbAdding = null;
+    pageTextUi('pb-picker', '');
+}
+
+function pbNewId() {
+    return `pb${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+function pbAdd(type) {
+    const t = PB_TYPES[type];
+    if (!t || !pbDraft || !pbAdding) return;
+    const b = { id: pbNewId(), type, after: pbAdding.anchor, data: t.data(), look: { bg: 'paper', space: 'm', ...(t.look || {}) } };
+    pbDraft.sections.splice(Math.min(pbAdding.index, pbDraft.sections.length), 0, b);
+    pbCloseAdd();
+    pbSelected = b.id;
+    pbRedraw(b.id);
+}
+
+// An added section up or down past the next section, the page's own included: the order is read as one list of the
+// page's sections (markers) and the added ones, the two neighbours swap, and each added one follows the marker before it
+function pbMove(id, dir) {
+    const known = new Set(['@top', ...pbOwnNames]);
+    const tokens = [];
+    ['@top', ...pbOwnNames].forEach(name => { tokens.push({ anchor: name }); pbDraft.sections.filter(b => b.after === name).forEach(b => tokens.push({ b })); });
+    pbDraft.sections.filter(b => !known.has(b.after)).forEach(b => tokens.push({ b }));
+    const i = tokens.findIndex(t => t.b && t.b.id === id), j = i + dir;
+    if (i < 0 || j < 1 || j >= tokens.length) return;
+    [tokens[i], tokens[j]] = [tokens[j], tokens[i]];
+    let anchor = '@top';
+    const out = [];
+    tokens.forEach(t => { if (t.anchor) anchor = t.anchor; else { t.b.after = anchor; out.push(t.b); } });
+    pbDraft.sections = out;
+    pbSelected = id;
+    pbRedraw(id);
+}
+
+// Dragging an added section onto a "+ Add section" line puts it there
+function pbDragStart(ev, id) {
+    pbDragging = id;
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', id);
+    document.body.classList.add('pb-dragging');
+    document.querySelectorAll('.pb-insert button').forEach(b => { b.textContent = 'Drop here'; });
+}
+
+function pbDragOver(ev) {
+    if (!pbDragging) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    ev.currentTarget.classList.add('is-over');
+}
+
+function pbDragEnd() {
+    if (!pbDragging) return;
+    pbDragging = null;
+    document.body.classList.remove('pb-dragging');
+    document.querySelectorAll('.pb-insert').forEach(el => el.classList.remove('is-over'));
+    document.querySelectorAll('.pb-insert button').forEach(b => { b.textContent = '+ Add section'; });
+}
+
+function pbDrop(ev, anchorIndex, index) {
+    ev.preventDefault();
+    const id = pbDragging;
+    pbDragEnd();
+    const from = pbDraft.sections.findIndex(b => b.id === id);
+    if (from < 0) return;
+    const [b] = pbDraft.sections.splice(from, 1);
+    b.after = pbAnchorNames[anchorIndex] || '@end';
+    pbDraft.sections.splice(Math.min(from < index ? index - 1 : index, pbDraft.sections.length), 0, b);
+    pbSelected = id;
+    pbRedraw(id);
+}
+
+// The page's own sections: up or down one place (the sections added after one move with it), and hide or show
+function pbOwnMove(i, dir) {
+    const order = pbOwnNames.slice(), j = i + dir;
+    if (j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    pbDraft.order = order;
+    pbRedraw();
+    const el = document.querySelector(`[data-pb-name="${CSS.escape(order[j])}"]`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function pbOwnHide(i) {
+    const name = pbOwnNames[i];
+    pbDraft.hidden = pbDraft.hidden.includes(name) ? pbDraft.hidden.filter(n => n !== name) : [...pbDraft.hidden, name];
+    pbRedraw();
+}
+
+function pbDuplicate(id) {
+    const i = pbDraft.sections.findIndex(b => b.id === id);
+    if (i < 0) return;
+    const copy = { ...clone(pbDraft.sections[i]), id: pbNewId() };
+    pbDraft.sections.splice(i + 1, 0, copy);
+    pbSelected = copy.id;
+    pbRedraw(copy.id);
+}
+
+function pbToggleHidden(id) {
+    const b = pbFind(id);
+    if (!b) return;
+    if (b.hidden) delete b.hidden; else b.hidden = true;
+    pbRedraw();
+}
+
+function pbDelete(id) {
+    if (!confirm('Delete this section?')) return;
+    pbDraft.sections = pbDraft.sections.filter(b => b.id !== id);
+    if (pbSelected === id) pbSelected = null;
+    pbRedraw();
+}
+
+// ---- The panel: the chosen section's content and look ----
+function pbGet(obj, path) {
+    return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+
+// One change from the panel. Typing redraws only that section, so the field keeps its focus; a choice also redraws the panel
+function pbSet(path, value, panel) {
+    const b = pbFind(pbSelected);
+    if (!b) return;
+    const keys = path.split('.');
+    let o = b;
+    keys.slice(0, -1).forEach(k => { if (o[k] == null) o[k] = {}; o = o[k]; });
+    o[keys[keys.length - 1]] = value;
+    const el = document.querySelector(`[data-pb-id="${CSS.escape(b.id)}"]`);
+    if (el) el.outerHTML = pbSectionHtml(b, true);
+    renderPbBar();
+    if (panel) renderPbPanel();
+}
+
+function pbListAdd(path, kind) {
+    const b = pbFind(pbSelected), list = b && pbGet(b, path);
+    if (!Array.isArray(list) || list.length >= pbLimit(path)) return;
+    list.push(kind ? PB_BLOCKS[kind].make() : PB_ITEMS[path]());
+    pbRedraw();
+}
+
+function pbListRemove(path, i) {
+    const b = pbFind(pbSelected), list = b && pbGet(b, path);
+    if (!Array.isArray(list)) return;
+    list.splice(i, 1);
+    pbRedraw();
+}
+
+function pbListMove(path, i, dir) {
+    const b = pbFind(pbSelected), list = b && pbGet(b, path), j = i + dir;
+    if (!Array.isArray(list) || j < 0 || j >= list.length) return;
+    [list[i], list[j]] = [list[j], list[i]];
+    pbRedraw();
+}
+
+async function pbUpload(path, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const id = pbSelected;
+    showToast('Uploading the photo…');
+    try {
+        const url = await uploadSitePhoto(file, 'page-sections');
+        pbSelected = id;
+        pbSet(path, url, true);
+        showToast('Photo added.');
+    } catch (err) {
+        showToast(`Photo not added: ${err.message}`);
+    }
+}
+
+const pbAttr = v => escapeHtml(String(v == null ? '' : v));
+
+function pbInput(label, path, value, { area = false, placeholder = '' } = {}) {
+    const field = area
+        ? `<textarea rows="3" oninput="pbSet('${path}', this.value)">${pbAttr(value)}</textarea>`
+        : `<input type="text" value="${pbAttr(value)}" placeholder="${pbAttr(placeholder)}" oninput="pbSet('${path}', this.value)">`;
+    return `<label>${label}${field}</label>`;
+}
+
+function pbChoice(label, path, value, options) {
+    return `<label>${label}<select onchange="pbSet('${path}', this.value, true)">${options.map(([v, text]) => `<option value="${v}"${value === v ? ' selected' : ''}>${text}</option>`).join('')}</select></label>`;
+}
+
+function pbPhoto(label, path, value) {
+    const url = pbSrc(value);
+    return `<div class="pb-photo-field"><span class="page-text-label">${label}</span>${url ? `<img src="${escapeHtml(url)}" alt="">` : ''}
+        <label class="pb-upload">Upload a photo<input type="file" accept="image/jpeg,image/png,image/webp" onchange="pbUpload('${path}', this)"></label>
+        <input type="text" value="${pbAttr(value)}" placeholder="or a photo address (image/… or https://…)" onchange="pbSet('${path}', this.value, true)"></div>`;
+}
+
+const PB_LINK_HINT = 'e.g. carts/, contact/, #home-quote, https://…';
+
+function pbButtonFields(d, prefix, label = 'Button') {
+    return pbInput(`${label} text (empty: no button)`, `data.${prefix}Label`, d[`${prefix}Label`])
+        + pbInput(`${label} goes to`, `data.${prefix}Link`, d[`${prefix}Link`], { placeholder: PB_LINK_HINT });
+}
+
+// A column's contents: each piece with its own fields, moved, removed, and new ones added
+function pbColumnFields(col, path) {
+    const blocks = col.blocks || [];
+    const list = `${path}.blocks`;
+    return blocks.map((k, i) => {
+        const p = `${list}.${i}`;
+        const fields = k.kind === 'heading' ? pbInput('Heading', `${p}.text`, k.text)
+            : k.kind === 'text' ? pbInput('Text', `${p}.text`, k.text, { area: true })
+                : k.kind === 'image' ? pbPhoto('Photo', `${p}.src`, k.src) + pbInput('Description', `${p}.alt`, k.alt)
+                    : pbInput('Button text', `${p}.label`, k.label) + pbInput('Goes to', `${p}.link`, k.link, { placeholder: PB_LINK_HINT })
+                        + pbChoice('Style', `${p}.style`, k.style, [['primary', 'Green'], ['outline', 'Outlined']]);
+        return `<div class="pb-piece"><div class="page-text-row"><span class="page-text-label">${(PB_BLOCKS[k.kind] || { label: 'Piece' }).label}</span>
+            <button type="button" onclick="pbListMove('${list}', ${i}, -1)" aria-label="Move up"${i ? '' : ' disabled'}>↑</button>
+            <button type="button" onclick="pbListMove('${list}', ${i}, 1)" aria-label="Move down"${i < blocks.length - 1 ? '' : ' disabled'}>↓</button>
+            <button type="button" onclick="pbListRemove('${list}', ${i})" aria-label="Remove">✕</button></div>${fields}</div>`;
+    }).join('') + (blocks.length < pbLimit(list) ? `<div class="page-text-row"><span class="page-text-label">Add</span>${Object.entries(PB_BLOCKS)
+        .map(([kind, t]) => `<button type="button" onclick="pbListAdd('${list}', '${kind}')">${t.label}</button>`).join('')}</div>` : '');
+}
+
+function renderPbPanel() {
+    const b = pbDraft && pbFind(pbSelected);
+    if (!b) { pageTextUi('pb-panel', ''); return; }
+    pageTextUi('pb-pages', '');
+    pageTextUi('pb-history', '');
+    const d = b.data || {}, t = PB_TYPES[b.type] || { label: 'Section' }, look = { bg: 'paper', space: 'm', ...(b.look || {}) };
+    const list = (path, items, legend, fields, addLabel) => items.map((item, i) => `<fieldset><legend>${legend} ${i + 1}</legend>${fields(item, `${path}.${i}`)}
+            ${items.length > 1 ? `<button type="button" onclick="pbListRemove('${path}', ${i})">Remove</button>` : ''}</fieldset>`).join('')
+        + (items.length < pbLimit(path) ? `<button type="button" onclick="pbListAdd('${path}')">${addLabel}</button>` : '');
+    let fields = '';
+    if (b.type === 'text') {
+        fields = pbInput('Small label above (optional)', 'data.eyebrow', d.eyebrow) + pbInput('Heading', 'data.heading', d.heading)
+            + pbInput('Text (a blank line starts a new paragraph)', 'data.body', d.body, { area: true })
+            + pbChoice('Alignment', 'data.align', d.align, [['left', 'Left'], ['center', 'Centred']]);
+    } else if (b.type === 'image-text') {
+        fields = pbPhoto('Photo', 'data.image', d.image) + pbInput('Photo description (for screen readers)', 'data.alt', d.alt)
+            + pbChoice('Photo side', 'data.side', d.side, [['left', 'Photo on the left'], ['right', 'Photo on the right']])
+            + pbInput('Heading', 'data.heading', d.heading) + pbInput('Text', 'data.body', d.body, { area: true }) + pbButtonFields(d, 'btn');
+    } else if (b.type === 'columns') {
+        const count = d.count === '3' ? 3 : 2;
+        fields = pbInput('Heading (optional)', 'data.heading', d.heading) + pbChoice('Columns', 'data.count', String(count), [['2', '2 columns'], ['3', '3 columns']])
+            + (d.cols || []).slice(0, count).map((c, i) => `<fieldset><legend>Column ${i + 1}</legend>${pbColumnFields(c, `data.cols.${i}`)}</fieldset>`).join('');
+    } else if (b.type === 'banner') {
+        fields = pbPhoto('Photo', 'data.image', d.image) + pbInput('Photo description (for screen readers)', 'data.alt', d.alt)
+            + pbChoice('Height', 'data.height', d.height, [['m', 'Medium'], ['l', 'Tall']])
+            + pbInput('Headline', 'data.heading', d.heading) + pbInput('Text (optional)', 'data.body', d.body, { area: true }) + pbButtonFields(d, 'btn');
+    } else if (b.type === 'cards') {
+        fields = pbInput('Heading (optional)', 'data.heading', d.heading)
+            + list('data.cards', d.cards || [], 'Card', (c, p) => pbPhoto('Photo (optional)', `${p}.image`, c.image) + pbInput('Title', `${p}.title`, c.title)
+                + pbInput('Text', `${p}.text`, c.text, { area: true }) + pbInput('Link text (optional)', `${p}.btnLabel`, c.btnLabel)
+                + pbInput('Link goes to', `${p}.btnLink`, c.btnLink, { placeholder: PB_LINK_HINT }), 'Add a card');
+    } else if (b.type === 'gallery') {
+        fields = pbInput('Heading (optional)', 'data.heading', d.heading)
+            + list('data.images', d.images || [], 'Photo', (i, p) => pbPhoto('Photo', `${p}.src`, i.src) + pbInput('Description', `${p}.alt`, i.alt), 'Add a photo');
+    } else if (b.type === 'cta') {
+        fields = pbInput('Heading', 'data.heading', d.heading) + pbInput('Text (optional)', 'data.body', d.body, { area: true })
+            + pbButtonFields(d, 'btn', 'Main button') + pbButtonFields(d, 'btn2', 'Second button');
+    } else if (b.type === 'faq') {
+        fields = pbInput('Heading (optional)', 'data.heading', d.heading)
+            + list('data.items', d.items || [], 'Question', (q, p) => pbInput('Question', `${p}.q`, q.q) + pbInput('Answer', `${p}.a`, q.a, { area: true }), 'Add a question');
+    } else if (b.type === 'quote') {
+        fields = pbInput('What they said', 'data.quote', d.quote, { area: true }) + pbInput('Name', 'data.name', d.name) + pbInput('Role or place (optional)', 'data.role', d.role);
+    } else if (b.type === 'spacer') {
+        fields = pbChoice('Space', 'data.size', d.size, [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']])
+            + pbChoice('Line', 'data.line', d.line, [['yes', 'With a line'], ['no', 'Space only']]);
+    }
+    const lookFields = b.type === 'banner' || b.type === 'spacer' ? '' : `<fieldset><legend>Look</legend>
+        ${pbChoice('Background', 'look.bg', look.bg, [['paper', 'Page'], ['stone', 'Stone band'], ['band', 'Dark band']])}
+        ${pbChoice('Space above and below', 'look.space', look.space, [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']])}</fieldset>`;
+    const scroll = (document.getElementById('pb-panel') || {}).scrollTop || 0;
+    const panel = pageTextUi('pb-panel', `
+        <div class="page-text-head"><b>${t.label}</b><button type="button" onclick="pbSelect(null)" aria-label="Close">✕</button></div>
+        ${fields}${lookFields}
+        <div class="page-text-row page-text-end"><button type="button" onclick="pbSelect(null)">Done</button></div>`, 'pb-panel');
+    if (panel) { panel.setAttribute('aria-label', `${t.label} settings`); panel.scrollTop = scroll; }
+}
+
+// ---- Phase 3: History (the versions saved) and Pages (pages made here) ----
+let pbRevisions = []; // the versions listed in History, newest first
+
+// One side panel at a time: a section's settings, Pages or History
+function pbSidePanel(id, html) {
+    if (pbSelected) { pbSelected = null; applyPageSections(); }
+    ['pb-pages', 'pb-history'].filter(x => x !== id).forEach(x => pageTextUi(x, ''));
+    return pageTextUi(id, html, 'pb-panel');
+}
+
+const pbPanelHead = (title, id) => `<div class="page-text-head"><b>${title}</b><button type="button" onclick="pageTextUi('${id}', '')" aria-label="Close">✕</button></div>`;
+
+// The page a saved version holds: its draft when it was a Save draft, else what was published (nothing when cleared)
+function pbRevisionPage(r) {
+    const v = r.value || {};
+    return pbPage(v.draft) || pbPage(v.live) || pbEmpty();
+}
+
+async function pbOpenHistory() {
+    if (!pbDraft) return;
+    pbSidePanel('pb-history', `${pbPanelHead('History', 'pb-history')}<p class="page-text-label">Loading…</p>`);
+    const key = pbDraftKey;
+    const { data, error } = await sb.from('page_revisions').select('id, value, saved_by, saved_at').eq('key', key).order('id', { ascending: false }).limit(30);
+    if (!pbDraft || pbDraftKey !== key || !document.getElementById('pb-history')) return;
+    pbRevisions = data || [];
+    const when = at => new Date(at).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+    const list = error
+        ? `<p>History isn't available yet: ${/does not exist|schema cache|relation/i.test(error.message) ? 're-run supabase/schema.sql in Supabase' : escapeHtml(error.message)}.</p>`
+        : !pbRevisions.length ? '<p class="page-text-label">No versions yet. Each Save draft and Publish keeps one.</p>'
+            : pbRevisions.map((r, i) => {
+                const kind = !r.value ? 'Page cleared' : r.value.draft ? 'Draft saved' : 'Published';
+                const n = pbRevisionPage(r).sections.length;
+                return `<div class="pb-page-row"><div><b>${kind}</b><span>${when(r.saved_at)} · ${escapeHtml(adminName(r.saved_by) || 'unknown')} · ${n} added section${n === 1 ? '' : 's'}</span></div>
+                    <button type="button" onclick="pbRestore(${i})">Load</button></div>`;
+            }).join('');
+    pageTextUi('pb-history', `${pbPanelHead('History', 'pb-history')}
+        <p class="page-text-label">Load an earlier version into the editor, then Save draft or Publish to keep it. Newest first; the last 30 are kept.</p>${list}`, 'pb-panel');
+}
+
+function pbRestore(i) {
+    const r = pbRevisions[i];
+    if (!r || !pbDraft) return;
+    if (pbChanged() && !confirm('Replace your unsaved changes with this version?')) return;
+    pbDraft = clone(pbRevisionPage(r));
+    pbSelected = null;
+    pageTextUi('pb-history', '');
+    pbRedraw();
+    showToast('Earlier version loaded. Save draft or Publish to keep it.');
+}
+
+// A page's address from its title: lower case, words joined by dashes
+function pbSlug(title) {
+    return String(title || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60).replace(/-+$/, '');
+}
+
+function pbOpenPages() {
+    if (!pbDraft) return;
+    const current = currentPage === 'custom' ? CUSTOM_PAGES.find(c => c.slug === currentSlug) : null;
+    const pages = CUSTOM_PAGES.slice().sort((a, b) => String(a.title).localeCompare(String(b.title)));
+    pbSidePanel('pb-pages', `${pbPanelHead('Pages', 'pb-pages')}
+        <fieldset><legend>New page</legend>
+            <label>Title<input id="pb-new-title" type="text" placeholder="e.g. Golf course partners" oninput="document.getElementById('pb-new-address').textContent = 'p/' + (pbSlug(this.value) || '…') + '/'"></label>
+            <span class="page-text-label">Address: golfcarts.ph/<span id="pb-new-address">p/…/</span></span>
+            <button type="button" onclick="pbCreatePage(this)">Create the page</button>
+        </fieldset>
+        ${current ? `<fieldset><legend>This page</legend>
+            <label>Title<input id="pb-page-title" type="text" value="${pbAttr(current.title)}"></label>
+            <label>Intro under the title (also shown by search engines)<textarea id="pb-page-intro" rows="3">${pbAttr(current.intro)}</textarea></label>
+            <label class="pb-check"><input id="pb-page-menu" type="checkbox"${current.menu ? ' checked' : ''}> Show in the footer menu (Company)</label>
+            <label>Name in the menu (optional)<input id="pb-page-label" type="text" value="${pbAttr(current.menuLabel)}" placeholder="The title"></label>
+            <div class="page-text-row"><button type="button" onclick="pbSavePageSettings(this)">Save page settings</button>
+                <button type="button" onclick="pbDeletePage()">Delete this page</button></div>
+        </fieldset>` : ''}
+        <fieldset><legend>Pages made here</legend>
+            ${pages.length ? pages.map(c => `<div class="pb-page-row"><div><b>${pbText(c.title)}</b><span>p/${c.slug}/${c.menu ? ' · in the footer menu' : ''}</span></div>
+                <button type="button" onclick="pbGoToPage('${c.slug}')"${current && current.slug === c.slug ? ' disabled' : ''}>Open</button></div>`).join('')
+                : '<p class="page-text-label">None yet.</p>'}
+        </fieldset>`);
+}
+
+// Leaving the page being built: asks first when there are unsaved changes
+function pbLeave() {
+    if (pbDraft && pbChanged() && !confirm('Leave this page? Your changes since the last save will be lost.')) return false;
+    endPageBuilding();
+    return true;
+}
+
+function pbGoToPage(slug) {
+    if (!pbLeave()) return;
+    navigateTo('custom', slug);
+    startPageBuilding();
+}
+
+async function pbCreatePage(button) {
+    const title = ((document.getElementById('pb-new-title') || {}).value || '').trim();
+    const base = pbSlug(title);
+    if (!base) { showToast('Give the page a title first.'); return; }
+    let slug = base;
+    for (let n = 2; CUSTOM_PAGES.some(c => c.slug === slug); n++) slug = `${base}-${n}`;
+    if (!pbLeave()) return;
+    button.disabled = true;
+    const ok = await saveSiteEdit(`custom-page:${slug}`, { title, intro: '', menu: false, menuLabel: '' }, `Page created at p/${slug}/. Add sections, then Publish.`);
+    if (!ok) { button.disabled = false; return; }
+    navigateTo('custom', slug);
+    startPageBuilding();
+    pbOpenPages();
+}
+
+async function pbSavePageSettings(button) {
+    const page = CUSTOM_PAGES.find(c => c.slug === currentSlug);
+    if (currentPage !== 'custom' || !page) return;
+    const value = id => ((document.getElementById(id) || {}).value || '').trim();
+    const title = value('pb-page-title');
+    if (!title) { showToast('The page needs a title.'); return; }
+    button.disabled = true;
+    const ok = await saveSiteEdit(`custom-page:${page.slug}`, { title, intro: value('pb-page-intro'), menu: !!(document.getElementById('pb-page-menu') || {}).checked, menuLabel: value('pb-page-label') }, 'Page settings saved.');
+    applyPageMeta(currentPage, currentSlug);
+    if (ok) pbOpenPages(); else button.disabled = false;
+}
+
+async function pbDeletePage() {
+    const page = CUSTOM_PAGES.find(c => c.slug === currentSlug);
+    if (currentPage !== 'custom' || !page) return;
+    if (!confirm(`Delete the page "${page.title}" and everything on it? Its address will stop working.`)) return;
+    const sectionsKey = pageSectionsKey();
+    endPageBuilding();
+    if (siteEdits[sectionsKey] && !(await saveSiteEdit(sectionsKey, null, 'Page sections removed.'))) return;
+    if (await saveSiteEdit(`custom-page:${page.slug}`, null, `The page "${page.title}" is deleted.`)) navigateTo('home');
+}
+
+// While building, a click on an added section opens it in the panel; links and buttons elsewhere on the page don't
+// navigate away from the unsaved draft
+document.addEventListener('click', ev => {
+    if (!pbDraft || ev.target.closest('.page-text-ui') || !ev.target.closest('#app-viewport')) return;
+    const section = ev.target.closest('.pb-section');
+    if (section) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (pbSelected !== section.dataset.pbId) pbSelect(section.dataset.pbId);
+        return;
+    }
+    if (ev.target.closest('a, button')) { ev.preventDefault(); ev.stopPropagation(); }
+}, true);
 
 // --- Admin sign in ---
 async function handleAdminSignIn(e) {
@@ -3394,9 +4249,15 @@ function suggestBundleLines(quote, group, bundles) {
     return { lines: picked.map(bundleToQuotationLine), unmatched };
 }
 
+// Body and seat lines are always Qty 1 (2026-11-17): a colour picked is its pair of SKUs (front and rear panel, seat
+// back and bottom), one of each, whatever Qty the Bundles sheet has; sales types more for a second bench. Other
+// parts (wheels x4, batteries x6, two sand bottles) keep the sheet's Qty
+const BUNDLE_QTY_ONE = new Set(['body', 'seat']);
+
 function bundleToQuotationLine(b) {
+    const qty = BUNDLE_QTY_ONE.has(String(b.part || '').trim().toLowerCase()) || b.qty == null ? 1 : Number(b.qty);
     return { sheet_row: b.sheet_row, sku: b.sku || '', part: b.part || '', option: b.color || '', description: b.description || '',
-        qty: b.qty == null ? 1 : Number(b.qty), cost_usd: b.cost_usd == null ? null : Number(b.cost_usd), price_php: null, manual: false };
+        qty, cost_usd: b.cost_usd == null ? null : Number(b.cost_usd), price_php: null, manual: false };
 }
 
 // A line's peso cost (USD x rate x (1 + freight), net of VAT), to the centavo, and its unit selling price, VAT

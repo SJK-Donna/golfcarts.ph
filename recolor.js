@@ -59,12 +59,16 @@ const COLOR_PREVIEW = {
         canopy: { hue: [0, 360], sat: [0, 0.35], light: [0, 0.55], box: [0, 0.17] }
     },
     'golfer-tempo-2': TEMPO_TWO_SEAT_PREVIEW,
-    'lifestyle-tempo-2': TEMPO_TWO_SEAT_PREVIEW,
-    // A paint map of the red body and the white front and rear-facing seats (scripts/build-color-masks.mjs)
-    'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', mask: 'image/Products/builds/masks/lifestyle-2-2-sangria.png' },
+    // A paint map of the red body and the white front and rear-facing seats (scripts/build-color-masks.mjs). Shaded
+    // like paint (2026-11-16): the map takes in the dark red inside the rear body, and painted flat it came out as
+    // blocks of the new colour with black holes; shaded, those stay the body's shadows. Red measures as dark as a black
+    // cart's paint, but its light and shade are the panel's, not reflections, so it isn't softened as a dark photo is
+    'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', mask: 'image/Products/builds/masks/lifestyle-2-2-sangria.png', shade: true, brightPaint: true },
     // Paint maps (scripts/build-color-masks.mjs) of body, seats and roof, shaded like paint. The Transporter photo has
     // no roof, so its canopy choice can't be shown; the Villagers' seats aren't offered in other colours
-    'lifestyle-tempo-4-2': { base: 'image/Products/4 plus2 Lifted.png', mask: 'image/Products/builds/masks/lifestyle-4-2.png', shade: true },
+    // Its seats and grab handles are the same black, so pixels of the seat's colour beside a seat are handle, not seat:
+    // they aren't recoloured with it (`seatStrays: false`, 2026-11-16; they streaked the handles under a light seat)
+    'lifestyle-tempo-4-2': { base: 'image/Products/4 plus2 Lifted.png', mask: 'image/Products/builds/masks/lifestyle-4-2.png', shade: true, seatStrays: false, seatFormGain: 1.3 },
     'villager-6': { base: 'image/Products/Villager 6.png', mask: 'image/Products/builds/masks/villager-6.png', shade: true },
     'villager-8': { base: 'image/Products/Villager 8.png', mask: 'image/Products/builds/masks/villager-8.png', shade: true },
     'transporter-400': { base: 'image/Products/Transporter 4.png', mask: 'image/Products/builds/masks/transporter-4.png', shade: true },
@@ -103,6 +107,19 @@ COLOR_PREVIEW['golfer-tempo-2:scratch-plain'] = {
     look: { body: 'White', seat: 'Beige', canopy: '2 Pass Canopy Beige' }
 };
 COLOR_PREVIEW['golfer-tempo-2:scratch'].plainSeatPhoto = 'golfer-tempo-2:scratch-plain';
+// Lifestyle 2 (2026-11-16): every build is previewed on the Essential photo, with its paint map, shaded like paint,
+// instead of the red Base+ cut-out picked by colour (whose patterned seats were flat stripes across the seat, the
+// steering wheel and the windshield post, on a background the depth effect showed black). The Signature and Elite
+// photos have no paint maps; they are the same cart, so their colours show on it. A patterned seat is painted
+// tone by tone with the Scratch seat's stripe map carried over to this seat (scripts/build-color-masks.mjs
+// WARPED_TONES); a one-colour seat is shaded like paint
+['essential', 'signature', 'elite'].forEach(level => {
+    COLOR_PREVIEW[`lifestyle-tempo-2:${level}`] = {
+        base: 'image/Products/builds/lifestyle-2-essential.jpg', mask: 'image/Products/builds/masks/lifestyle-2-essential.png', shade: true,
+        seatTones: 'image/Products/builds/masks/lifestyle-2-essential-tones.png', look: { body: 'White', seat: 'Beige', canopy: '2 Pass Canopy Beige' }
+    };
+});
+COLOR_PREVIEW['lifestyle-tempo-2'] = COLOR_PREVIEW['lifestyle-tempo-2:essential'];
 // Lifestyle 4: one photo per build, as on Golfer 2+2 (one cart, one camera; paint maps by
 // scripts/build-color-masks.mjs). The Elite photo's seats are two-tone (black bolsters, grey panels, traced in its
 // tone map), like the Scratch 2+2 photo's Tsunami seats: a patterned choice is painted on them tone by tone, and a
@@ -137,6 +154,10 @@ COLOR_PREVIEW['golfer-tempo-4:pro-plain'] = {
 COLOR_PREVIEW['golfer-tempo-4:scratch'].plainSeatFrom = 'golfer-tempo-4:pro-plain';
 
 const recolorCache = {};
+// The largest side a photo is repainted at: the build photos' full 1600 px
+const RECOLOR_MAX = 1600;
+// A distance set in 900 px terms, at this photo's size
+const px900 = (base, d) => Math.max(1, Math.round(d * (base.k || 1)));
 
 // A paint map at the size the photo is worked at. Scaling it down softens its edges, so each pixel's
 // value (0-255) says how much of it belongs to the part.
@@ -164,23 +185,32 @@ function loadRecolorMask(src, w, h) {
 // (fully within one pixel, half at two), and the more alike the two colours are, the more the map stands.
 function matteWeights(base, mask, channel) {
     const { w, h } = base, px = base.imageData.data, n = w * h;
-    const m = new Float32Array(n);
-    for (let i = 0; i < n; i++) m[i] = mask[i * 4 + channel] / 255;
-    // How close each pixel is to the map's edge: 1 or 2 pixels (0 = further), and which side it is clearly on
-    const near = new Uint8Array(n), side = new Uint8Array(n);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-        const i = y * w + x, own = m[i] > 0.5;
-        let lo1 = 1, hi1 = 0, lo2 = 1, hi2 = 0;
-        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
-            const xx = x + dx, yy = y + dy;
-            if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
-            const v = m[yy * w + xx];
-            if (v < lo2) lo2 = v;
-            if (v > hi2) hi2 = v;
-            if (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) { if (v < lo1) lo1 = v; if (v > hi1) hi1 = v; }
+    // The edge bands and the window the two colours are read from, in 900 px terms (1, 2 and 4 px)
+    const e1 = px900(base, 1), e2 = px900(base, 2), e4 = px900(base, 4);
+    const m = new Float32Array(n), own = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { m[i] = mask[i * 4 + channel] / 255; own[i] = m[i] > 0.5 ? 1 : 0; }
+    // How close each pixel is to the map's edge: 1 or 2 pixels (0 = further), and which side it is clearly on. A
+    // pixel is that close when the square around it holds both sides; the squares' highs and lows are found row by
+    // row, then column by column (per pixel, at full size, this took seconds)
+    const mixed = r => {
+        const hi = new Uint8Array(n), lo = new Uint8Array(n), hi2 = new Uint8Array(n), lo2 = new Uint8Array(n);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+            let a = 0, b = 1;
+            for (let d = Math.max(0, x - r); d <= Math.min(w - 1, x + r); d++) { const v = own[y * w + d]; if (v > a) a = v; if (v < b) b = v; }
+            hi[y * w + x] = a; lo[y * w + x] = b;
         }
-        near[i] = lo1 < 0.5 && hi1 > 0.5 ? 1 : lo2 < 0.5 && hi2 > 0.5 ? 2 : 0;
-        side[i] = near[i] ? 2 : own ? 1 : 0; // 2 = at the edge, else clearly in (1) or out (0)
+        for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) {
+            let a = 0, b = 1;
+            for (let d = Math.max(0, y - r); d <= Math.min(h - 1, y + r); d++) { if (hi[d * w + x] > a) a = 1; if (lo[d * w + x] < b) b = 0; }
+            hi2[y * w + x] = a; lo2[y * w + x] = b;
+        }
+        return i => hi2[i] !== lo2[i];
+    };
+    const at1 = mixed(e1), at2 = mixed(e2);
+    const near = new Uint8Array(n), side = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+        near[i] = at1(i) ? 1 : at2(i) ? 2 : 0;
+        side[i] = near[i] ? 2 : own[i] ? 1 : 0; // 2 = at the edge, else clearly in (1) or out (0)
     }
     const out = m.slice();
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -189,7 +219,7 @@ function matteWeights(base, mask, channel) {
         // The part's colour and the neighbour's, from the pixels clear of the edge around this one
         const fg = [0, 0, 0], bg = [0, 0, 0];
         let nf = 0, nb = 0;
-        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        for (let dy = -e4; dy <= e4; dy++) for (let dx = -e4; dx <= e4; dx++) {
             const xx = x + dx, yy = y + dy;
             if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
             const j = yy * w + xx;
@@ -261,7 +291,7 @@ function shadeRegion(out, base, region, target, gradient, top) {
     const stops = gradient && gradient.map(toRgb);
     const dark = Math.max(0, Math.min(1, (0.12 - region.refY) / 0.06));
     const refY = top ? Math.max(region.refY, region.topY) : region.refY;
-    const form = dark ? regionForm(base, region) : null;
+    const form = dark || region.brightPaint ? regionForm(base, region) : null;
     // A black roof photographs as dark slate, not black: its matte top catches the sky (the real black roofs in the
     // build photos measure L* 37-65). So on a roof a near-black color is lifted toward a cool dark grey.
     const sky = top ? Math.max(0, Math.min(1, (0.1 - (0.2126 * solid[0] + 0.7152 * solid[1] + 0.0722 * solid[2])) / 0.08)) : 0;
@@ -274,19 +304,33 @@ function shadeRegion(out, base, region, target, gradient, top) {
             t = a.map((v, c) => v + (b[c] - v) * f);
         }
         const tY = 0.2126 * t[0] + 0.7152 * t[1] + 0.0722 * t[2];
-        const Y = linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+        let Y = linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
+        // `brightPaint` (a photo's config, 2026-11-16): a strong red measures as dark as black paint, but its deep
+        // shadows are real shade (the well inside the Sangria 2+2's rear body), which the broad light below lifted to a
+        // flat mid tone. Its sparkle and grain, under a light colour, read as dirt, so it is read smoothed a little
+        // (with a trace of the fine detail). Where the broad light (12 px) is under half the part's typical, a shadowed
+        // hollow, not a narrow dark reflection, the photo's own shading takes over from it (fully under a quarter)
+        let deep = 1;
+        if (region.brightPaint) {
+            Y = form.soft[k] + (Y - form.soft[k]) * 0.15;
+            deep = Math.max(0, Math.min(1, (form.blur[k] / form.ref - 0.25) / 0.25));
+        }
         const shade = Math.min(1, Y / refY);
         // Reflections show more strongly on dark paint
         const gloss = Math.max(0, Y - refY) * (0.6 + 0.4 * (1 - tY));
         let rgb = t.map(v => v * shade + gloss);
         // The lighter the color, the more it follows the panel's broad light on a dark photo
-        const light = dark * Math.max(0, Math.min(1, (tY - 0.05) / 0.5));
+        const light = dark * deep * Math.max(0, Math.min(1, (tY - 0.05) / 0.5));
         if (light) {
             const B = form.blur[k];
             // Fine detail is weak: on near-black paint it is mostly JPEG noise, which showed as blocks on a white cart
             // Deep shadow is floored at 75% of the color's lightness: faces in near-black shadow on a dark photo (the
-            // roof's side ends) otherwise turned a light roof charcoal, which read as unpainted
-            const lum = Math.max(Math.cbrt(tY) * 0.75, Math.min(1, Math.cbrt(tY) + (Math.cbrt(B) - Math.cbrt(top ? form.top : form.ref)) * 0.7 + (Math.cbrt(Y) - Math.cbrt(B)) * 0.1)) ** 3;
+            // roof's side ends) otherwise turned a light roof charcoal, which read as unpainted. Roofs only (2026-11-16): on a
+            // body the floor flattened deep shadow (inside the Sangria 2+2's rear body) into blocks of the new colour
+            // `formGain` (a matte part, such as black vinyl seats: its light and shade are its shape, not reflections) carries
+            // more of both over, so a black seat painted white isn't a flat cut-out
+            const gain = region.formGain || (top ? 0.7 : 0.55), fine = region.formGain ? 0.3 : 0.1;
+            const lum = Math.max(top ? Math.cbrt(tY) * 0.75 : 0, Math.min(1, Math.cbrt(tY) + (Math.cbrt(B) - Math.cbrt(top ? form.top : form.ref)) * gain + (Math.cbrt(Y) - Math.cbrt(B)) * fine)) ** 3;
             const shine = Math.max(0, Y - Math.max(B, refY) * 1.5) * 0.35;
             rgb = rgb.map((v, c) => v + (t[c] * lum / Math.max(tY, 1e-4) + shine - v) * light);
         }
@@ -310,12 +354,12 @@ async function paintDonorSeat(out, regions, donor, target, bands) {
     const n = dbase.w * dbase.h;
     const share = new Float32Array(n), keep = new Float32Array(n);
     // This photo's seat is replaced whole, with a 2 px margin, so no outline of it (the Tsunami headrests) shows
-    const w = dbase.w;
+    const w = dbase.w, e = px900(dbase, 2);
     regions.seat.idx.forEach(i => {
         const x = i % w;
-        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        for (let dy = -e; dy <= e; dy++) for (let dx = -e; dx <= e; dx++) {
             const j = i + dy * w + dx;
-            if (x + dx >= 0 && x + dx < w && j >= 0 && j < n) share[j] = Math.max(share[j], 1 - Math.max(Math.abs(dx), Math.abs(dy)) / 3);
+            if (x + dx >= 0 && x + dx < w && j >= 0 && j < n) share[j] = Math.max(share[j], 1 - Math.max(Math.abs(dx), Math.abs(dy)) / (e + 1));
         }
     });
     dseat.idx.forEach((i, k) => { share[i] = Math.max(share[i], dseat.weight[k]); });
@@ -339,7 +383,7 @@ async function paintDonorSeat(out, regions, donor, target, bands) {
 function blendRegionEdges(out, base, region, strays, reach = 10) {
     const { w, h } = base;
     const px = base.imageData.data;
-    if (strays && !region.strayFrom) region.strayFrom = seatStrays(base, region, reach);
+    if (strays && !region.strayFrom) region.strayFrom = seatStrays(base, region, px900(base, reach));
     // A stray takes its seat pixel's new color at its own brightness (adding the change instead turned dark
     // strays blue on a white seat)
     if (strays) region.strayFrom.forEach((j, i) => {
@@ -350,11 +394,12 @@ function blendRegionEdges(out, base, region, strays, reach = 10) {
         const inside = new Uint8Array(w * h);
         region.idx.forEach((i, k) => { if (region.weight[k] >= 0.95) inside[i] = 1; });
         region.edgeFrom = new Map();
+        const e = px900(base, 3);
         region.idx.forEach((i, k) => {
             if (region.weight[k] >= 0.95) return;
             const x = i % w, y = Math.floor(i / w);
             let best = -1, bestD = Infinity;
-            for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+            for (let dy = -e; dy <= e; dy++) for (let dx = -e; dx <= e; dx++) {
                 const xx = x + dx, yy = y + dy, d = dx * dx + dy * dy;
                 if (xx < 0 || yy < 0 || xx >= w || yy >= h || d >= bestD || !inside[yy * w + xx]) continue;
                 best = yy * w + xx; bestD = d;
@@ -385,6 +430,9 @@ function seatStrays(base, region, reach) {
     region.idx.forEach(i => {
         if (!inside[i]) return;
         const x = i % w, y = Math.floor(i / w);
+        // Only the seat's border looks outward: a pixel deeper in has a border pixel nearer every outside pixel
+        // (at full size, searching from every seat pixel took seconds)
+        if (x > 0 && y > 0 && x < w - 1 && y < h - 1 && inside[i - 1] && inside[i + 1] && inside[i - w] && inside[i + w]) return;
         for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
             const xx = x + dx, yy = y + dy, j = yy * w + xx;
             if (xx < 0 || yy < 0 || xx >= w || yy >= h || inRegion[j] || strays.has(j)) continue;
@@ -416,15 +464,18 @@ function regionForm(base, region) {
             SW[(y + 1) * W1 + x + 1] = SW[y * W1 + x + 1] + rw;
         }
     }
-    const r = 12;
-    const blur = region.idx.map(i => {
+    const blurAt = r => region.idx.map(i => {
         const x = i % w, y = Math.floor(i / w);
         const x0 = Math.max(0, x - r), x1 = Math.min(w, x + r + 1), y0 = Math.max(0, y - r), y1 = Math.min(h, y + r + 1);
         const box = A => A[y1 * W1 + x1] - A[y0 * W1 + x1] - A[y1 * W1 + x0] + A[y0 * W1 + x0];
         return box(SY) / Math.max(1e-6, box(SW));
     });
+    // 20 px (2026-11-16; was 12): on black paint the broad light is mostly reflected trees and sky, and at 12 px their
+    // shapes showed through a light colour as blotches
+    const blur = blurAt(px900(base, 20));
     const sorted = blur.filter((_, k) => region.weight[k] > 0.5).sort((p, q) => p - q);
-    region.form = { blur, ref: sorted[Math.floor(sorted.length / 2)] || region.refY, top: sorted[Math.floor(sorted.length * 0.8)] || region.refY };
+    // `soft`: the brightness smoothed only a little (2 px), for paint whose own grain shouldn't carry over (brightPaint)
+    region.form = { blur, soft: region.brightPaint ? blurAt(px900(base, 2)) : null, ref: sorted[Math.floor(sorted.length / 2)] || region.refY, top: sorted[Math.floor(sorted.length * 0.8)] || region.refY };
     return region.form;
 }
 
@@ -434,8 +485,9 @@ function loadRecolorBase(src) {
     recolorCache[src] = new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-            // Work at a moderate size so repainting stays instant
-            const scale = Math.min(1, 900 / Math.max(img.width, img.height));
+            // Worked at the photo's own size (2026-11-16; was 900 px): repainted smaller, the preview's edges were stepped
+            // and soft under the magnifier. Distances in pixels below are set for 900 px and scaled by `k`
+            const scale = Math.min(1, RECOLOR_MAX / Math.max(img.width, img.height));
             const w = Math.round(img.width * scale);
             const h = Math.round(img.height * scale);
             const canvas = document.createElement('canvas');
@@ -444,7 +496,12 @@ function loadRecolorBase(src) {
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             ctx.drawImage(img, 0, 0, w, h);
             const data = ctx.getImageData(0, 0, w, h);
-            resolve(analyzeRecolorBase(data, w, h));
+            const base = analyzeRecolorBase(data, w, h);
+            base.k = Math.max(w, h) / 900;
+            // A photo with no transparency goes out as a JPEG: at full size a PNG took too long to make
+            base.opaque = true;
+            for (let i = 3; i < data.data.length; i += 4) if (data.data[i] < 255) { base.opaque = false; break; }
+            resolve(base);
         };
         img.onerror = reject;
         img.src = src;
@@ -725,6 +782,8 @@ async function loadMaskRegions(slug, cfg, base) {
     if (recolorRegionCache[slug]) return recolorRegionCache[slug];
     const mask = await loadRecolorMask(cfg.mask, base.w, base.h);
     const regions = { body: maskRegion(base, mask, 0), seat: maskRegion(base, mask, 1), canopy: maskRegion(base, mask, 2) };
+    if (cfg.brightPaint && regions.body) regions.body.brightPaint = true;
+    if (cfg.seatFormGain && regions.seat) regions.seat.formGain = cfg.seatFormGain;
     const seat = regions.seat;
     if (seat && cfg.seatTones) {
         // Each seat pixel's share of bolster, panel and stripe (the map's red, green and blue)
@@ -749,7 +808,7 @@ async function loadMaskRegions(slug, cfg, base) {
 // a highlight stays a highlight. Found once per photo (`regions.fringe`).
 function tintBodyFringe(out, base, regions, target, cfg) {
     if (!regions.fringe) {
-        const w = base.w, h = base.h, reach = 4;
+        const w = base.w, h = base.h, reach = px900(base, 4);
         const taken = new Uint8Array(w * h), near = new Uint8Array(w * h);
         [regions.body, regions.seat, regions.canopy].forEach(r => r && r.idx.forEach(i => { taken[i] = 1; }));
         regions.body.idx.forEach(i => {
@@ -842,7 +901,7 @@ async function renderCartPreview(slug, choice) {
         else if (cfg.seatTones && (cfg.stripedSeat || patterned)) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatShadowDepth);
         else if (cfg.shade) shadeRegion(out, base, regions.seat, seat.hsl, null);
         else paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
-        if (cfg.mask && !(cfg.plainSeatFrom && !patterned) && !(cfg.patternSeatFrom && patterned)) blendRegionEdges(out, base, regions.seat, true);
+        if (cfg.mask && !(cfg.plainSeatFrom && !patterned) && !(cfg.patternSeatFrom && patterned)) blendRegionEdges(out, base, regions.seat, cfg.seatStrays !== false);
     }
     const body = parseSwatch(choice.body);
     if (body && regions.body) {
@@ -863,5 +922,5 @@ async function renderCartPreview(slug, choice) {
     canvas.width = base.w;
     canvas.height = base.h;
     canvas.getContext('2d').putImageData(new ImageData(out, base.w, base.h), 0, 0);
-    return canvas.toDataURL('image/png');
+    return base.opaque ? canvas.toDataURL('image/jpeg', 0.94) : canvas.toDataURL('image/png');
 }

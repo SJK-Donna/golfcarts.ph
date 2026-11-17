@@ -41,6 +41,12 @@ on conflict (email) do nothing;
 -- line, or running the file again moves him back.
 update public.staff set role = 'pricing' where email = 'matthew@sjkguahan.com' and role = 'master';
 
+-- The page builder (2026-11-16): adding, moving and publishing sections on the site's pages (account.js, "Build this
+-- page"). Given person by person, on top of the role; Donna only for now. To give it to someone else:
+--   update public.staff set page_builder = true where email = '...';
+alter table public.staff add column if not exists page_builder boolean not null default false;
+update public.staff set page_builder = true where email = 'donnavalonda@sjkguahan.com';
+
 -- The signed-in person's staff role ('master', 'pricing', 'sales', 'marketing'), or null for golfers and visitors.
 -- security definer: it reads staff without going through staff's own policies (which call this function).
 create or replace function public.staff_role() returns text
@@ -55,6 +61,12 @@ language sql stable security definer set search_path = public as $$
     select exists (select 1 from public.staff where email = lower(trim(check_email)))
 $$;
 grant execute on function public.is_staff_email(text) to anon, authenticated;
+
+-- Whether the signed-in person may use the page builder (staff.page_builder, above)
+create or replace function public.page_builder() returns boolean
+language sql stable security definer set search_path = public as $$
+    select coalesce((select page_builder from public.staff where email = lower(auth.jwt() ->> 'email')), false)
+$$;
 
 -- ---------- Golfers (members): one profile per member account ----------
 create table if not exists public.golfers (
@@ -855,12 +867,50 @@ create policy quotes_delete on public.quotes for delete to authenticated
 revoke update on public.quotes from anon, authenticated;
 grant update (status) on public.quotes to authenticated;
 
--- site edits: read by every visitor (the site applies them); written by master admins and marketing
+-- site edits: read by every visitor (the site applies them); written by master admins and marketing, except what the
+-- page builder makes: a page's added sections ('page-sections:<page>') and pages made with it ('custom-page:<slug>'),
+-- which only page builders write
 drop policy if exists edits_read on public.site_edits;
 create policy edits_read on public.site_edits for select to anon, authenticated using (true);
 drop policy if exists edits_write on public.site_edits;
 create policy edits_write on public.site_edits for all to authenticated
-    using (public.staff_role() in ('master', 'marketing')) with check (public.staff_role() in ('master', 'marketing'));
+    using (public.staff_role() in ('master', 'marketing') and key not like 'page-sections:%' and key not like 'custom-page:%')
+    with check (public.staff_role() in ('master', 'marketing') and key not like 'page-sections:%' and key not like 'custom-page:%');
+drop policy if exists edits_page_sections on public.site_edits;
+create policy edits_page_sections on public.site_edits for all to authenticated
+    using ((key like 'page-sections:%' or key like 'custom-page:%') and public.page_builder())
+    with check ((key like 'page-sections:%' or key like 'custom-page:%') and public.page_builder());
+
+-- The page builder's History (2026-11-16): each save of a page's sections is kept here by the trigger below, the last
+-- 30 per page; a page cleared keeps a version with no value. Page builders read it; nobody writes it directly
+create table if not exists public.page_revisions (
+    id bigint generated always as identity primary key,
+    key text not null,
+    value jsonb,
+    saved_by text,
+    saved_at timestamptz not null default now()
+);
+create index if not exists page_revisions_key on public.page_revisions (key, id desc);
+alter table public.page_revisions enable row level security;
+drop policy if exists page_revisions_read on public.page_revisions;
+create policy page_revisions_read on public.page_revisions for select to authenticated using (public.page_builder());
+
+create or replace function public.keep_page_revision() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+    k text := case when tg_op = 'DELETE' then old.key else new.key end;
+begin
+    if k not like 'page-sections:%' then return null; end if;
+    insert into public.page_revisions (key, value, saved_by)
+    values (k, case when tg_op = 'DELETE' then null else new.value end, lower(auth.jwt() ->> 'email'));
+    delete from public.page_revisions where key = k
+        and id not in (select id from public.page_revisions where key = k order by id desc limit 30);
+    return null;
+end $$;
+
+drop trigger if exists site_edits_revision on public.site_edits;
+create trigger site_edits_revision after insert or update or delete on public.site_edits
+    for each row execute function public.keep_page_revision();
 
 -- Photos uploaded in the admin's Products (product, build, gallery and accessory photos): a public Storage bucket, so
 -- the site shows them to everyone; master admins and marketing upload and replace them. JPEG and PNG up to 10 MB

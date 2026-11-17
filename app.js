@@ -937,14 +937,15 @@ const TEMPO_MATRIX_LEGACY = {
         '2+2': [['80" GC Canopy'], ['80" Canopy Black', '4 Pass Onward Canopy Black', '4 Pass Onward Canopy White', '4 Pass Onward Canopy Beige'], ['4 Pass Onward Canopy Black', '4 Pass Onward Canopy White', '4 Pass Onward Canopy Beige']],
         '4': [['88" Canopy Black'], ['88" Canopy Black'], ['88" Canopy Black']]
     },
-    // Lead-acid on every level; lithium is an upgrade on every level (the package comparisons' "battery upgrade")
-    battery: ['Trojan FLA 8V lead-acid', 'Trojan FLA 8V lead-acid', 'Trojan FLA 8V lead-acid'],
+    // The document (2026-11-17): Trojan FLA on Golf / Essential and Scratch / Signature, Battlite lithium on Pro /
+    // Elite; lithium is an upgrade on the first two
+    battery: ['Trojan FLA 8V lead-acid', 'Trojan FLA 8V lead-acid', 'Battlite lithium'],
     batteryUpgrade: 'Battlite lithium battery upgrade',
-    // Included by the package comparisons: the GC floor mat (Golfer Scratch 2+2 also gets it, see
-    // getTempoOptionGroups), the mirror package, audio and the speed code (a paid option below Pro / Elite)
-    floorMat: { golfer: [false, false, true], lifestyle: [false, true, true] },
-    mirrorPackage: { golfer: [false, true, false], lifestyle: [true, true, true] },
-    audio: { golfer: [null, null, 'Speaker + Apple CarPlay'], lifestyle: [null, 'GC Bluetooth speakers', 'Bluetooth speaker with Apple CarPlay'] },
+    // The document has no included floor mat, mirrors or audio: the floor mat is an upgrade on every build, and
+    // mirrors and audio are upgrades (below). The speed code is included on Pro / Elite, a paid option below
+    floorMat: { golfer: [false, false, false], lifestyle: [false, false, false] },
+    mirrorPackage: { golfer: [false, false, false], lifestyle: [false, false, false] },
+    audio: { golfer: [null, null, null], lifestyle: [null, null, null] },
     speedCodeIncluded: [false, false, true],
     wheels: [[WHEEL_STEEL_LEGACY], [WHEEL_STEEL_LEGACY, WHEEL_TRITON, WHEEL_HELA], [WHEEL_ALLOY, WHEEL_TRITON, WHEEL_HELA]],
     wheelUpgrades: [
@@ -958,13 +959,18 @@ const TEMPO_MATRIX_LEGACY = {
     ],
     lighting: {
         // Golfer: no lights; Scratch: GC lights (a kit is included, the visitor picks which); Pro: Club Car premium lights
-        golfer: [[], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']],
+        golfer: [[], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights', 'No headlight'], ['Club Car Tempo Deluxe Light Kit']],
         lifestyle: [['GC Tempo LED Headlights & Tail Lights'], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']]
     },
-    // Golfer 2 and 4 golf accessories, all included: the black GC bag cover on every level, and from Scratch a
-    // sand bottle and a ball and club cleaner or a Caddy Master cooler (the visitor picks one). Golfer 2+2 has a
-    // golf bag attachment instead.
-    bagCover: ['GC Bag Cover, Black', 'GC Bag Cover, Black', 'GC Bag Cover, Black'],
+    // Golfer 2 and 4 golf accessories, all included: Golf the black GC bag cover only; Scratch a GC bag cover (black,
+    // beige, white) or a CC magnetic one (black, beige); Pro a CC magnetic one. From Scratch, a sand bottle (max 2)
+    // and ball washers and Caddy Master coolers (the document's 1+1, 2+0 or 0+2). Golfer 2+2 has a golf bag
+    // attachment instead.
+    bagCover: [['GC Bag Cover, Black'],
+        ['GC Bag Cover, Black', 'GC Bag Cover, Beige', 'GC Bag Cover, White', 'CC Magnetic Bag Cover, Black', 'CC Magnetic Bag Cover, Beige'],
+        ['CC Magnetic Bag Cover, Black', 'CC Magnetic Bag Cover, Beige']],
+    sandBottles: ['Sand bottle with mounting bracket', 'Two sand bottles with mounting brackets'],
+    golfSides: ['Ball washer and Caddy Master cooler', 'Two ball washers', 'Two Caddy Master coolers'],
     golfExtras: [false, true, true],
     lifestyleCooler: [false, true, true], // an add-on on the Lifestyle builds
     lift: [true, true, true],            // Lifted 3.5" GC lift kit, an option on every level
@@ -975,7 +981,7 @@ const TEMPO_MATRIX_LEGACY = {
     flipSeat: {
         golfer: { '2+2': [['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat', 'Club Car Premium Flip Seat']] },
         lifestyle: {
-            '2+2': [['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat'], ['Club Car Premium Flip Seat']],
+            '2+2': [['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat', 'Club Car Premium Flip Seat']],
             '4+2': [['Club Car Flip Seat'], ['Club Car Flip Seat'], ['Club Car Premium Flip Seat']]
         }
     },
@@ -986,10 +992,12 @@ const TEMPO_MATRIX_LEGACY = {
         golfer: [['Golf Bag Attachment Combo'], ['Golf Bag Attachment Combo', 'GC Premium Bag Attachment'], ['GC Premium Bag Attachment']],
         lifestyle: [[], [], ['GC Premium Bag Attachment']]
     },
+    // Pro / Elite upgrades: audio, then charging add-ons
+    audioUpgrades: [[], [], ['Club Car Premium Sound Bar', 'Apple CarPlay', 'GC Sound Bar 27" RGB']],
     electronicsAddOns: [[], [], ['Wireless Charging', 'Premium USB-C Charging Port', 'GC USB-C Charging Port QC3.0 with Volt Meter']],
-    steering: [[], [], ['Premium Steering Wheel with Scorecard (Club Car)']], // included on Pro / Elite
-    // Single mirrors as add-ons, only where the mirror package isn't included
-    mirrors: { golfer: [[], [], TEMPO_MIRRORS_LEGACY], lifestyle: [[], [], []] },
+    steering: [[], [], ['Premium Steering Wheel with Scorecard (Club Car)']], // an upgrade on Pro / Elite
+    // Mirrors, as upgrades on Scratch / Signature and Pro / Elite
+    mirrors: { golfer: [[], TEMPO_MIRRORS_LEGACY, TEMPO_MIRRORS_LEGACY], lifestyle: [[], TEMPO_MIRRORS_LEGACY, TEMPO_MIRRORS_LEGACY] },
     storage: [[], ['Overhead Storage Console', 'Under Seat Storage Tray'], ['Overhead Storage Console', 'Under Seat Storage Tray']],
     enclosureTwoSeat: [[], TEMPO_THREE_SIDED_LEGACY, ['Two-sided rain enclosure, Black (Club Car)', ...TEMPO_THREE_SIDED_LEGACY]],
     enclosureFourSeat: [[], ['Custom enclosure'], ['Custom enclosure']],
@@ -1004,13 +1012,13 @@ function tempoLevelIncludesLegacy(line, i, layout = '2') {
     const lights = find('lighting');
     const wheels = m.wheels[i];
     const golf = find('bagAttachment') ? 'Golf bag attachment'
-        : find('ballWasher') ? 'GC bag cover, sand bottle, and a ball and club cleaner or cooler'
+        : find('ballWasher') ? 'Bag cover, sand bottle (max 2), ball washers and Caddy Master coolers'
         : find('bagCover') ? 'GC bag cover, black' : null;
     return [
         `${m.battery[i]} battery`,
         wheels.length > 1 ? `${wheels[0]}, or ${wheels.length - 1} other wheel choices` : wheels[0],
         !lights ? 'No headlights' : lights.type === 'fixed' ? lights.value : `GC LED lights (${lights.options.length} kits to choose from)`,
-        `${m.body[i].length} body colors, ${m.seat[i].length} seat colors`,
+        `${tempoBodyNames({ version: line, layout }, i).length} body colors, ${m.seat[i].length} seat colors`,
         golf,
         text('flipSeat'),
         text('mirrors'),
@@ -1024,9 +1032,9 @@ function tempoLevelIncludesLegacy(line, i, layout = '2') {
 // The line under each build card: its upgrades (the card's checkbox switches them on), or its options
 function tempoLevelNoteLegacy(line, i) {
     return [
-        'Options: lithium battery, lift kit and speed code (with fee).',
-        'Upgrades: lithium battery, lift kit, 14" wheels, storage, rain enclosure and cooling.',
-        `Upgrades: lithium battery, lift kit, 14" wheels, ${line === 'golfer' ? 'mirrors, ' : ''}charging, storage, rain enclosure and cooling.`
+        'Options: lithium battery, lift kit, floor mat and speed code (with fee).',
+        'Upgrades: lithium battery, lift kit, 14" wheels, mirrors, storage, rain enclosure, cooling and floor mat.',
+        'Upgrades: lift kit, 14" wheels, mirrors, audio, charging, scorecard steering wheel, storage, rain enclosure, cooling and floor mat.'
     ][i];
 }
 
@@ -1036,8 +1044,7 @@ function getTempoOptionGroupsLegacy(product, i) {
     const line = product.version;
     const layout = tempoLayoutRow(product);
     const plusTwo = /\+2$/.test(product.layout);
-    // Golfer 2+2 swaps the golf accessories for a bag attachment and the flip seat; Golfer Scratch 2+2 also
-    // gets the floor mat and GC Bluetooth speakers (the package comparison's 2+2 rows)
+    // Golfer 2+2 swaps the golf accessories for a bag attachment and the flip seat
     const golfPlusTwo = line === 'golfer' && plusTwo;
     const groups = [];
     const add = g => groups.push(g);
@@ -1046,21 +1053,17 @@ function getTempoOptionGroupsLegacy(product, i) {
     // Included. Ids match the quote accessories they make redundant (see getBuildDetails)
     include('battery', 'Battery', m.battery[i]);
     if (m.mirrorPackage[line][i]) include('mirrors', 'Mirrors', 'Mirror package');
-    if (m.floorMat[line][i] || (golfPlusTwo && i === 1)) include('floorMat', 'Floor mat', 'GC floor mat');
-    const audio = golfPlusTwo && i === 1 ? 'GC Bluetooth speakers' : m.audio[line][i];
-    if (audio) include('electronics', 'Audio', audio);
-    if (m.steering[i].length) include('steering', 'Steering wheel', m.steering[i][0]);
+    if (m.floorMat[line][i]) include('floorMat', 'Floor mat', 'GC floor mat');
+    if (m.audio[line][i]) include('electronics', 'Audio', m.audio[line][i]);
     if (m.speedCodeIncluded[i]) include('speedCode', 'Speed code', 'Included, no fee');
     // Lighting: one kit is included as it is; where there are several, one is included and the visitor picks it;
     // a build without lights has no lighting row
     const kits = m.lighting[line][i];
     if (kits.length > 1) add({ id: 'lighting', section: 'Wheels and lighting', title: 'Lighting', type: 'single', options: kits, included: true });
     else if (kits.length) include('lighting', 'Lighting', kits[0]);
-    // Wheels: 8" to 12" are the standard choices; 14" wheels are an upgrade, locked until the visitor turns
-    // the 14" upgrade on (`wheelUpgrade`)
-    const allWheels = [...m.wheels[i], ...m.wheelUpgrades[i]];
-    const wheelSize = w => parseInt(w, 10);
-    const standardWheels = allWheels.filter(w => wheelSize(w) <= 12), upgradeWheels = allWheels.filter(w => wheelSize(w) > 12);
+    // Wheels: the document's "Rims & Tires" are the standard choices; its "Rims Upgrade" (14", and the 12" with
+    // 23x10.5 tires) are locked until the visitor turns the upgrade on (`wheelUpgrade`)
+    const standardWheels = m.wheels[i], upgradeWheels = m.wheelUpgrades[i];
     add({ id: 'wheels', section: 'Wheels and lighting', title: 'Wheels and tires', type: 'single',
         options: [...standardWheels, ...upgradeWheels], upgradeFrom: upgradeWheels.length ? standardWheels.length : undefined });
 
@@ -1071,12 +1074,14 @@ function getTempoOptionGroupsLegacy(product, i) {
             if (bags.length > 1) add({ id: 'bagAttachment', section: 'Accessories', title: 'Golf bag attachment', type: 'single', options: bags, included: true });
             else include('bagAttachment', 'Golf bag attachment', bags[0]);
         } else {
-            include('bagCover', 'Bag cover', m.bagCover[i]);
+            const bags = m.bagCover[i];
+            if (bags.length > 1) add({ id: 'bagCover', section: 'Accessories', title: 'Bag cover', type: 'single', options: bags, included: true });
+            else include('bagCover', 'Bag cover', bags[0]);
             if (m.golfExtras[i]) {
-                include('sandBottle', 'Sand bottle', 'Sand bottle with mounting bracket');
-                // One or the other; the group also stands for the cooler among the quote accessories
+                add({ id: 'sandBottle', section: 'Accessories', title: 'Sand bottle', type: 'single', options: m.sandBottles, included: true });
+                // The document's ball washer / cooler pairs; the group also stands for the cooler among the quote accessories
                 add({ id: 'ballWasher', covers: ['cooler'], section: 'Accessories', title: 'Ball and club cleaner or cooler', type: 'single',
-                    options: ['Ball and club cleaner', 'Caddy Master cooler'], included: true });
+                    options: m.golfSides, included: true });
             }
         }
         if (layout === '2') add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
@@ -1085,15 +1090,18 @@ function getTempoOptionGroupsLegacy(product, i) {
     }
     if (plusTwo) add({ id: 'flipSeat', section: 'Accessories', title: 'Rear flip seat', type: 'single', options: m.flipSeat[line][product.layout][i], included: true });
 
-    // Upgrades
-    add({ id: 'batteryUpgrade', section: 'Upgrades', title: 'Lithium battery', type: 'flag', label: m.batteryUpgrade });
+    // Upgrades (lithium is standard on Pro / Elite)
+    if (i < 2) add({ id: 'batteryUpgrade', section: 'Upgrades', title: 'Lithium battery', type: 'flag', label: m.batteryUpgrade });
     if (!m.speedCodeIncluded[i]) add({ id: 'speedCode', section: 'Upgrades', title: 'Speed code', type: 'flag', label: 'Speed code (with fee)' });
     if (m.lift[i]) add({ id: 'lift', section: 'Upgrades', title: 'Lift kit', type: 'flag', label: 'Lifted 3.5" GC lift kit' });
     if (plusTwo && line === 'lifestyle') {
         const bags = m.bagAttachment.lifestyle[i];
         if (bags.length) add({ id: 'bagAttachment', section: 'Upgrades', title: 'Golf bag attachment', type: 'optional', options: bags });
     }
+    if (m.audioUpgrades[i].length) add({ id: 'audio', section: 'Upgrades', title: 'Audio', type: 'multi', options: m.audioUpgrades[i] });
     if (m.electronicsAddOns[i].length) add({ id: 'charging', section: 'Upgrades', title: 'Charging', type: 'multi', options: m.electronicsAddOns[i] });
+    if (m.steering[i].length) add({ id: 'steering', section: 'Upgrades', title: 'Steering wheel', type: 'flag', label: m.steering[i][0] });
+    if (!m.floorMat[line][i]) add({ id: 'floorMat', section: 'Upgrades', title: 'Floor mat', type: 'flag', label: 'GC floor mat' });
     if (m.mirrors[line][i].length) add({ id: 'mirrors', section: 'Upgrades', title: 'Mirrors', type: 'multi', options: m.mirrors[line][i] });
     if (m.storage[i].length) add({ id: 'storage', section: 'Upgrades', title: 'Storage', type: 'multi', options: m.storage[i] });
     const enclosures = (layout === '2' ? m.enclosureTwoSeat : m.enclosureFourSeat)[i];
@@ -1118,9 +1126,12 @@ function getTempoSubGroupsLegacy(product, i, o) {
 }
 
 
-// Lifestyle 2 and 4 keep the previous builder (no bundle yet); every other Tempo model follows its bundle
+// Every Tempo model follows the "Versions" document (Versions (1).pdf, 2026-11-17; TEMPO_MATRIX_LEGACY): what each
+// build includes, what it can be upgraded with, and what it doesn't have. Before, all but Lifestyle 2 and 4 followed
+// the Bundles sheet (TEMPO_MATRIX, kept for reference); a choice the bundles have no line for comes into the
+// quotation unmatched, for sales to price
 function isLegacyTempo(product) {
-    return !!product && product.version === 'lifestyle' && (product.layout === '2' || product.layout === '4');
+    return !!product && !!TEMPO_LINES[product.version];
 }
 
 function tempoMatrix(product) {
@@ -1194,7 +1205,7 @@ function tempoLevelIncludes(line, i, layout = '2') {
         `${m.battery[i]} battery`,
         standard > 1 ? `${wheels.options[0]}, or ${standard - 1} other wheel choices` : wheels.options[0],
         lights ? lights.value : 'No headlights',
-        `${m.body[i].length} body colors, ${m.seat[i].length} seat colors`,
+        `${tempoBodyNames({ version: line, layout }, i).length} body colors, ${m.seat[i].length} seat colors`,
         find('sandBottle') && 'Bag cover, sand bottle, a ball and club cleaner and a cooler (or two coolers)',
         find('flipSeat') && find('flipSeat').value,
         find('mirrors') && 'Side mirrors (5 panel rear mirror optional)',
@@ -1506,11 +1517,14 @@ function buildYourCart() {
 // its real height (about 2.4 m, 2.0 m, 1.9 m and 1.8 m) on one ground line. Photos are the product
 // cut-outs trimmed to the cart (image/lineup/). Positions are percentages of a 3.57 : 1 stage; each cart
 // overlaps the next slightly, and later carts sit in front, so every cart's front stays visible.
+// Five families since 2026-11-17 (the Transporter, cut out by scripts/cut-lineup.mjs): all at 80% of their former
+// size so the five fit, on a lower 4.46 : 1 strip (.lineup-range); width = height x the photo's aspect / 4.46
 const HOME_LINEUP = [
-    { name: 'Minibus', seats: '14 and 21 seats', image: 'image/lineup/minibus.png', slug: 'minibus-14', left: 1.12, width: 34.76, height: 82 },
-    { name: 'Villager', seats: '6 to 8 seats', image: 'image/lineup/villager.png', slug: 'villager-8', left: 33.08, width: 29, height: 68 },
-    { name: 'Carryall', seats: '2 seats and a cargo bed', image: 'image/lineup/carryall.png', slug: 'carryall-500', left: 59.28, width: 25.18, height: 65 },
-    { name: 'Tempo', seats: '2 to 6 seats', image: 'image/lineup/tempo.png', slug: 'golfer-tempo-2', left: 81.67, width: 17.21, height: 61 }
+    { name: 'Minibus', seats: '14 and 21 seats', image: 'image/lineup/minibus.png', slug: 'minibus-14', left: 0.5, width: 27.8, height: 82 },
+    { name: 'Villager', seats: '6 to 8 seats', image: 'image/lineup/villager.png', slug: 'villager-8', left: 26.3, width: 23.2, height: 68 },
+    { name: 'Transporter', seats: '4 seats and a cargo bed', image: 'image/lineup/transporter-roof.png', slug: 'transporter-400', left: 47, width: 20.9, height: 65 },
+    { name: 'Carryall', seats: '2 seats and a cargo bed', image: 'image/lineup/carryall.png', slug: 'carryall-500', left: 65.4, width: 20.1, height: 65 },
+    { name: 'Tempo', seats: '2 to 6 seats', image: 'image/lineup/tempo.png', slug: 'golfer-tempo-2', left: 83.5, width: 13.8, height: 61 }
 ];
 
 // Shop by use, in the review's order. Private Golf Carts leads with the largest photo; Rebuilt is a text-led strip (see renderHomeUses)
@@ -1815,9 +1829,15 @@ function routeToPath(page, slug = null) {
         case 'contact': return 'contact/';
         case 'golfer': return 'golfer/';
         case 'admin': return 'admin/';
+        case 'custom': return `p/${slug}/`;
         default: return '';
     }
 }
+
+// Pages made with the page builder (account.js, 2026-11-16): { slug, title, intro, menu, menuLabel }, filled from the
+// site edits ('custom-page:<slug>'). Each lives at p/<slug>/; it has no pre-rendered page, so its address opens through
+// 404.html and the page is drawn once the edits arrive (as a story added in the admin is)
+const CUSTOM_PAGES = [];
 
 // Absolute path -> { page, slug }; unknown paths fall back to the homepage
 function pathToRoute(pathname, search = '') {
@@ -1828,6 +1848,7 @@ function pathToRoute(pathname, search = '') {
     if (first === 'models' && PRODUCTS_DATA.some(p => p.slug === second)) return { page: 'product-details', slug: second };
     if (first === 'use' && NAV_SEGMENTS.some(s => s.id === second)) return { page: 'segment', slug: second };
     if (first === 'blog' && second && BLOGS_DATA.some(b => b.slug === second)) return { page: 'blog-details', slug: second };
+    if (first === 'p' && second && CUSTOM_PAGES.some(c => c.slug === second)) return { page: 'custom', slug: second };
     if (simple[first] && !second) {
         const category = new URLSearchParams(search).get('category');
         return { page: simple[first], slug: null, category };
@@ -1854,6 +1875,8 @@ function getPageMeta(page, slug = null) {
     };
     if (segment) return { title: `${segment.label} | ${site}`, description: (segment.description || defaultDescription).slice(0, 158), image: segment.image || null };
     if (post) return { title: `${post.title} | ${site}`, description: (post.excerpt || defaultDescription).slice(0, 158), image: post.image };
+    const custom = page === 'custom' && CUSTOM_PAGES.find(c => c.slug === slug);
+    if (custom) return { title: `${custom.title} | ${site}`, description: (custom.intro || defaultDescription).slice(0, 158), image: null };
     const pages = {
         home: { title: `${site} | Low-speed electric vehicles for private roads`, description: defaultDescription },
         products: { title: `All carts | ${site}`, description: 'Every Golfcarts.ph cart: golf, lifestyle, resort and utility models, with colors, seats and accessories.' },
@@ -2557,14 +2580,18 @@ function renderApp() {
         viewport.innerHTML = renderAdminPage();
     } else if (currentPage === 'not-found') {
         viewport.innerHTML = renderNotFoundPage();
+    } else if (currentPage === 'custom') {
+        viewport.innerHTML = renderCustomPage();
     }
+    renderCustomPageLinks();
 
     initRevealOnScroll();
     // The admin is a workspace of its own: the site's header and footer are hidden there (site.css, .admin-mode)
     document.body.classList.toggle('admin-mode', currentPage === 'admin');
     // A logged-in golfer's name, email and number go into the page's quote and contact forms (account.js)
     prefillGolferForms(viewport);
-    // The page text edited on the page by staff, and its editing controls (account.js)
+    // Sections added with the page builder, then the page text edited on the page by staff, and their controls (account.js)
+    if (typeof applyPageSections === 'function') applyPageSections();
     if (typeof applyPageText === 'function') applyPageText();
 }
 
@@ -2846,7 +2873,7 @@ function renderHomeRange() {
                     <h2 id="home-range-title" class="type-xl text-ink max-w-[13ch]">From two seats to fourteen.</h2>
                     <a href="${routeHref('products')}" data-route="products" class="link self-start md:self-auto">See every cart</a>
                 </div>
-                <ul class="lineup" aria-label="Model families">
+                <ul class="lineup lineup-range" aria-label="Model families">
                     ${HOME_LINEUP.map((c, i) => `
                         <li class="lineup-item" style="--left:${c.left}%; --width:${c.width}%; --height:${c.height}%; z-index:${i + 1}">
                             <a href="${routeHref('product-details', c.slug)}" data-route="product-details" data-slug="${c.slug}" class="lineup-cart">
@@ -2944,19 +2971,20 @@ function quoteRedSeries(index) {
     renderQuoteSummary();
 }
 
-// Festive effects behind the carts: snowflakes and holly leaves drifting down, and sparkles twinkling. Spread by a
+// Festive effects behind the carts: glitter drifting down, and sparkles twinkling. Spread by a
 // fixed pattern (not random) so the pre-rendered page and the live page match.
-const PROMO_HOLLY = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="#1F7A3A" d="M12 2c1 2 3 2 4 1 0 2 1 3 3 3-1 1-1 3 0 4-2 0-3 1-3 3 1 1 1 3 0 4-1-1-3-1-4 1-1-2-3-2-4-1 0-2-1-3-3-3 1-1 1-3 0-4 2 0 3-1 3-3-1-1-1-3 0-4 1 1 3 1 4-1z"/><circle cx="12" cy="20" r="2.2" fill="#D7262C"/></svg>';
 const PROMO_SPARKLE = '<svg viewBox="0 0 24 24" width="100%" height="100%"><path fill="currentColor" d="M12 0c.6 6.5 5.5 11.4 12 12-6.5.6-11.4 5.5-12 12-.6-6.5-5.5-11.4-12-12C6.5 11.4 11.4 6.5 12 0z"/></svg>';
 
+// Falling glitter (2026-11-17; was snowflakes and holly): gold, red, green and silver specks, stars and confetti
+// drifting down and catching the light as they turn
+const PROMO_GLITTER = ['gold', 'gold', 'red', 'gold', 'green', 'silver'];
 function renderPromoEffects() {
     const at = (i, n, spread) => ((i * spread) % n) / n;
-    const falling = Array.from({ length: 26 }, (_, i) => {
-        const leaf = i % 4 === 3;
-        const style = `--x:${(at(i, 26, 11) * 100).toFixed(1)}%; --size:${leaf ? 16 + (i % 3) * 4 : 6 + (i % 5) * 3}px; --dur:${(9 + (i % 7) * 1.6).toFixed(1)}s; --delay:-${(at(i, 26, 7) * 14).toFixed(1)}s; --sway:${(i % 2 ? 1 : -1) * (14 + (i % 4) * 8)}px`;
-        return leaf
-            ? `<span class="promo-fall promo-leaf" style="${style}">${PROMO_HOLLY}</span>`
-            : `<span class="promo-fall promo-flake" style="${style}"></span>`;
+    const falling = Array.from({ length: 34 }, (_, i) => {
+        const kind = i % 3 === 0 ? 'star' : i % 3 === 1 ? 'speck' : 'confetti';
+        const size = kind === 'star' ? 10 + (i % 4) * 4 : kind === 'speck' ? 4 + (i % 3) * 2 : 6 + (i % 3) * 2;
+        const style = `--x:${(at(i, 34, 13) * 100).toFixed(1)}%; --size:${size}px; --dur:${(8 + (i % 7) * 1.4).toFixed(1)}s; --delay:-${(at(i, 34, 7) * 14).toFixed(1)}s; --sway:${(i % 2 ? 1 : -1) * (12 + (i % 4) * 8)}px; --shine:${(0.9 + (i % 5) * 0.35).toFixed(2)}s`;
+        return `<span class="promo-fall promo-glitter promo-glitter-${kind} promo-glitter-${PROMO_GLITTER[i % PROMO_GLITTER.length]}" style="${style}"><i>${kind === 'star' ? PROMO_SPARKLE : ''}</i></span>`;
     }).join('');
     const sparkles = Array.from({ length: 16 }, (_, i) => {
         const style = `--x:${(4 + at(i, 16, 7) * 92).toFixed(1)}%; --y:${(6 + at(i, 16, 5) * 60).toFixed(1)}%; --size:${10 + (i % 4) * 6}px; --dur:${(2.2 + (i % 5) * 0.6).toFixed(1)}s; --delay:-${(at(i, 16, 3) * 3).toFixed(1)}s`;
@@ -3018,53 +3046,42 @@ function togglePromoCover(open, quiet) {
     if (!quiet) (open ? back : stage.querySelector('.promo-open')).focus();
 }
 
-function renderHomeUseTile(id, sizeClass, imageClass) {
-    const seg = NAV_SEGMENTS.find(s => s.id === id);
-    const use = HOME_USES[id];
-    return `
-        <a href="${routeHref('segment', id)}" data-route="segment" data-slug="${id}" class="group block ${sizeClass}">
-            <div class="media-zoom edge-light ${imageClass}">
-                <img src="${use.image}" alt="${use.alt}" width="${use.width}" height="${use.height}" loading="lazy" decoding="async" class="w-full h-full object-cover">
-            </div>
-            <div class="pt-5 space-y-2">
-                <h3 class="type-lg text-ink">${seg.label}</h3>
-                <p class="measure">${seg.tagline}</p>
-            </div>
-        </a>`;
-}
 
-// Editorial grid: a large Private Golf Carts photo, two offset tiles (Fleet, Resort), and a text-led Rebuilt strip
+// Five tiles (2026-11-17): Private Golf Carts, The Golfer and Fleet Solutions in a row of three, then Rebuilt and
+// Pre Owned and Resort and Hospitality in a row of two. The photos are this section's own (image/Banners); the
+// segment pages keep theirs (HOME_USES)
+const HOME_USE_TILES = [
+    { route: 'segment', slug: 'private', image: 'image/Banners/Private Golf Carts.jpg', alt: 'A white Tempo 2 on a fairway, hills and palms behind', width: 5328, height: 4000 },
+    { route: 'segment', slug: 'golfer', image: 'image/Banners/b2c golf.JPG', alt: 'Two Tempo carts on a golf course cart path', width: 5328, height: 4000 },
+    { route: 'solutions', label: 'Fleet Solutions', tagline: 'Fleets for golf courses, resorts and sites.', image: 'image/Banners/Fleet Solutions1.JPG', alt: 'Five numbered fleet carts lined up under a clubhouse', width: 5328, height: 4000 },
+    { route: 'segment', slug: 'remanufactured', tagline: 'Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.', image: 'image/Banners/Rebuilt and Pre Owned.png', alt: 'A red lifted rebuilt cart on a village street', width: 2390, height: 1792 },
+    { route: 'segment', slug: 'resort', image: 'image/Banners/Resort and Hospitality.png', alt: 'A black six-seat shuttle at a resort hotel entrance', width: 1086, height: 1448 }
+];
+
 function renderHomeUses() {
-    const reman = NAV_SEGMENTS.find(s => s.id === 'remanufactured');
+    const tile = (t, aspect) => {
+        const seg = t.slug ? NAV_SEGMENTS.find(s => s.id === t.slug) : null;
+        return `
+            <a href="${routeHref(t.route, t.slug)}" data-route="${t.route}"${t.slug ? ` data-slug="${t.slug}"` : ''} class="group block">
+                <div class="media-zoom edge-light ${aspect}">
+                    <img src="${t.image}" alt="${t.alt}" width="${t.width}" height="${t.height}" loading="lazy" decoding="async" class="w-full h-full object-cover">
+                </div>
+                <div class="pt-5 space-y-2">
+                    <h3 class="type-lg text-ink">${t.label || seg.label}</h3>
+                    <p class="measure">${t.tagline || seg.tagline}</p>
+                </div>
+            </a>`;
+    };
     return `
         <section class="rise home-section bg-paper" aria-labelledby="home-uses-title">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
                 <h2 id="home-uses-title" class="type-xl text-ink mb-12 lg:mb-16 max-w-[14ch]">Shop by how you'll use it.</h2>
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-x-8 gap-y-14">
-                    ${renderHomeUseTile('private', 'lg:col-span-7', 'aspect-[4/3] lg:aspect-[7/6]')}
-                    <div class="lg:col-span-5 grid gap-y-14 lg:pt-40">
-                        <a href="${routeHref('solutions')}" data-route="solutions" class="group block">
-                            <div class="media-zoom edge-light aspect-square lg:aspect-[5/4]">
-                                <img src="image/Hero/fleet_hero.jpg" alt="Three golf carts lined up side by side" width="799" height="527" loading="lazy" decoding="async" class="w-full h-full object-cover">
-                            </div>
-                            <div class="pt-5 space-y-2">
-                                <h3 class="type-lg text-ink">Fleet Solutions</h3>
-                                <p class="measure">Fleets for golf courses, resorts and sites.</p>
-                            </div>
-                        </a>
-                    </div>
-                    <div class="lg:col-span-5 lg:col-start-2">
-                        ${renderHomeUseTile('resort', '', 'aspect-[4/3]')}
-                    </div>
-                    <a href="${routeHref('segment', 'remanufactured')}" data-route="segment" data-slug="remanufactured" class="group lg:col-span-5 lg:col-start-8 self-end border-t border-ink pt-6 space-y-3">
-                        <!-- A rebuilt cart above the heading -->
-                        <div class="media-zoom edge-light aspect-[16/10]">
-                            <img src="image/Products/reman-street.jpg" alt="A black rebuilt Club Car 2+2 parked on a residential street" width="1600" height="1000" loading="lazy" decoding="async" class="w-full h-full object-cover">
-                        </div>
-                        <h3 class="type-lg text-ink">${reman.label}</h3>
-                        <p class="measure">Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.</p>
-                        <span class="link inline-block">See available builds</span>
-                    </a>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-14">
+                    ${HOME_USE_TILES.slice(0, 3).map(t => tile(t, 'aspect-[4/3]')).join('')}
+                </div>
+                <!-- The second row's two tiles, as wide as the first row's three, centred -->
+                <div class="grid grid-cols-1 md:flex md:justify-center gap-x-8 gap-y-14 mt-14">
+                    ${HOME_USE_TILES.slice(3).map(t => `<div class="md:w-[calc((100%-4rem)/3)]">${tile(t, 'aspect-[4/3]')}</div>`).join('')}
                 </div>
             </div>
         </section>
@@ -3072,71 +3089,86 @@ function renderHomeUses() {
 }
 
 // One Tempo 2 that repaints from a few swatches, leading into the full builder
-// "What's under the seat": the animated tour of a Tempo 2 (video/vid2.mp4), leading into the battery
-// comparison. The figures come from the Tempo 2's own data so they always match its model page.
+// Warranty (2026-11-17; was "What's under the seat", with the battery, motor and charge figures and the animated
+// tour video): the heading on the left, the Club Car warranty in brief filling the right, and a link to Service and
+// support under it
+// The detailed warranty (2026-11-17), for carts in general for now: shown in a pop-up from the homepage Warranty
+// section's "Click for more info", and on the Service and support page (#warranty). [item, sub-items, coverage]
+const WARRANTY_ROWS = [
+    ['Vehicle mainframe', '', 'Limited lifetime'],
+    ['Suspension', 'Steering gearbox, steering column, shocks and leaf springs', '4 years'],
+    ['Electric powertrain', 'Electric motor, transaxle and MCOR', '3 years'],
+    ['FLA battery', 'Flooded lead acid battery', '4 years or 20,000 hrs'],
+    ['AGM batteries', 'Absorbent glass mat maintenance-free battery', '2 years or 8,000 hrs'],
+    ['Lithium batteries', 'LiFePO4 (lithium iron phosphate) battery', '5 years or 28,000 hrs'],
+    ['Lithium charger', '', '1.5 years or 14,000 hrs'],
+    ['Major electronics', 'Solid state speed controller and battery charger', '4 years'],
+    ['Pedal group', 'Pedal group mechanical assembly, brake cluster assemblies, brake cables and accelerator pedal position sensor (APPS)', '4 years'],
+    ['Seats', 'Seat bottom, seat back and armrests', '4 years'],
+    ['Canopy system', 'Canopy, rear canopy supports, drainage system and structural accessory module (SAM)', '4 years'],
+    ['Body group', 'Beauty panels and front / rear underbody', '3 years'],
+    ['All remaining components', 'Solenoid, limit switches, voltage regulator, F&R switch, and options and accessories supplied by Club Car, including components not specified otherwise', '2 years']
+];
+const WARRANTY_NOTE = 'Coverage by part. Warranty is subject to applicable operating-hour limits and Club Car\'s terms and conditions; ask our service team about your cart.';
+
+function renderWarrantyTable() {
+    return `
+        <div class="overflow-x-auto"><table class="warranty-table w-full min-w-[520px] text-left">
+            <thead><tr><th scope="col">Item</th><th scope="col">Covers</th><th scope="col">Coverage</th></tr></thead>
+            <tbody>${WARRANTY_ROWS.map(([item, sub, cover]) => `<tr><th scope="row">${item}</th><td>${sub || '—'}</td><td>${cover}</td></tr>`).join('')}</tbody>
+        </table></div>`;
+}
+
+let warrantyReturnFocus = null;
+function openWarrantyModal() {
+    let modal = document.getElementById('warranty-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'warranty-modal';
+        modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-0 sm:p-3 flex items-center';
+        modal.onclick = e => { if (e.target === modal) closeWarrantyModal(); };
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+        <div role="dialog" aria-modal="true" aria-labelledby="warranty-modal-title" class="relative w-full max-w-4xl mx-auto sm:my-auto bg-paper border border-line min-h-full sm:min-h-0 sm:max-h-[calc(100vh-1.5rem)] flex flex-col px-6 py-5 lg:px-8">
+            <button type="button" onclick="closeWarrantyModal()" class="absolute top-3 right-3 w-10 h-10 flex items-center justify-center text-ink" aria-label="Close">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+            <h2 id="warranty-modal-title" class="type-md text-ink mb-1">Warranty coverage.</h2>
+            <p class="text-sm text-mute mb-4 pr-8">${WARRANTY_NOTE}</p>
+            <div class="flex-1 min-h-0 overflow-auto">${renderWarrantyTable()}</div>
+            <div class="flex flex-wrap gap-3 mt-4">
+                <a href="${routeHref('service')}#service-request" data-route="service" onclick="closeWarrantyModal()" class="btn btn-primary min-h-[2.5rem] text-sm">Contact our service team</a>
+                <button type="button" onclick="closeWarrantyModal()" class="btn btn-outline min-h-[2.5rem] text-sm">Close</button>
+            </div>
+        </div>`;
+    warrantyReturnFocus = document.activeElement;
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    modal.querySelector('[aria-label="Close"]').focus();
+}
+
+function closeWarrantyModal() {
+    const modal = document.getElementById('warranty-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+    if (warrantyReturnFocus && warrantyReturnFocus.focus) warrantyReturnFocus.focus();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWarrantyModal(); });
+
 function renderHomeInside() {
-    const tempo = PRODUCTS_DATA.find(p => p.slug === 'golfer-tempo-2');
-    const facts = [
-        ['Battery', tempo.battery],
-        ['Motor', tempo.powertrain],
-        ['Full charge', tempo.chargingTime]
-    ].filter(([, v]) => isMeaningful(v));
     return `
         <section class="rise home-inside" aria-labelledby="home-inside-title">
-            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 py-12 lg:py-[4.5rem] grid lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-                <div class="lg:col-span-5 space-y-8">
-                    <h2 id="home-inside-title" class="type-xl text-ink">What's under the seat.</h2>
-                    <p class="measure">The battery, the drive and the frame decide how far a cart goes, how it climbs and how long it lasts. Here is the Tempo 2, taken apart.</p>
-                    <dl class="border-t border-line">
-                        ${facts.map(([k, v]) => `<div class="grid grid-cols-[7rem_1fr] gap-4 py-3 border-b border-line"><dt class="text-sm text-mute pt-1">${k}</dt><dd class="text-lg text-ink">${v}</dd></div>`).join('')}
-                    </dl>
-                    <a href="${routeHref('product-details', tempo.slug)}" data-route="product-details" data-slug="${tempo.slug}" class="btn btn-outline">See the Tempo 2</a>
-                </div>
-                <div class="lg:col-span-7">
-                    <div class="home-inside-frame">
-                        <video id="home-inside-video" class="home-inside-media" muted playsinline loop preload="none" poster="image/Hero/vid2-poster.jpg" aria-label="Animation: a Tempo 2 opens to show its suspension, lithium battery and motor, then reassembles">
-                            <source src="video/vid2.mp4" type="video/mp4">
-                        </video>
-                        <button type="button" id="home-inside-toggle" class="home-hero-toggle" aria-label="Pause video" hidden>
-                            <svg class="icon-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>
-                            <svg class="icon-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7 5v14l12-7z"/></svg>
-                        </button>
-                    </div>
+            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 py-12 lg:py-[4.5rem] grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+                <h2 id="home-inside-title" class="type-xl text-ink lg:col-span-4">Warranty.</h2>
+                <div class="lg:col-span-8 space-y-8">
+                    <p class="text-xl lg:text-2xl leading-[1.6] text-ink-2">The Club Car Golf Carts comes with comprehensive warranty coverage for added peace of mind, including a limited lifetime warranty on the vehicle mainframe, up to 5 years on lithium batteries, 4 years on FLA batteries, suspension, electric components, seats, canopy, and other major parts, and 3 years on the electric powertrain and body group. AGM batteries and other remaining components are covered for 2 years, while the lithium charger has a 1.5-year warranty. Warranty coverage is subject to applicable operating-hour limits and Club Car's terms and conditions.</p>
+                    <button type="button" onclick="openWarrantyModal()" class="btn btn-outline">Click for more info</button>
                 </div>
             </div>
         </section>
     `;
-}
-
-// Plays the tour only while it's on screen, loads it only when it comes near, and follows reduced motion
-function initHomeInside() {
-    const video = document.getElementById('home-inside-video');
-    const toggle = document.getElementById('home-inside-toggle');
-    if (!video || !toggle || !('IntersectionObserver' in window)) return;
-    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) return; // the poster stays as a still
-    let userPaused = false;
-    const sync = () => {
-        toggle.classList.toggle('is-paused', video.paused);
-        toggle.setAttribute('aria-label', video.paused ? 'Play video' : 'Pause video');
-    };
-    const play = () => { const p = video.play(); if (p && p.catch) p.catch(sync); };
-    video.addEventListener('play', sync);
-    video.addEventListener('pause', sync);
-    toggle.addEventListener('click', () => {
-        userPaused = !video.paused;
-        if (video.paused) play(); else video.pause();
-    });
-    toggle.hidden = false;
-    sync();
-    new IntersectionObserver(([entry]) => {
-        if (entry.isIntersecting) {
-            if (video.preload === 'none') { video.preload = 'auto'; video.load(); }
-            if (!userPaused) play();
-        } else if (!video.paused) {
-            video.pause();
-        }
-    }, { rootMargin: '200px 0px', threshold: 0.25 }).observe(video);
 }
 
 // ==========================================
@@ -3172,6 +3204,122 @@ function homeStageBuilds() {
     }));
 }
 
+// Compare (2026-11-17): the Golfer, Scratch and Pro side by side in a pop-up, as the "Versions" document's Golfer page
+// has them (Versions (1).pdf: Tempo Golf, Tempo Scratch Golf, Tempo Pro; the 2-seater's canopy row). Each row: a
+// label, then per build a photo of the part with its line, or a dash where the build has none; colours as swatches.
+// The document's typos are fixed (Sapphire; Tsunami Silver Grey & Black was listed twice). The model page's build
+// options follow the Bundles sheet, which differs from the document in places
+const OPT = name => `image/Options/${name}.jpg`;
+const HOME_COMPARE_COLORS = [
+    { body: ['White', 'Cashmere'], seat: ['White', 'Beige'] },
+    { body: ['White', 'Black', 'Cashmere', 'Sangria', 'Sapphire', 'Green', 'Platinum Grey'],
+        seat: ['White', 'Beige', 'Black', 'Grey', 'Tsunami Silver Red & Black', 'Tsunami Silver Grey & Black', 'Tsunami Silver Blue & Black', 'GC Black Premium Seat'] },
+    { body: ['White', 'Black', 'Cashmere', 'Sangria', 'Sapphire', 'Green', 'Platinum Grey', 'Metallic Platinum', 'Atomic Orange', 'Synergy Green',
+        'Metallic Blue', 'Metallic Grey', 'Metallic Green', 'Metallic Glacier White', 'Metallic Black', '3D Paint', 'Chameleon (7 colors) Black Red',
+        'Chameleon (7 colors) Violet Blue', 'Chameleon (7 colors) Green Blue', 'Chameleon (3 colors) White'],
+        seat: ['Classic Premium Seat Camello', 'Classic Premium Seat Black and Gray', 'Elite Bright White Seat'] }
+];
+const LIFT_TEXT = 'Lifted 3.5" GC, with Tempo fenders 3" or 1.5" or the Onward fender flare kit; GC brush guard and nerf bar optional';
+const MIRROR_TEXT = 'Side mirrors, side mirrors with turn signal, 5 panel mirror, convex inner mirror (short or long)';
+// [label, [Golf, Scratch, Pro]]: a cell is [photo, text] (photo may be null), or null where the build has none
+const HOME_COMPARE_ROWS = [
+    ['Lighting', [null,
+        [OPT('light-gc-apex'), 'Choice of: no headlight, GC Apex Tempo LED headlights & tail lights, GC Tempo LED headlights, or GC Tempo LED headlights & tail lights'],
+        [OPT('light-cc-deluxe'), 'Club Car Tempo Deluxe Light Kit']]],
+    ['Colors', 'colors'],
+    ['Canopy', [[null, '2 Pass Canopy: white or beige'], [null, '2 Pass Canopy: white, beige or black'], [null, '2 Pass Canopy: white, beige or black']]],
+    ['Battery', [[OPT('battery-trojan-8v'), 'Trojan FLA 8V'], [OPT('battery-trojan-8v'), 'Trojan FLA 8V'], [OPT('battery-battlite'), 'Battlite lithium']]],
+    ['Rims & tires', [[OPT('wheel-8-steel'), '8" steel rims with cover'],
+        [OPT('wheel-8-steel'), '8" steel rims with cover, 12" Triton Machined Black or 12" Hela Bright Chrome (215/35-12 tires)'],
+        [OPT('wheel-10-5spoke-gunmetal'), '10" 5 Spoke Alloy Wheel in Gunmetal, 12" Triton Machined Black or 12" Hela Bright Chrome (215/35-12 tires)']]],
+    ['Rims upgrade', [null,
+        [OPT('wheel-14-gridlock-machined-225'), '14" Gridlock Machined Black or Gloss Black, 14" Talon (225/30-14); 12" Triton Machined Black (23x10.5-12)'],
+        [OPT('wheel-14-aerion-gloss-kraken'), '14 choices: 14" Aerion, Gridlock, Talon (225/30-14); Aerion, Athena, Atlas, Zeus, Mercury (Kraken 23x10-14); 12" Hela, Triton (23x10.5-12)']]],
+    ['Golf accessories', [[OPT('bag-cover-black'), 'GC Bag Cover, black'],
+        [OPT('bag-cover-black'), 'GC bag cover (black, beige, white) or CC magnetic (black, beige); sand bottle (max 2); ball washer; Caddy Master cooler'],
+        [OPT('bag-cover-magnetic-black'), 'CC magnetic bag cover (black, beige); sand bottle (max 2); ball washer; Caddy Master cooler']]],
+    ['Caddy stand', [[OPT('caddy-stand'), 'Caddy stand'], [OPT('caddy-stand'), 'Caddy stand'], [OPT('caddy-stand'), 'Caddy stand']]],
+    ['Lifted upgrade', [[OPT('lift-gc-35'), LIFT_TEXT], [OPT('lift-gc-35'), LIFT_TEXT], [OPT('lift-gc-35'), LIFT_TEXT]]],
+    ['Steering & floor mat', [[OPT('floor-mat-gc'), 'GC floor mat'], [OPT('floor-mat-gc'), 'GC floor mat'],
+        [OPT('steering-scorecard'), 'Premium steering wheel with score card (CC); GC floor mat']]],
+    ['Mirrors', [null, [OPT('mirror-side'), MIRROR_TEXT], [OPT('mirror-side'), MIRROR_TEXT]]],
+    ['Electronics', [null, null,
+        [OPT('audio-cc-soundbar'), 'Club Car Premium Sound Bar, Apple CarPlay, GC Sound Bar 27" RGB; add-on wireless charging, premium USB-C port, GC USB-C QC3.0 port with volt meter']]],
+    ['Storage', [null, [OPT('overhead-storage-console'), 'Overhead storage console, under seat storage tray'],
+        [OPT('overhead-storage-console'), 'Overhead storage console, under seat storage tray']]],
+    ['Rain enclosure', [null, [OPT('enclosure-3-beige'), 'Three-sided (CCJX): beige, white or black'],
+        [OPT('enclosure-3-black'), 'Two-sided black (CC), or three-sided (CCJX): beige, white or black']]],
+    ['Cooling', [null, [null, 'Zero Breeze Mark 3 (with an enclosure)'], [null, 'Zero Breeze Mark 3 (with an enclosure)']]]
+];
+
+function homeCompareColors(k) {
+    const elite = PRODUCTS_DATA.find(p => p.slug === 'lifestyle-tempo-2');
+    const hex = { ...Object.fromEntries(COLOR_FAMILIES.tempo.body.flatMap(g => g.colors).map(c => [c.name, c.hex])), ...Object.fromEntries(getProductBodyColors(elite, 2).map(c => [c.name, c.hex])) };
+    const swatch = (name, bg) => `<span class="home-compare-swatch" style="background:${bg || '#ccc'}" title="${attrText(name)}" aria-label="${attrText(name)}" role="img"></span>`;
+    const c = HOME_COMPARE_COLORS[k];
+    return `<div class="home-compare-colors"><p class="home-compare-label">Body</p><div class="home-compare-swatches">${c.body.map(n => swatch(n, hex[n])).join('')}</div>
+        <p class="home-compare-label">Seat</p><div class="home-compare-swatches">${c.seat.map(n => swatch(n, getTrimHex('seat', n))).join('')}</div></div>`;
+}
+
+function renderHomeCompare(product, buildSet) {
+    const cell = (row, k) => {
+        if (row === 'colors') return homeCompareColors(k);
+        const c = row[k];
+        if (!c) return '<span class="home-compare-none" aria-label="Not included">—</span>';
+        return `${c[0] ? `<span class="home-compare-photo"><img src="${c[0]}" alt="" loading="lazy"></span>` : ''}<p>${c[1]}</p>`;
+    };
+    return `
+        <div class="home-compare-scroll"><div class="home-compare min-w-[640px]">
+            <div class="home-compare-head home-compare-corner"></div>
+            ${buildSet.builds.map(b => `<div class="home-compare-head">
+                <img src="${product.buildPhotos[b.id]}" alt="" loading="lazy">
+                <div><p class="type-md text-ink">${buildLabelHtml(b)}</p><p class="text-xs text-mute mt-1">${b.tagline}</p></div></div>`).join('')}
+            ${HOME_COMPARE_ROWS.map(([label, row]) => `<div class="home-compare-cell home-compare-rowlabel">${label}</div>`
+                + [0, 1, 2].map(k => `<div class="home-compare-cell">${cell(row, k)}</div>`).join('')).join('')}
+        </div></div>`;
+}
+
+let homeCompareReturnFocus = null;
+function openHomeStageCompare() {
+    const product = PRODUCTS_DATA.find(p => p.slug === HOME_STAGE_SLUG);
+    const buildSet = getProductBuildSet(product);
+    if (!buildSet) return;
+    let modal = document.getElementById('home-compare-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'home-compare-modal';
+        modal.className = 'fixed inset-0 z-50 hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-0 sm:p-3 flex items-center';
+        modal.onclick = e => { if (e.target === modal) closeHomeStageCompare(); };
+        document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+        <div role="dialog" aria-modal="true" aria-labelledby="home-compare-title" class="relative w-full max-w-5xl mx-auto sm:my-auto bg-paper border border-line h-full sm:h-[calc(100vh-1.5rem)] flex flex-col px-6 py-5 lg:px-8">
+            <button type="button" onclick="closeHomeStageCompare()" class="absolute top-3 right-3 w-10 h-10 flex items-center justify-center text-ink" aria-label="Close">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+            <p class="text-xs text-mute">${product.name} · Club Car Tempo</p>
+            <h2 id="home-compare-title" class="type-md text-ink mt-1 mb-3">Compare ${buildSet.builds.map(buildLabelHtml).join(', ')}.</h2>
+            ${renderHomeCompare(product, buildSet)}
+            <div class="flex flex-wrap gap-3 mt-4">
+                <a href="${routeHref('product-details', product.slug)}" data-route="product-details" data-slug="${product.slug}" onclick="closeHomeStageCompare()" class="btn btn-primary min-h-[2.5rem] text-sm">Build your ${product.name}</a>
+                <button type="button" onclick="closeHomeStageCompare()" class="btn btn-outline min-h-[2.5rem] text-sm">Close</button>
+            </div>
+        </div>`;
+    homeCompareReturnFocus = document.activeElement;
+    modal.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    modal.querySelector('[aria-label="Close"]').focus();
+}
+
+function closeHomeStageCompare() {
+    const modal = document.getElementById('home-compare-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+    if (homeCompareReturnFocus && homeCompareReturnFocus.focus) homeCompareReturnFocus.focus();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHomeStageCompare(); });
+
 function homeStageSwatches(build) {
     return build.colors.map(c => `<button type="button" role="radio" class="home-stage-swatch" data-color="${attrText(c.name)}" aria-checked="${c.name === build.body}" aria-label="${attrText(c.name)}" title="${attrText(c.name)}" style="background:${c.hex}"></button>`).join('');
 }
@@ -3192,6 +3340,28 @@ function homeStageFacts(product) {
     return [['Seating', product.seating.split(' (')[0]], ['Top speed', product.speed.replace(' max', '')], ['Motor', product.powertrain]]
         .map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
 }
+
+// Each build's features (2026-11-17), as round photos under the stage's cart: the Golfer's four, the Scratch adds
+// three, the Pro two more (square crops in image/Banners/golfer-features). The CarPlay circle shows the Club Car
+// overhead unit until a photo of the CarPlay unit is added
+const HOME_STAGE_FEATURE = {
+    dashboard: { image: 'image/Banners/golfer-features/dashboard.jpg', alt: 'Dashboard and steering wheel' },
+    charger: { image: 'image/Banners/golfer-features/wired-charger.jpg', alt: 'Wired USB charger' },
+    ballHolder: { image: 'image/Banners/golfer-features/golf-ball-holder.jpg', alt: 'Side storage with golf ball holder' },
+    cups: { image: 'image/Banners/golfer-features/cup-holders.jpg', alt: 'Cup holders' },
+    cooler: { image: 'image/Banners/golfer-features/cooler-ball-washer.jpg', alt: 'Caddy cooler and ball washer' },
+    mirror: { image: 'image/Banners/golfer-features/mirror.jpg', alt: 'Side mirrors' },
+    sand: { image: 'image/Banners/golfer-features/sand-bottle.jpg', alt: 'Sand bottle' },
+    steering: { image: 'image/Banners/golfer-features/steering-premium.jpg', alt: 'Premium steering wheel' },
+    carplay: { image: 'image/Banners/golfer-features/carplay.jpg', alt: 'Overhead entertainment with Apple CarPlay' }
+};
+const HOME_STAGE_FEATURES = {
+    golf: ['dashboard', 'charger', 'ballHolder', 'cups'],
+    scratch: ['dashboard', 'charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand'],
+    pro: ['dashboard', 'charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'steering', 'carplay']
+};
+const homeStageFeats = level => (HOME_STAGE_FEATURES[level.id] || []).map(k => HOME_STAGE_FEATURE[k])
+    .map(f => `<li><img src="${f.image}" alt="${f.alt}" title="${f.alt}" width="320" height="320" loading="lazy"></li>`).join('');
 
 function renderHomeStage() {
     const builds = homeStageBuilds();
@@ -3220,21 +3390,24 @@ function renderHomeStage() {
                     </div>
                 </div>
 
+                <ul class="home-stage-feats" aria-label="Features of this build">${homeStageFeats(level)}</ul>
+
                 <div class="home-stage-models">
                     <p id="home-stage-models-label" class="home-stage-eyebrow">Choose a build</p>
                     <div class="home-stage-cards" role="group" aria-labelledby="home-stage-models-label" data-txt-pass>
                         ${builds.map((b, k) => `
                             <button type="button" class="home-stage-card" data-build="${k}" aria-pressed="${k === 0}">
                                 <img src="${b.photo}" alt="" loading="lazy">
-                                <span>${buildLabelHtml(b.level)}</span><small>${b.level.tagline}</small>
+                                <span>${buildLabelHtml(b.level)}</span>
                             </button>
                         `).join('')}
                     </div>
-                </div>
-
-                <div class="home-stage-shown">
-                    <div class="home-stage-swatches" role="radiogroup" aria-label="Body color" hidden>${homeStageSwatches(builds[0])}</div>
-                    <p>Shown in <b id="home-stage-body">${body}</b></p>
+                    <!-- The body colours, under the build cards (2026-11-17) -->
+                    <div class="home-stage-shown">
+                        <div class="home-stage-swatches" role="radiogroup" aria-label="Body color" hidden>${homeStageSwatches(builds[0])}</div>
+                        <p>Shown in <b id="home-stage-body">${body}</b></p>
+                        <button type="button" onclick="openHomeStageCompare()" class="btn btn-outline home-stage-compare">Compare builds</button>
+                    </div>
                 </div>
 
                 <dl class="home-stage-facts">${homeStageFacts(product)}</dl>
@@ -3288,6 +3461,7 @@ function initHomeStage() {
         find('#home-stage-desc').textContent = build.level.about || build.level.blurb;
         find('#home-stage-build').innerHTML = `Build the ${buildLabelHtml(build.level)}`;
         find('#home-stage-body').textContent = build.body;
+        find('.home-stage-feats').innerHTML = homeStageFeats(build.level);
         section.querySelectorAll('.home-stage-card').forEach((c, k) => c.setAttribute('aria-pressed', String(k === i)));
         setBackdrop(build.backdrop);
         photo.src = build.photo;
@@ -3915,7 +4089,38 @@ function initHomePage() {
     initHomeStage();
     initLogoGrid();
     initBranchMap();
-    initHomeInside();
+}
+
+// A page made with the page builder: its title and intro; the sections added to it follow (account.js)
+function renderCustomPage() {
+    const page = CUSTOM_PAGES.find(c => c.slug === currentSlug);
+    if (!page) return renderNotFoundPage();
+    const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+    return `
+        <section id="custom-page-head" class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-16 lg:pt-24 pb-8">
+            <h1 class="type-xl text-ink">${esc(page.title)}</h1>
+            ${page.intro ? `<p class="measure mt-6 text-lg leading-[1.7]">${esc(page.intro)}</p>` : ''}
+        </section>
+    `;
+}
+
+// The pages shown in the footer's Company menu, after its own links
+function renderCustomPageLinks() {
+    const list = document.getElementById('footer-company');
+    if (!list) return;
+    list.querySelectorAll('[data-custom-page]').forEach(li => li.remove());
+    CUSTOM_PAGES.filter(c => c.menu).forEach(c => {
+        const li = document.createElement('li');
+        li.dataset.customPage = c.slug;
+        const a = document.createElement('a');
+        a.href = routeHref('custom', c.slug);
+        a.dataset.route = 'custom';
+        a.dataset.slug = c.slug;
+        a.className = 'footer-link';
+        a.textContent = c.menuLabel || c.title;
+        li.append(a);
+        list.append(li);
+    });
 }
 
 function renderNotFoundPage() {
@@ -4138,11 +4343,15 @@ const COLOR_FAMILIES = {
                 { name: 'Sangria', hex: '#8E1B22' }, { name: 'Sapphire', hex: '#1E3A78' }, { name: 'Green', hex: '#0F5A45' },
                 { name: 'Platinum Grey', hex: '#8F9396' }
             ] },
-            { tier: 'Premium Club Car Colors', colors: [
-                { name: 'Atomic Orange', hex: '#F26B1D' }, { name: 'Synergy Green', hex: '#6DB33F' }, { name: 'Rally Red', hex: '#C4161C' },
-                { name: 'Metallic Green', hex: '#2E5E3A' }, { name: 'Metallic Black', hex: '#232427' }, { name: 'Metallic Midnight Silver', hex: '#4B5056' },
-                { name: 'Metallic Brilliant Blue', hex: '#1F4FBF' }, { name: 'Metallic Ice Blue', hex: '#A9C8DA' }, { name: 'Metallic Signature Silver', hex: '#B7BABD' },
-                { name: 'Metallic Glacier White', hex: '#EEF0EE' }, { name: 'Pearl Mist Grey', hex: '#A7A9AA' }, { name: 'Pearl Blue', hex: '#2F5D8A' }
+            // Club Car Premium Painted Colors (the color chart, 2026-11-17): offered on Pro Golfer only (TEMPO_PRO_PAINT)
+            { tier: 'Club Car Premium Painted Colors', colors: [
+                { name: 'Metallic Platinum', hex: '#A9ADB1' },
+                { name: 'Atomic Orange', hex: '#D9541B' }, { name: 'Synergy Green', hex: '#5BC236' },
+                { name: 'Metallic Blue', hex: '#1F3FA6' },
+                { name: 'Metallic Grey', hex: '#8D8F93' },
+                { name: 'Metallic Green', hex: '#2C5E3B' },
+                { name: 'Metallic Glacier White', hex: '#EEF0EF' },
+                { name: 'Metallic Black', hex: '#2A2B2E' }
             ] },
             { tier: 'Premium GC Custom Paint', colors: [
                 { name: '3D Paint', hex: 'linear-gradient(135deg, #C9CCD1, #5E6670, #E8EAEC)' },
@@ -4206,15 +4415,24 @@ function getProductBodyGroups(product, level) {
     const family = COLOR_FAMILIES[product.colorFamily];
     if (!family) return [];
     if (!isTempoVersion(product)) return family.body;
-    const bodies = tempoMatrix(product).body;
-    const names = bodies[level === undefined ? bodies.length - 1 : level];
+    const names = tempoBodyNames(product, level === undefined ? 2 : level);
     const known = Object.fromEntries(family.body.flatMap(g => g.colors).map(c => [c.name, c.hex]));
     const colors = names.map(name => ({ name, hex: known[name] || TEMPO_EXTRA_BODY_HEX[name] }));
     const custom = colors.filter(c => TEMPO_CUSTOM_BODY.includes(c.name));
+    const painted = colors.filter(c => TEMPO_PRO_PAINT.includes(c.name));
     return [
-        { tier: 'Standard Club Car Colors', colors: colors.filter(c => !custom.includes(c)) },
+        { tier: 'Standard Club Car Colors', colors: colors.filter(c => !custom.includes(c) && !painted.includes(c)) },
+        { tier: 'Club Car Premium Painted Colors', colors: painted },
         { tier: 'Premium GC Custom Paint', colors: custom }
     ].filter(g => g.colors.length);
+}
+
+// A Tempo build's body colors: the document's, plus on Pro Golfer (the golfer line's top build) the Club Car
+// Premium Painted Colors (2026-11-17)
+const TEMPO_PRO_PAINT = ['Metallic Platinum', 'Atomic Orange', 'Synergy Green', 'Metallic Blue', 'Metallic Grey', 'Metallic Green', 'Metallic Glacier White', 'Metallic Black'];
+function tempoBodyNames(product, i) {
+    const base = tempoMatrix(product).body[i];
+    return product.version === 'golfer' && i === 2 ? [...TEMPO_STD_BODY, ...TEMPO_PRO_PAINT, ...base.filter(n => !TEMPO_STD_BODY.includes(n))] : base;
 }
 
 // Flat list of a product's body colors, each with a photo when one exists for that color
@@ -4627,7 +4845,9 @@ function initDetailDepth() {
             vec2 q = p + shift * (texture2D(depth, p).r - 0.5);
             q = p + shift * (texture2D(depth, q).r - 0.5);
             bool outside = p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 || q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0;
-            gl_FragColor = outside ? vec4(1.0) : texture2D(photo, q);
+            // A cut-out photo's transparent backdrop is laid on white (multiplied into the page, white is the page)
+            vec4 c = texture2D(photo, q);
+            gl_FragColor = outside ? vec4(1.0) : vec4(mix(vec3(1.0), c.rgb, c.a), 1.0);
         }`));
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) { canvas.remove(); return; }
@@ -4651,7 +4871,8 @@ function initDetailDepth() {
     gl.uniform1i(gl.getUniformLocation(program, 'photo'), 0);
     gl.uniform1i(gl.getUniformLocation(program, 'depth'), 1);
     const uShift = gl.getUniformLocation(program, 'shift'), uBox = gl.getUniformLocation(program, 'box');
-    const upload = (unit, source) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source); };
+    // RGBA (2026-11-16): taken as RGB, a cut-out photo's transparent backdrop came out black
+    const upload = (unit, source) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source); };
 
     let depthSrc = null, depthReady = false, photoReady = false, stopped = false, running = false, onScreen = false, drawn = null;
     const show = on => { canvas.hidden = !on; img.style.opacity = on ? '0' : ''; };
@@ -5249,7 +5470,7 @@ function applyBuildLook(product) {
     const look = product.buildLooks && product.buildLooks[detailBuild.level];
     if (!look || detailBuild.colorsPicked) return;
     const i = detailLevelIndex(product);
-    if (look.body && tempoMatrix(product).body[i].includes(look.body)) detailBuild.body = look.body;
+    if (look.body && tempoBodyNames(product, i).includes(look.body)) detailBuild.body = look.body;
     if (look.seat && tempoMatrix(product).seat[i].includes(look.seat)) detailBuild.seat = look.seat;
     if (look.canopy && getDetailCanopyOptions(product).includes(look.canopy)) detailBuild.canopy = look.canopy;
 }
@@ -5305,7 +5526,7 @@ const TEMPO_UPGRADE_PACKAGE = [
 const TEMPO_UPGRADE_PACKAGE_LEGACY = [
     [],
     ['batteryUpgrade', 'lift', 'wheels', 'storage', 'enclosure', 'cooling'],
-    ['batteryUpgrade', 'lift', 'wheels', 'mirrors', 'charging', 'storage', 'enclosure', 'cooling']
+    ['lift', 'wheels', 'mirrors', 'audio', 'charging', 'storage', 'enclosure', 'cooling']
 ];
 
 // The package's groups on this model and level, each with the value it gets: the group's first choice (wheels:
@@ -5383,12 +5604,12 @@ function openWheelUpgrade(index) {
         <div role="dialog" aria-modal="true" aria-labelledby="wheel-upgrade-title" class="w-full max-w-md bg-paper border border-line">
             ${photo ? `<div class="bg-stone aspect-[4/3] flex items-center justify-center p-6"><img src="${photo}" alt="" class="max-h-full object-contain mix-blend-multiply"></div>` : ''}
             <div class="p-6 space-y-3">
-                <p class="text-sm text-mute">14" wheel upgrade</p>
+                <p class="text-sm text-mute">Rims upgrade</p>
                 <h2 id="wheel-upgrade-title" class="type-md text-ink">${name}</h2>
                 ${detail ? `<p class="text-sm text-ink-2">${detail}</p>` : ''}
-                <p class="text-ink-2">14" wheels are an upgrade over the standard 8" to 12" wheels, priced on top of the build. Add the 14" upgrade to choose this wheel.</p>
+                <p class="text-ink-2">These rims are an upgrade over the build's standard rims, priced on top of the build. Add the rims upgrade to choose this wheel.</p>
                 <div class="flex flex-wrap gap-3 pt-3">
-                    <button type="button" onclick="confirmWheelUpgrade()" class="btn btn-primary">Add 14" upgrade</button>
+                    <button type="button" onclick="confirmWheelUpgrade()" class="btn btn-primary">Add rims upgrade</button>
                     <button type="button" onclick="closeWheelUpgrade()" class="btn btn-outline">Not now</button>
                 </div>
             </div>
@@ -5636,7 +5857,7 @@ function optionSegments(items) {
 function optionGroupHint(g) {
     if (g.hint) return g.hint;
     if (g.included) return g.options.length > 1 ? 'Included, choose one' : 'Included';
-    if (g.type === 'single') return g.upgradeFrom ? 'Choose one; 14" wheels are an upgrade' : 'Choose one';
+    if (g.type === 'single') return g.upgradeFrom ? 'Choose one; upgrade rims are priced on top' : 'Choose one';
     if (g.type === 'optional') return 'Optional, choose one (tap again to remove)';
     if (g.type === 'multi') return 'Optional, add any';
     if (g.type === 'qty') return 'Optional, one or two (tap again to remove)';
@@ -5653,7 +5874,7 @@ function renderTempoGroup(g, o, nested, cell = false) {
             if (g.upgradeFrom && k === g.upgradeFrom) {
                 cards.push(`
                     <div class="opt-grid-label opt-upgrade-head">
-                        <span>14" upgrade</span>
+                        <span>Rims upgrade</span>
                         ${optionSegments([false, true].map(on => ({ key: `wheelUpgrade:${on}`, label: on ? 'On' : 'Off', active: !!o.wheelUpgrade === on, onclick: `setWheelUpgrade(${on})` })))}
                     </div>`);
             }
@@ -6765,7 +6986,9 @@ function initServiceStage() {
             vec2 q = uv + shift * (texture2D(depth, uv).r - 0.5);
             q = uv + shift * (texture2D(depth, q).r - 0.5);
             bool outside = q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0;
-            gl_FragColor = outside ? vec4(1.0) : texture2D(photo, q);
+            // A cut-out photo's transparent backdrop is laid on white (multiplied into the page, white is the page)
+            vec4 c = texture2D(photo, q);
+            gl_FragColor = outside ? vec4(1.0) : vec4(mix(vec3(1.0), c.rgb, c.a), 1.0);
         }`));
     gl.bindAttribLocation(program, 0, 'at');
     gl.linkProgram(program);
@@ -6785,7 +7008,8 @@ function initServiceStage() {
     gl.uniform1i(gl.getUniformLocation(program, 'photo'), 0);
     gl.uniform1i(gl.getUniformLocation(program, 'depth'), 1);
     const uShift = gl.getUniformLocation(program, 'shift');
-    const upload = (unit, source) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source); };
+    // RGBA (2026-11-16): taken as RGB, a cut-out photo's transparent backdrop came out black
+    const upload = (unit, source) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source); };
 
     let photoReady = false, depthReady = false, stopped = false, running = false, onScreen = true;
     const pingDepth = SERVICE_PINGS.map(() => 0.5);
@@ -7279,6 +7503,14 @@ function renderServicePage() {
                     </li>
                 `).join('')}
             </ol>
+        </section>
+
+        <section id="warranty" class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12 scroll-mt-20" aria-labelledby="warranty-title">
+            <div class="lg:col-span-4 space-y-4">
+                <h2 id="warranty-title" class="type-lg text-ink">Warranty coverage.</h2>
+                <p class="measure">${WARRANTY_NOTE}</p>
+            </div>
+            <div class="lg:col-span-8">${renderWarrantyTable()}</div>
         </section>
 
         <section id="service-request" class="home-section bg-stone scroll-mt-20" aria-labelledby="service-request-title">

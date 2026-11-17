@@ -122,7 +122,11 @@ const MASKS = {
                 // Front seat's handle (a thin arc), the rear seat's handle (a bar rising to the right) and the third's
                 [[428, 495], [442, 458], [465, 444], [490, 447], [499, 470], [499, 490], [491, 490], [491, 472], [486, 456], [466, 453], [449, 463], [436, 497]],
                 [[605, 567], [620, 530], [640, 495], [665, 465], [690, 445], [710, 440], [722, 447], [720, 462], [705, 470], [685, 487], [665, 515], [650, 545], [635, 567]],
-                [[808, 522], [825, 480], [840, 455], [860, 447], [878, 450], [882, 470], [875, 500], [868, 522]]
+                [[808, 522], [825, 480], [840, 455], [860, 447], [878, 450], [882, 470], [875, 500], [868, 522]],
+                // 2026-11-16: the black tubes of the rear seat's handle and the third's (the outlines above cut out only
+                // the openings inside them, so a light seat colour painted the tubes in streaks)
+                [[603, 548], [610, 520], [620, 500], [634, 480], [650, 460], [666, 446], [688, 434], [706, 428], [720, 432], [722, 447], [710, 440], [690, 445], [665, 465], [640, 495], [620, 530], [612, 548]],
+                [[788, 528], [796, 500], [808, 478], [824, 458], [842, 442], [864, 432], [888, 430], [906, 438], [910, 470], [905, 520], [890, 525], [880, 470], [868, 452], [850, 455], [835, 470], [822, 495], [812, 528]]
             ] }
     },
     // Villager 6 (a cut-out): white body (the cowl, headlights and badge cut out; the seat pedestals and side panel)
@@ -183,15 +187,12 @@ const MASKS = {
         canopy: { any: [{ sat: [0, 0.2], light: [0.45, 1] }, { sat: [0, 0.6], light: [0.8, 1] }], keepWhite: true, close: 2, minArea: 300,
             polys: [[[250, 247], [300, 228], [400, 213], [500, 205], [600, 203], [700, 206], [790, 215], [800, 232], [790, 240], [700, 238], [600, 236], [500, 238], [400, 240], [300, 246]]] }
     },
-    // Golfer 4 Golfer: black paint, as black as the bumpers and trim, so its outlines follow the paint's edges
-    // (traced on this photo) and the badge is cut out. White seats
+    // Golfer 4 Golfer: black paint, as black as the bumpers and trim, so it can't be found by colour. Its body is the
+    // Scratch photo's (2026-11-16): the same cart and camera in red paint, found exactly by colour, badge and all; this
+    // photo is framed a little larger (scripts/align-photos.mjs). Traced by hand before, it left black along the
+    // hood's top edge and front corner, a black box round the badge, and the rear panel cut off. White seats
     'golfer-4-golfer': {
-        body: { sat: [0, 0.35], light: [0, 0.85], close: 3, minArea: 600,
-            polys: [
-                [[912, 650], [935, 620], [960, 605], [1010, 590], [1110, 584], [1210, 590], [1270, 606], [1300, 628], [1330, 645], [1395, 668], [1418, 690], [1422, 760], [1400, 782], [1330, 790], [1250, 802], [1170, 790], [1090, 775], [1010, 760], [950, 745], [925, 740], [912, 720]],
-                [[118, 640], [150, 620], [230, 624], [252, 650], [272, 668], [330, 678], [365, 690], [405, 697], [407, 830], [262, 832], [257, 800], [236, 765], [215, 732], [192, 710], [170, 697], [142, 692], [118, 697]]
-            ],
-            exclude: [[[1250, 717], [1340, 717], [1340, 763], [1250, 763]]] },
+        body: { from: 'golfer-4-scratch', fromAt: { scale: 1.0115, dx: -27, dy: -3.5 }, light: [0, 1], keepWhite: true, close: 1, minArea: 600 },
         seat: { sat: [0, 0.3], light: [0.5, 1], keepWhite: true, close: 2, minArea: 400, polys: [
             [[250, 445], [260, 430], [305, 424], [360, 427], [400, 442], [425, 452], [445, 450], [465, 437], [490, 427], [490, 570], [455, 572], [420, 580], [380, 590], [305, 592], [260, 585], [247, 565]],
             [[490, 445], [510, 422], [555, 416], [610, 420], [660, 437], [680, 447], [700, 445], [730, 422], [780, 415], [855, 420], [890, 440], [897, 500], [895, 565], [880, 585], [780, 590], [705, 585], [680, 595], [630, 606], [555, 607], [510, 600], [492, 580], [487, 525]],
@@ -291,12 +292,24 @@ for (const [name, spec] of Object.entries(MASKS)) {
     const px = new Array(w * h);
     for (let i = 0; i < w * h; i++) px[i] = hsl(data[i * 3], data[i * 3 + 1], data[i * 3 + 2]);
     if (alpha) for (let i = 0; i < w * h; i++) px[i].cutOut = alpha[i] < 128;
-    // `from`: a part outlined by another photo's map (shot from the same camera), grown by `grow` px
+    // `from`: a part outlined by another photo's map (shot from the same camera), grown by `grow` px. `fromAt`
+    // (2026-11-16): where that photo is framed differently, { scale, dx, dy } takes this photo's pixel (x, y) to the
+    // other's ((x - w/2) / scale + w/2 - dx, (y - h/2) / scale + h/2 - dy), measured by scripts/align-photos.mjs
     const fromMap = async (part, c) => {
         if (!part.from) return null;
-        const raw = await sharp(path.join(root, 'image/Products/builds/masks', `${part.from}.png`)).resize(w, h).removeAlpha().raw().toBuffer();
+        const file = path.join(root, 'image/Products/builds/masks', `${part.from}.png`);
         let m = new Uint8Array(w * h);
-        for (let i = 0; i < w * h; i++) m[i] = raw[i * 3 + c] > 127 ? 1 : 0;
+        if (part.fromAt) {
+            const { data: raw, info: ri } = await sharp(file).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+            const { scale, dx, dy } = part.fromAt;
+            for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+                const sx = Math.round((x - w / 2) / scale + w / 2 - dx), sy = Math.round((y - h / 2) / scale + h / 2 - dy);
+                if (sx >= 0 && sy >= 0 && sx < ri.width && sy < ri.height) m[y * w + x] = raw[(sy * ri.width + sx) * 3 + c] > 127 ? 1 : 0;
+            }
+        } else {
+            const raw = await sharp(file).resize(w, h).removeAlpha().raw().toBuffer();
+            for (let i = 0; i < w * h; i++) m[i] = raw[i * 3 + c] > 127 ? 1 : 0;
+        }
         return part.grow ? morph(m, w, h, part.grow, true) : m;
     };
     const parts = [];
@@ -397,4 +410,36 @@ for (const [name, a] of Object.entries(ALIGNED)) {
     await shifted(path.join(root, 'image/Products/builds', `${a.from}.jpg`), '#ffffff', path.join(root, 'image/Products/builds', `${name}.jpg`));
     await shifted(path.join(root, 'image/Products/builds/masks', `${a.from}.png`), '#000000', path.join(root, 'image/Products/builds/masks', `${name}.png`));
     console.log(`${name}: ${a.from} shifted ${a.dx}, ${a.dy} px`);
+}
+
+// Stripe maps carried over from another photo of the same cart (2026-11-16), for a photo whose seat is plain but
+// can be offered patterned (Tsunami). The Lifestyle 2 Essential photo is the Golfer 2 Scratch photo's cart and
+// angle, framed 0.97 times as large and moved (measured on the body, seat and roof paint maps, in the 1600 px
+// photos): each of its seat pixels takes the Scratch seat's tone at the same place, and a seat pixel the Scratch
+// seat doesn't cover (its edges) takes the nearest one's. recolor.js paints a patterned seat tone by tone with it
+const WARPED_TONES = { 'lifestyle-2-essential': { from: 'golfer-2-scratch-right', scale: 0.97, dx: -136, dy: 36.4 } };
+for (const [name, t] of Object.entries(WARPED_TONES)) {
+    if (only && name !== only && t.from !== only) continue;
+    const masks = path.join(root, 'image/Products/builds/masks');
+    const { data: src, info: si } = await sharp(path.join(masks, `${t.from}-tones.png`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data: map, info } = await sharp(path.join(masks, `${name}.png`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { width: w, height: h } = info;
+    const out = Buffer.alloc(w * h * 3);
+    const has = new Uint8Array(w * h), seat = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        if (map[i * 3 + 1] < 20) continue; // the seat is the paint map's green
+        seat[i] = 1;
+        const sx = Math.round((x - w / 2) / t.scale + w / 2 - t.dx), sy = Math.round((y - h / 2) / t.scale + h / 2 - t.dy);
+        if (sx < 0 || sy < 0 || sx >= si.width || sy >= si.height) continue;
+        const j = sy * si.width + sx;
+        if (src[j * 3] + src[j * 3 + 1] + src[j * 3 + 2] === 0) continue;
+        for (let c = 0; c < 3; c++) out[i * 3 + c] = src[j * 3 + c];
+        has[i] = 1;
+    }
+    // The seat's edges the Scratch seat didn't reach are bolster, as a Tsunami seat's edges are (grown in from their
+    // neighbours, they ran out in straight blocks). The tones' edges are softened, as traced ones are
+    for (let i = 0; i < w * h; i++) if (seat[i] && !has[i]) out[i * 3] = 255;
+    await sharp(out, { raw: { width: w, height: h, channels: 3 } }).blur(1.5).png().toFile(path.join(masks, `${name}-tones.png`));
+    console.log(`${name}-tones: carried over from ${t.from}`);
 }
