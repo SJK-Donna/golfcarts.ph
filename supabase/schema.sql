@@ -969,6 +969,195 @@ drop policy if exists sku_usd_write on public.sku_usd;
 create policy sku_usd_write on public.sku_usd for all to authenticated
     using (public.staff_role() in ('master', 'pricing')) with check (public.staff_role() in ('master', 'pricing'));
 
+-- ---------- Bundles, the admin's own (2026-11-18): a parts list and each build's basis ----------
+-- The admin is now where bundles are kept (the user's choice; the Bundles sheet was loaded once, from
+-- supabase/private/bundles-v2-data.sql). Two layers:
+--   bundle_items:        each part once: SKU, description, unit cost and its currency (USD, or PHP for a local part)
+--   bundle_builds:       a build, e.g. Golfcarts / 2 seater / Pro
+--   bundle_options:      a build's choices by slot (Body: White, Green...); at most one per slot is_default, which is
+--                        what the build includes when nothing else is chosen; a slot with none is an upgrade
+--   bundle_option_items: the parts an option brings, each with its quantity (wheels x4, batteries x6)
+-- Same access as the old bundles: read by staff who price quotations, changed by super admins and the price manager.
+-- The old bundles and sku_usd tables stay as they were until quotations switch over.
+create table if not exists public.bundle_items (
+    id bigserial primary key,
+    sku text not null default '',
+    description text not null,
+    cost numeric,
+    currency text not null default 'USD' check (currency in ('USD', 'PHP')),
+    photo text not null default '',
+    note text not null default '',
+    updated_by text,
+    updated_at timestamptz,
+    unique (sku, description)
+);
+create table if not exists public.bundle_builds (
+    id bigserial primary key,
+    product text not null,
+    config text not null,
+    type text not null,
+    sort int not null default 0,
+    note text not null default '',
+    updated_by text,
+    updated_at timestamptz,
+    unique (product, config, type)
+);
+create table if not exists public.bundle_options (
+    id bigserial primary key,
+    build_id bigint not null references public.bundle_builds (id) on delete cascade,
+    slot text not null,
+    option text not null,
+    is_default boolean not null default false,
+    sort int not null default 0,
+    note text not null default '',
+    updated_by text,
+    updated_at timestamptz,
+    unique (build_id, slot, option)
+);
+-- One default per slot
+create unique index if not exists bundle_options_one_default on public.bundle_options (build_id, lower(slot)) where is_default;
+create table if not exists public.bundle_option_items (
+    option_id bigint not null references public.bundle_options (id) on delete cascade,
+    item_id bigint not null references public.bundle_items (id) on delete restrict,
+    qty numeric not null default 1 check (qty > 0),
+    sort int not null default 0,
+    primary key (option_id, item_id)
+);
+create index if not exists bundle_option_items_item on public.bundle_option_items (item_id);
+-- Locked first (written out, so the SQL Editor's check sees it); opened to staff by the policies below
+alter table public.bundle_items enable row level security;
+alter table public.bundle_builds enable row level security;
+alter table public.bundle_options enable row level security;
+alter table public.bundle_option_items enable row level security;
+
+do $$
+declare t text;
+begin
+    foreach t in array array['bundle_items', 'bundle_builds', 'bundle_options'] loop
+        execute format('drop trigger if exists %1$s_stamp on public.%1$s', t);
+        execute format('create trigger %1$s_stamp before insert or update on public.%1$s for each row execute function public.stamp_site_edit()', t);
+        execute format('drop trigger if exists %1$s_activity on public.%1$s', t);
+        execute format('create trigger %1$s_activity after insert or update or delete on public.%1$s for each row execute function public.log_activity(%2$L)', t,
+            case t when 'bundle_items' then 'description' when 'bundle_builds' then 'type' else 'option' end);
+    end loop;
+    foreach t in array array['bundle_items', 'bundle_builds', 'bundle_options', 'bundle_option_items'] loop
+        execute format('alter table public.%I enable row level security', t);
+        execute format('drop policy if exists %1$s_read on public.%1$s', t);
+        execute format('create policy %1$s_read on public.%1$s for select to authenticated using (public.staff_role() in (''master'', ''pricing'', ''sales''))', t);
+        execute format('drop policy if exists %1$s_write on public.%1$s', t);
+        execute format('create policy %1$s_write on public.%1$s for all to authenticated using (public.staff_role() in (''master'', ''pricing'')) with check (public.staff_role() in (''master'', ''pricing''))', t);
+    end loop;
+end $$;
+
+-- What the website's builder shows (2026-11-18, the user's choice "A": the builder follows the bundles): each build's
+-- options by slot, their names, order and default. Names and ids only: no SKUs, parts or costs, so anyone may read
+-- it (security definer: the tables themselves stay closed to visitors). A request carries the ids of the options
+-- chosen (quotes.bundle_options), and its quotation takes exactly those options' parts
+create or replace function public.bundle_catalog() returns jsonb
+language sql stable security definer set search_path = public as $$
+    select coalesce(jsonb_agg(jsonb_build_object(
+        'id', b.id, 'product', b.product, 'config', b.config, 'type', b.type,
+        'options', (select coalesce(jsonb_agg(jsonb_build_object('id', o.id, 'slot', o.slot, 'option', o.option, 'default', o.is_default)
+                        order by o.sort, o.id), '[]'::jsonb)
+                    from public.bundle_options o where o.build_id = b.id))
+        order by b.sort, b.id), '[]'::jsonb)
+    from public.bundle_builds b
+$$;
+revoke execute on function public.bundle_catalog() from public;
+grant execute on function public.bundle_catalog() to anon, authenticated;
+-- The options a request chose in the builder (ids of bundle_options), beside its rows of names
+alter table public.quotes add column if not exists bundle_options bigint[] not null default '{}';
+
+-- ---------- Bundles, live from the team's sheet (2026-11-18, the user's choice) ----------
+-- The email script (google-apps-script/golfcarts-mail.gs, syncBundles) reads the Bundles tab of "Bundles and USD sku
+-- list.xlsx" in Drive every hour when the file has changed, and on "Sync from the sheet now" in the admin, and saves
+-- it here with the shared secret (save_bundles). The sheet is the master for what came from it (source 'sheet'):
+-- each sync updates those options, their parts, costs and defaults, and removes the ones the sheet no longer has.
+-- Options added in the admin (source 'admin', e.g. the paints) are kept. An option keeps its id while its build, slot
+-- and name stay the same, so requests made before a sync still price right. bundle_sync keeps when it last ran.
+alter table public.bundle_options add column if not exists source text not null default 'sheet';
+alter table public.bundle_options alter column source set default 'admin';
+create table if not exists public.bundle_sync (
+    id int primary key default 1 check (id = 1),
+    synced_at timestamptz,
+    file_modified text not null default '',
+    options int not null default 0,
+    error text not null default '',
+    requested_at timestamptz
+);
+insert into public.bundle_sync (id) values (1) on conflict (id) do nothing;
+alter table public.bundle_sync enable row level security;
+drop policy if exists bundle_sync_read on public.bundle_sync;
+create policy bundle_sync_read on public.bundle_sync for select to authenticated using (public.staff_role() in ('master', 'pricing', 'sales'));
+
+-- data: { items: [{ sku, description, cost, currency }], options: [{ product, config, type, slot, option, is_default,
+-- sort, parts: [{ sku, description, qty }] }] }, already shaped by the script (defaults, the wheel cover, the light kits)
+create or replace function public.save_bundles(secret text, data jsonb, error_text text default '', sheet_modified text default '')
+returns void language plpgsql security definer set search_path = public as $$
+begin
+    if secret is null or secret is distinct from (select decrypted_secret from vault.decrypted_secrets where name = 'notify_secret' limit 1) then
+        raise exception 'Not allowed';
+    end if;
+    if coalesce(error_text, '') <> '' or data is null or jsonb_array_length(coalesce(data -> 'options', '[]'::jsonb)) = 0 then
+        update public.bundle_sync set error = left(coalesce(nullif(error_text, ''), 'The sheet had no bundle lines'), 1000) where id = 1;
+        return;
+    end if;
+    -- Parts: new ones added, costs and currencies brought up to date
+    insert into public.bundle_items (sku, description, cost, currency)
+    select coalesce(i ->> 'sku', ''), i ->> 'description', nullif(i ->> 'cost', '')::numeric, case when i ->> 'currency' = 'PHP' then 'PHP' else 'USD' end
+    from jsonb_array_elements(data -> 'items') i
+    where coalesce(i ->> 'description', '') <> ''
+    on conflict (sku, description) do update set cost = excluded.cost, currency = excluded.currency
+        where public.bundle_items.cost is distinct from excluded.cost or public.bundle_items.currency is distinct from excluded.currency;
+    -- Builds
+    insert into public.bundle_builds (product, config, type, sort)
+    select distinct on (o ->> 'product', o ->> 'config', o ->> 'type') o ->> 'product', o ->> 'config', o ->> 'type', (o ->> 'build_sort')::int
+    from jsonb_array_elements(data -> 'options') o
+    on conflict (product, config, type) do nothing;
+    -- The sheet's options: kept by build, slot and name (so their ids stay), their order brought up to date
+    create temporary table sheet_options on commit drop as
+    select b.id as build_id, o ->> 'slot' as slot, o ->> 'option' as option, coalesce((o ->> 'is_default')::boolean, false) as is_default,
+           (o ->> 'sort')::int as sort, o -> 'parts' as parts
+    from jsonb_array_elements(data -> 'options') o
+    join public.bundle_builds b on b.product = o ->> 'product' and b.config = o ->> 'config' and b.type = o ->> 'type';
+    insert into public.bundle_options (build_id, slot, option, is_default, sort, source)
+    select build_id, slot, option, false, sort, 'sheet' from sheet_options
+    on conflict (build_id, slot, option) do update set sort = excluded.sort, source = 'sheet';
+    -- Options the sheet no longer has (and that came from it) go, with their parts lists
+    delete from public.bundle_options x where x.source = 'sheet'
+        and not exists (select 1 from sheet_options s where s.build_id = x.build_id and s.slot = x.slot and s.option = x.option);
+    -- Defaults: the sheet's, in the slots it gives one (cleared there first: one per slot)
+    update public.bundle_options x set is_default = false
+    where x.is_default and exists (select 1 from sheet_options s where s.build_id = x.build_id and lower(s.slot) = lower(x.slot) and s.is_default);
+    update public.bundle_options x set is_default = true
+    from sheet_options s where s.build_id = x.build_id and s.slot = x.slot and s.option = x.option and s.is_default;
+    -- Each sheet option's parts, as the sheet has them now
+    delete from public.bundle_option_items l using public.bundle_options x where l.option_id = x.id and x.source = 'sheet';
+    insert into public.bundle_option_items (option_id, item_id, qty, sort)
+    select x.id, i.id, sum(coalesce(nullif(e.part ->> 'qty', '')::numeric, 1)), min(e.ord)::int
+    from sheet_options s
+    join public.bundle_options x on x.build_id = s.build_id and x.slot = s.slot and x.option = s.option
+    cross join lateral jsonb_array_elements(s.parts) with ordinality as e(part, ord)
+    join public.bundle_items i on i.sku = coalesce(e.part ->> 'sku', '') and i.description = e.part ->> 'description'
+    group by x.id, i.id
+    on conflict (option_id, item_id) do update set qty = excluded.qty, sort = excluded.sort;
+    update public.bundle_sync set synced_at = now(), file_modified = coalesce(sheet_modified, ''), error = '',
+        options = (select count(*) from sheet_options) where id = 1;
+end $$;
+revoke execute on function public.save_bundles(text, jsonb, text, text) from public;
+grant execute on function public.save_bundles(text, jsonb, text, text) to anon, authenticated;
+
+-- "Sync from the sheet now" in the admin: asks the script to read the sheet at once
+create or replace function public.request_bundles_sync() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+    if coalesce(public.staff_role(), '') not in ('master', 'pricing') then raise exception 'Not allowed'; end if;
+    update public.bundle_sync set requested_at = now() where id = 1;
+    perform public.notify_mail('bundles_sync', 0);
+end $$;
+revoke execute on function public.request_bundles_sync() from public, anon;
+grant execute on function public.request_bundles_sync() to authenticated;
+
 -- pricing settings: read by staff who price quotations, changed by super admins and the price manager
 drop policy if exists pricing_read on public.pricing_settings;
 create policy pricing_read on public.pricing_settings for select to authenticated

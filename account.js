@@ -447,13 +447,17 @@ async function recordQuote(fields, slug) {
     let quoteRows = [];
     try { quoteRows = JSON.parse(fields.rows || '[]'); } catch (e) { /* rows stay empty */ }
     const text = v => (v == null ? '' : String(v));
-    const { error } = await sb.from('quotes').insert({
+    const row = {
         reference: text(fields.reference), golfer_id: currentGolfer() ? currentGolfer().id : null, source: text(fields.source),
         name: text(fields.name), email: text(fields.email), phone: text(fields.phone), model: text(fields.model),
         quantity: text(fields.quantity), branch: text(fields.branch), notes: text(fields.notes), rows: quoteRows,
         // The model page it came from, so its quotation can be priced from that model's bundle
         slug: slug || null
-    });
+    };
+    // The bundle options chosen in the builder, by id (2026-11-18); a database without the column yet still takes the request
+    const ids = (fields.bundle_options || []).map(Number).filter(n => Number.isInteger(n) && n > 0);
+    let { error } = await sb.from('quotes').insert(ids.length ? { ...row, bundle_options: ids } : row);
+    if (error && ids.length && /bundle_options/.test(error.message)) ({ error } = await sb.from('quotes').insert(row));
     if (error) console.warn('Quote not saved:', error.message);
     else pageData = null;
     return { error };
@@ -709,6 +713,25 @@ async function loadSiteEdits({ rerender = true } = {}) {
     }
 }
 loadSiteEdits();
+
+// The builder's options from the bundles (2026-11-18; app.js BUNDLE_CATALOG): names and ids only, for everyone. Kept
+// for the next visit; a model page open when a different list arrives is drawn again. Before schema.sql adds it,
+// the builder keeps its own lists
+async function loadBundleCatalog() {
+    if (!sb) return;
+    try {
+        const { data, error } = await sb.rpc('bundle_catalog');
+        if (error) throw error;
+        const next = Array.isArray(data) && data.length ? data : null;
+        const changed = JSON.stringify(next) !== JSON.stringify(BUNDLE_CATALOG);
+        BUNDLE_CATALOG = next;
+        try { if (next) localStorage.setItem(BUNDLE_CATALOG_KEY, JSON.stringify(next)); else localStorage.removeItem(BUNDLE_CATALOG_KEY); } catch (e) { /* not kept */ }
+        if (changed && currentPage === 'product-details') renderApp();
+    } catch (err) {
+        console.warn('Bundle list not loaded:', err.message || err);
+    }
+}
+loadBundleCatalog();
 
 async function saveSiteEdit(key, value, message) {
     const { error } = value ? await sb.from('site_edits').upsert({ key, value }) : await sb.from('site_edits').delete().eq('key', key);
@@ -2236,7 +2259,7 @@ function renderAdminPage() {
         // Bundles are read by everyone who prices quotations; tables not created yet (supabase/schema.sql not re-run)
         // come back as null, and the rest of the admin still loads
         const costs = can('bundles.view') || can('quotations.view');
-        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads, skuPhotos, skuPhotoSync, zohoItems, skuSitePhotos, stockSheet] = await Promise.all([
+        const [quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads, skuPhotos, skuPhotoSync, zohoItems, skuSitePhotos, stockSheet, basis] = await Promise.all([
             can('quotes.view') ? rows(sb.from('quotes').select('*').order('created_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('golfers').select('*').order('joined_at', { ascending: false })) : Promise.resolve([]),
             can('golfers.view') ? rows(sb.from('saved_builds').select('golfer_id')) : Promise.resolve([]),
@@ -2257,9 +2280,11 @@ function renderAdminPage() {
                 .catch(() => null) : Promise.resolve(null),
             costs ? allRows(() => sb.from('sku_site_photos').select('sku, url').order('sku')).catch(() => null) : Promise.resolve(null),
             // The team's stock sheet: per-branch stock, in transit and remarks (null until schema.sql adds it)
-            costs ? allRows(() => sb.from('stock_sheet').select('sku, cebu, manila, sta_rosa, total, in_transit, remark, movement').order('sku')).catch(() => null) : Promise.resolve(null)
+            costs ? allRows(() => sb.from('stock_sheet').select('sku, cebu, manila, sta_rosa, total, in_transit, remark, movement').order('sku')).catch(() => null) : Promise.resolve(null),
+            // The admin's own bundles (2026-11-18): parts list and build bases (null until schema.sql adds them)
+            costs ? loadBundleBasis().catch(() => null) : Promise.resolve(null)
         ]);
-        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads, skuPhotos, skuPhotoSync, zohoItems, skuSitePhotos, stockSheet };
+        return { quotes, golfers, builds, staff, bundles, skuUsd, quotations, pricing, activity, zohoLeads, skuPhotos, skuPhotoSync, zohoItems, skuSitePhotos, stockSheet, basis };
     });
     const sections = ADMIN_SECTIONS.map(([group, items]) => [group, items.filter(([, , p]) => !p || can(p))]).filter(([, items]) => items.length);
     const allowed = sections.flatMap(([, items]) => items.map(([id]) => id));
@@ -3695,7 +3720,7 @@ function formatCost(n, b) {
 }
 // The mark under a local part's cost: priced in pesos, not converted from dollars
 const LOCAL_MARK = '<span class="cost-local" title="A local part, priced in pesos: no exchange rate or freight">Local ₱</span>';
-let bundleView = 'bundles'; // or 'usd', the USD SKU list
+let bundleView = 'builds'; // 'builds' and 'parts' (the admin's own bundles), 'bundles' (the old sheet lines), 'usd', 'zoho'
 
 function formatUsd(n) {
     return n == null ? '' : '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -4050,9 +4075,262 @@ function addZohoItemTo(where, sku) {
     if (next) { next.scrollIntoView({ block: 'center' }); next.focus(); }
 }
 
+// --- Bundles, the admin's own (2026-11-18; supabase/schema.sql bundle_items, bundle_builds, bundle_options,
+// bundle_option_items). Builds: pick a build and see its slots; in each slot one option can be ticked Included
+// (the default, what the build comes with) and the rest are its other choices; a slot with nothing ticked is an
+// upgrade. Each option lists the parts it brings and their quantities. Parts list: each part once, with its cost and
+// currency, so fixing it there fixes every build. Changes save at once; the database stamps who made them ---
+async function loadBundleBasis() {
+    const [items, builds, options, links] = await Promise.all([
+        allRows(() => sb.from('bundle_items').select('*').order('description')),
+        allRows(() => sb.from('bundle_builds').select('*').order('sort')),
+        allRows(() => sb.from('bundle_options').select('*').order('sort')),
+        allRows(() => sb.from('bundle_option_items').select('*').order('sort'))
+    ]);
+    // When the bundles were last read from the team's sheet (null until schema.sql adds it)
+    const sync = await rows(sb.from('bundle_sync').select('*').eq('id', 1).maybeSingle()).catch(() => null);
+    return { items, builds, options, links, sync };
+}
+
+let basisBuild = null;    // the build shown (id)
+let basisPartQuery = '';
+let basisPartEditing = null; // an item's id, or 'new'
+
+const basisName = b => `${b.product} · ${b.config} · ${b.type}`;
+const basisItemLabel = i => `${i.sku ? i.sku + ' · ' : ''}${i.description}`;
+
+// After a change: the four tables again, and the screen redrawn where it was
+async function refreshBasis() {
+    try { pageData.basis = await loadBundleBasis(); } catch (err) { showToast(`Couldn't reload: ${err.message || err}`); }
+    const y = scrollY;
+    renderApp();
+    scrollTo(0, y);
+}
+
+async function basisWrite(query, done) {
+    const { error } = await query;
+    if (error) {
+        showToast(/bundle_options_one_default/.test(error.message) ? 'A slot can have only one default.'
+            : /violates foreign key/.test(error.message) ? 'That part is still used in a build. Remove it from the builds first.'
+            : /duplicate key/.test(error.message) ? 'That already exists.' : `Not saved: ${error.message}`);
+        return false;
+    }
+    if (done) showToast(done);
+    await refreshBasis();
+    return true;
+}
+
+function renderBasisBuilds({ basis }) {
+    if (!basis) return '<p class="measure">The new bundles aren\'t in the database yet. Run supabase/schema.sql in the Supabase SQL Editor, then supabase/private/bundles-v2-data.sql.</p>';
+    if (!basis.builds.length) return '<p class="measure">No builds yet. Run supabase/private/bundles-v2-data.sql in the Supabase SQL Editor to load them from the Bundles sheet.</p>';
+    const build = basis.builds.find(b => b.id === basisBuild) || basis.builds[0];
+    basisBuild = build.id;
+    const items = new Map(basis.items.map(i => [i.id, i]));
+    const opts = basis.options.filter(o => o.build_id === build.id);
+    const slots = [];
+    opts.forEach(o => { let sl = slots.find(x => x.name.toLowerCase() === o.slot.toLowerCase()); if (!sl) slots.push(sl = { name: o.slot, options: [] }); sl.options.push(o); });
+    const partsOf = o => basis.links.filter(l => l.option_id === o.id).map(l => ({ ...l, item: items.get(l.item_id) })).filter(l => l.item);
+    // An option's cost: dollars and pesos apart
+    const optionCost = parts => {
+        const sum = peso => parts.filter(p => p.item.cost != null && isPesoLine(p.item) === peso).reduce((t, p) => t + Number(p.item.cost) * Number(p.qty), 0);
+        const has = peso => parts.some(p => p.item.cost != null && isPesoLine(p.item) === peso);
+        return [has(false) ? formatUsd(sum(false)) : '', has(true) ? formatPhp(sum(true)) : ''].filter(Boolean).join(' + ');
+    };
+    const included = slots.map(sl => sl.options.find(o => o.is_default)).filter(Boolean);
+    const includedParts = included.flatMap(partsOf);
+    return `
+        <div class="adm-toolbar">
+            <div class="field adm-grow"><label for="basis-build">Build</label>
+                <select id="basis-build" onchange="basisBuild = Number(this.value); renderApp()">
+                    ${basis.builds.map(b => `<option value="${b.id}"${b.id === build.id ? ' selected' : ''}>${escapeHtml(basisName(b))}</option>`).join('')}
+                </select></div>
+            <button type="button" onclick="addBasisSlot()" class="btn btn-outline adm-toolbar-end">Add a slot</button>
+        </div>
+        <datalist id="basis-items">${basis.items.map(i => `<option value="${escapeHtml(basisItemLabel(i))}"></option>`).join('')}</datalist>
+        ${renderBundleSync(basis.sync)}
+        <p class="adm-count-line">${escapeHtml(basisName(build))}: ${slots.length} slots, ${included.length} included by default${includedParts.length ? ` · included cost ${optionCost(includedParts)}` : ''}. Tick <b>Included</b> for what the build comes with; a slot with nothing ticked is an upgrade, only added when chosen.</p>
+        ${slots.map(sl => `
+            <div class="basis-slot">
+                <div class="basis-slot-head">
+                    <h3>${escapeHtml(sl.name)}</h3>
+                    <span class="basis-tag${sl.options.some(o => o.is_default) ? ' is-included' : ''}">${sl.options.some(o => o.is_default) ? 'Included' : 'Upgrade'}</span>
+                    <span class="flex-1"></span>
+                    ${sl.options.some(o => o.is_default) ? `<button type="button" onclick="setBasisDefault(${build.id}, ${escapeHtml(JSON.stringify(sl.name))}, null)" class="link text-xs">Make it an upgrade</button>` : ''}
+                    <button type="button" onclick="addBasisOption(${build.id}, ${escapeHtml(JSON.stringify(sl.name))})" class="link text-xs">Add an option</button>
+                </div>
+                <div class="admin-table-wrap"><table class="admin-table basis-table">
+                    <thead><tr><th scope="col">Included</th><th scope="col">Option</th><th scope="col">Parts it brings</th><th scope="col" class="text-right">Cost</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+                    <tbody>${sl.options.map(o => { const parts = partsOf(o); return `<tr${o.is_default ? ' class="is-default"' : ''}>
+                        <td><input type="radio" name="def-${build.id}-${escapeHtml(sl.name)}" aria-label="Included: ${escapeHtml(o.option)}"${o.is_default ? ' checked' : ''} onchange="setBasisDefault(${build.id}, ${escapeHtml(JSON.stringify(sl.name))}, ${o.id})"></td>
+                        <td class="font-semibold">${escapeHtml(o.option)}</td>
+                        <td>${parts.map(p => `<div class="basis-part">
+                                <span>${escapeHtml(p.item.sku || 'no SKU')} · ${escapeHtml(p.item.description)}</span>
+                                <label class="basis-qty">×<input type="text" inputmode="decimal" value="${Number(p.qty)}" aria-label="Quantity" onchange="setBasisQty(${o.id}, ${p.item_id}, this.value)"></label>
+                                <button type="button" onclick="removeBasisPart(${o.id}, ${p.item_id})" class="link text-xs">Remove</button>
+                            </div>`).join('') || '<span class="text-mute text-xs">No parts yet</span>'}
+                            <div class="basis-add"><input type="text" list="basis-items" placeholder="Add a part: SKU or name" aria-label="Add a part to ${escapeHtml(o.option)}" onchange="addBasisPart(${o.id}, this)"></div></td>
+                        <td class="text-right whitespace-nowrap">${optionCost(parts)}${parts.some(p => isPesoLine(p.item)) ? LOCAL_MARK : ''}</td>
+                        <td class="whitespace-nowrap"><button type="button" onclick="renameBasisOption(${o.id})" class="link text-xs mr-3">Rename</button><button type="button" onclick="deleteBasisOption(${o.id})" class="link text-xs">Delete</button></td>
+                    </tr>`; }).join('')}</tbody>
+                </table></div>
+            </div>`).join('')}`;
+}
+
+// The sheet the bundles come from (2026-11-18): when it was last read, any problem, and a button to read it now.
+// What came from the sheet is changed in the sheet: the next sync puts it back as the sheet has it
+function renderBundleSync(sync) {
+    if (!sync) return '';
+    const when = t => t ? new Date(t).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    return `<div class="bundle-sync">
+        <p>${sync.synced_at ? `Read from the Bundles sheet ${when(sync.synced_at)} (${sync.options} options)` : 'Not read from the Bundles sheet yet.'}
+            Changes to the bundles are made in the sheet; it's read every hour when it changes. Options added here (like the paints) are kept.</p>
+        ${sync.error ? `<p class="golfer-error">${escapeHtml(sync.error)}</p>` : ''}
+        ${can('bundles.view') ? '<button type="button" onclick="syncBundlesNow(this)" class="btn btn-outline min-h-[2.25rem] px-4 text-sm">Sync from the sheet now</button>' : ''}
+    </div>`;
+}
+
+async function syncBundlesNow(button) {
+    button.disabled = true;
+    const { error } = await sb.rpc('request_bundles_sync');
+    if (error) { button.disabled = false; showToast(`Not started: ${error.message}`); return; }
+    showToast('Reading the Bundles sheet… this takes about a minute.');
+    // The script answers within a minute or so: look again then
+    setTimeout(refreshBasis, 45000);
+    setTimeout(refreshBasis, 90000);
+}
+
+function basisFind(id) {
+    return pageData.basis.options.find(o => o.id === id);
+}
+
+// One default per slot: the old one is cleared first (the database allows only one)
+async function setBasisDefault(buildId, slot, optionId) {
+    const same = pageData.basis.options.filter(o => o.build_id === buildId && o.slot.toLowerCase() === slot.toLowerCase());
+    const { error } = await sb.from('bundle_options').update({ is_default: false }).in('id', same.filter(o => o.is_default).map(o => o.id));
+    if (error) { showToast(`Not saved: ${error.message}`); return; }
+    if (optionId == null) { await refreshBasis(); showToast(`${slot} is now an upgrade.`); return; }
+    await basisWrite(sb.from('bundle_options').update({ is_default: true }).eq('id', optionId), `${basisFind(optionId).option} is now included.`);
+}
+
+async function addBasisSlot() {
+    const slot = (prompt('New slot (for example Lights, Floor mat):') || '').trim();
+    if (!slot) return;
+    const option = (prompt(`Its first option (for example the part's name):`) || '').trim();
+    if (!option) return;
+    await basisWrite(sb.from('bundle_options').insert({ build_id: basisBuild, slot, option, sort: 100000 }), `${slot} added.`);
+}
+
+async function addBasisOption(buildId, slot) {
+    const option = (prompt(`New option for ${slot}:`) || '').trim();
+    if (!option) return;
+    const last = Math.max(0, ...pageData.basis.options.filter(o => o.build_id === buildId && o.slot.toLowerCase() === slot.toLowerCase()).map(o => o.sort));
+    await basisWrite(sb.from('bundle_options').insert({ build_id: buildId, slot, option, sort: last + 1 }), `${option} added.`);
+}
+
+async function renameBasisOption(id) {
+    const o = basisFind(id);
+    const option = (prompt('Option name:', o.option) || '').trim();
+    if (!option || option === o.option) return;
+    await basisWrite(sb.from('bundle_options').update({ option }).eq('id', id), 'Renamed.');
+}
+
+async function deleteBasisOption(id) {
+    const o = basisFind(id);
+    if (!confirm(`Delete the option "${o.option}" from ${o.slot}? Its parts stay in the parts list.`)) return;
+    await basisWrite(sb.from('bundle_options').delete().eq('id', id), 'Option deleted.');
+}
+
+async function addBasisPart(optionId, input) {
+    const text = input.value.trim();
+    if (!text) return;
+    const item = pageData.basis.items.find(i => basisItemLabel(i) === text)
+        || pageData.basis.items.find(i => i.sku && i.sku.toLowerCase() === text.toLowerCase());
+    if (!item) { showToast('Pick a part from the list, or add it in the Parts list first.'); return; }
+    await basisWrite(sb.from('bundle_option_items').insert({ option_id: optionId, item_id: item.id, qty: 1, sort: 1000 }), `${item.description} added.`);
+}
+
+async function setBasisQty(optionId, itemId, value) {
+    const qty = parseAmount(String(value));
+    if (!qty || Number.isNaN(qty) || qty <= 0) { showToast('Quantity must be more than 0.'); await refreshBasis(); return; }
+    await basisWrite(sb.from('bundle_option_items').update({ qty }).eq('option_id', optionId).eq('item_id', itemId));
+}
+
+async function removeBasisPart(optionId, itemId) {
+    await basisWrite(sb.from('bundle_option_items').delete().eq('option_id', optionId).eq('item_id', itemId), 'Part removed from the option.');
+}
+
+// --- Parts list ---
+function renderBasisParts({ basis }) {
+    if (!basis) return '<p class="measure">The new bundles aren\'t in the database yet. Run supabase/schema.sql in the Supabase SQL Editor, then supabase/private/bundles-v2-data.sql.</p>';
+    const used = new Map();
+    basis.links.forEach(l => used.set(l.item_id, (used.get(l.item_id) || 0) + 1));
+    const q = basisPartQuery.toLowerCase();
+    const shown = basis.items.filter(i => !q || `${i.sku} ${i.description}`.toLowerCase().includes(q));
+    const form = i => `<tr class="bundle-editing"><td colspan="6">
+        <form data-no-prefill onsubmit="saveBasisPart(event, ${i.id == null ? 'null' : i.id})" class="grid sm:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
+            <div class="field"><label for="bp-sku">SKU</label><input id="bp-sku" name="sku" type="text" list="zoho-skus" autocomplete="off" value="${escapeHtml(i.sku || '')}"></div>
+            <div class="field sm:col-span-2 lg:col-span-3"><label for="bp-description">Description</label><input id="bp-description" name="description" type="text" required value="${escapeHtml(i.description || '')}"></div>
+            <div class="field"><label for="bp-cost">Cost</label><input id="bp-cost" name="cost" type="text" inputmode="decimal" value="${i.cost == null ? '' : Math.round(Number(i.cost) * 100) / 100}"></div>
+            <div class="field"><label for="bp-currency">Currency</label><select id="bp-currency" name="currency">${[['USD', 'USD ($)'], ['PHP', 'PHP (₱), a local part']].map(([v, t]) => `<option value="${v}"${(isPesoLine(i) ? 'PHP' : 'USD') === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>
+            <p class="text-xs text-mute sm:col-span-3 lg:col-span-6">Cost is per unit. A PHP cost goes into quotations as it is; a USD cost is converted with the exchange rate and freight.${i.id != null && used.get(i.id) ? ` Used in ${used.get(i.id)} option${used.get(i.id) === 1 ? '' : 's'}: a change here changes them all.` : ''}</p>
+            <div class="flex gap-4 items-center sm:col-span-3 lg:col-span-6">
+                <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm">${i.id == null ? 'Add part' : 'Save'}</button>
+                <button type="button" onclick="basisPartEditing = null; renderApp()" class="link text-sm">Cancel</button>
+            </div>
+        </form></td></tr>`;
+    return `
+        <div class="adm-toolbar">
+            <div class="field adm-grow"><label for="bp-q">Search description or SKU</label><input id="bp-q" type="search" value="${escapeHtml(basisPartQuery)}" oninput="basisPartQuery = this.value; refreshBasisParts()"></div>
+            <button type="button" onclick="basisPartEditing = 'new'; renderApp()" class="btn btn-primary adm-toolbar-end">Add a part</button>
+        </div>
+        <div id="basis-parts">${renderBasisPartRows(shown, used, form)}</div>`;
+}
+
+function renderBasisPartRows(shown, used, form) {
+    return `<p class="adm-count-line">${shown.length} part${shown.length === 1 ? '' : 's'}</p>
+        <div class="admin-table-wrap"><table class="admin-table">
+            <thead><tr><th scope="col">SKU</th><th scope="col">Description</th><th scope="col" class="text-right">Cost</th><th scope="col">Used in</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody>${basisPartEditing === 'new' ? form({}) : ''}${shown.map(i => basisPartEditing === i.id ? form(i) : `<tr>
+                <td class="whitespace-nowrap">${escapeHtml(i.sku || '—')}</td>
+                <td>${escapeHtml(i.description)}${i.updated_by ? `<p class="text-xs text-mute mt-1">edited by ${escapeHtml(adminName(i.updated_by))}</p>` : ''}</td>
+                <td class="text-right whitespace-nowrap">${formatCost(i.cost, i)}${isPesoLine(i) ? LOCAL_MARK : ''}</td>
+                <td class="text-xs text-mute">${used.get(i.id) ? `${used.get(i.id)} option${used.get(i.id) === 1 ? '' : 's'}` : 'not used'}</td>
+                <td class="whitespace-nowrap"><button type="button" onclick="basisPartEditing = ${i.id}; renderApp()" class="link text-xs mr-3">Edit</button><button type="button" onclick="deleteBasisPart(${i.id})" class="link text-xs">Delete</button></td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+}
+
+// Typing in the search redraws the list only, so the box keeps its focus
+function refreshBasisParts() {
+    const box = document.getElementById('basis-parts');
+    if (!box) return;
+    const basis = pageData.basis, q = basisPartQuery.toLowerCase();
+    const used = new Map();
+    basis.links.forEach(l => used.set(l.item_id, (used.get(l.item_id) || 0) + 1));
+    box.innerHTML = renderBasisPartRows(basis.items.filter(i => !q || `${i.sku} ${i.description}`.toLowerCase().includes(q)), used, () => '');
+}
+
+async function saveBasisPart(e, id) {
+    e.preventDefault();
+    const data = new FormData(e.target);
+    const cost = parseAmount(String(data.get('cost') || ''));
+    if (Number.isNaN(cost)) { showToast('Cost must be a number.'); return; }
+    const part = { sku: String(data.get('sku') || '').trim(), description: String(data.get('description') || '').trim(), cost,
+        currency: data.get('currency') === 'PHP' ? 'PHP' : 'USD' };
+    if (!part.description) { showToast('A part needs a description.'); return; }
+    basisPartEditing = null;
+    await basisWrite(id == null ? sb.from('bundle_items').insert(part) : sb.from('bundle_items').update(part).eq('id', id), id == null ? 'Part added.' : 'Part saved.');
+}
+
+async function deleteBasisPart(id) {
+    const i = pageData.basis.items.find(x => x.id === id);
+    if (!confirm(`Delete "${i.description}" from the parts list?`)) return;
+    await basisWrite(sb.from('bundle_items').delete().eq('id', id), 'Part deleted.');
+}
+
 function renderAdminBundles(data) {
-    const views = [['bundles', 'Bundles'], ['usd', 'USD SKU list'], ['zoho', 'Items']];
-    const counts = { bundles: data.bundles && data.bundles.length, usd: data.skuUsd && data.skuUsd.length, zoho: data.zohoItems && data.zohoItems.length };
+    const views = [['builds', 'Builds'], ['parts', 'Parts list'], ['bundles', 'Old bundles'], ['usd', 'USD SKU list'], ['zoho', 'Zoho items']];
+    const counts = { builds: data.basis && data.basis.builds.length, parts: data.basis && data.basis.items.length, bundles: data.bundles && data.bundles.length, usd: data.skuUsd && data.skuUsd.length, zoho: data.zohoItems && data.zohoItems.length };
     return `
         ${renderSkuPhotoSync(data)}
         <!-- The SKU fields suggest Zoho items: type a SKU or part of a name -->
@@ -4060,7 +4338,7 @@ function renderAdminBundles(data) {
         <div class="bundle-parts mb-5" role="group" aria-label="Show">
             ${views.map(([id, label]) => `<button type="button" aria-pressed="${bundleView === id}" onclick="showBundleView('${id}')">${label}${counts[id] != null ? `<small>${counts[id].toLocaleString('en-PH')}</small>` : ''}</button>`).join('')}
         </div>
-        ${bundleView === 'usd' ? renderSkuUsd(data) : bundleView === 'zoho' ? renderZohoItems(data) : renderBundles(data)}`;
+        ${bundleView === 'builds' ? renderBasisBuilds(data) : bundleView === 'parts' ? renderBasisParts(data) : bundleView === 'usd' ? renderSkuUsd(data) : bundleView === 'zoho' ? renderZohoItems(data) : renderBundles(data)}`;
 }
 
 function showBundleView(view) {
@@ -4397,8 +4675,27 @@ function rowValue(rows, label) {
 }
 
 // Words to match on: lower case, inch sizes as "8in", plurals as singulars, filler words dropped
+// Names the builder and the bundles write differently as whole phrases (2026-11-18): "GC floor mat" is the bundle's
+// "GC Premium Floormat", "Apple CarPlay" its "Club Car Overhead Entertainment Carplay"
+const MATCH_PHRASES = [[/floor\s*mat/g, 'floormat'], [/apple\s+carplay/g, 'overhead entertainment carplay']];
+
+// The words a Body / Seat / Canopy / Battery choice's name may have around the colour or type itself (2026-11-18):
+// "Classic Premium Seat Camello" is the option "Camello", "4 Pass Onward Canopy White" is "2+2 White", "Battlite
+// lithium" is "Lithium". Everything else in the name must be in the option's name too, and the other way round
+const CHOICE_FILLER = {
+    body: ['body', 'panel', 'color', 'colour'],
+    seat: ['classic', 'premium', 'seat', 'front', 'rear', 'bench', 'cushion'],
+    canopy: ['pass', 'passenger', 'canopy', 'onward', '2+2', '4+2', 'top'],
+    battery: ['battery', 'battlite', 'trojan', '8v', '48v', 'lead', 'acid', 'deep', 'cycle', '100ah', 'ion', 'upgrade']
+};
+function choiceCore(part, text) {
+    // The filler written the way matchWords writes words ("pass" becomes "pas", as plurals lose their s)
+    const filler = new Set(matchWords((CHOICE_FILLER[part] || []).join(' ')));
+    return [...new Set(matchWords(text).filter(w => !filler.has(w)))].sort().join(' ');
+}
+
 function matchWords(text) {
-    return String(text || '').toLowerCase().replace(/(\d+)\s*(?:"|''|in\b|inch(?:es)?\b)/g, '$1in')
+    return MATCH_PHRASES.reduce((t, [re, to]) => t.replace(re, to), String(text || '').toLowerCase()).replace(/(\d+)\s*(?:"|''|in\b|inch(?:es)?\b)/g, '$1in')
         .split(/[^a-z0-9+]+/).filter(w => w.length >= 2 && !MATCH_STOPWORDS.has(w)).map(w => w.replace(/(?<=[a-z]{3})s$/, ''))
         .map(w => MATCH_SYNONYMS[w] || w);
 }
@@ -4441,7 +4738,7 @@ function suggestBundleLines(quote, group, bundles) {
     // Matched against what was chosen, not the questions: "Ball and club cleaner or cooler" must not pick the cooler
     const choiceLabels = new Set(Object.values(BUNDLE_CHOICE_ROWS));
     const otherText = (quote.rows || []).filter(([k]) => !choiceLabels.has(k) && k !== 'Model' && k !== 'Build').map(r => r[1]).join(' ');
-    const picked = [], unmatched = [];
+    const picked = [], unmatched = [], missing = [];
     for (const [part, options] of parts) {
         const key = part.toLowerCase();
         // A build with one canopy (the 4 and 4+2 canopy set) carries it, whatever the request calls it
@@ -4460,6 +4757,16 @@ function suggestBundleLines(quote, group, bundles) {
             continue;
         }
         const target = BUNDLE_CHOICE_ROWS[key] ? rowValue(quote.rows, BUNDLE_CHOICE_ROWS[key]) : otherText;
+        // A Body / Seat / Canopy / Battery choice takes only the option of the same name (2026-11-18): never the nearest
+        // one ("Chameleon (7 colors) Green Blue" is not "Green"). Not there: a line with the choice as it was made,
+        // without a SKU or price, to be filled in (missing), so the quotation says what the customer chose
+        if (BUNDLE_CHOICE_ROWS[key]) {
+            if (!target || /^standard$/i.test(target.trim())) { unmatched.push(part); continue; }
+            const same = [...options].find(([option]) => choiceCore(key, option) && choiceCore(key, option) === choiceCore(key, target));
+            if (same) picked.push(...same[1]);
+            else missing.push(missingLine(part, target));
+            continue;
+        }
         // An option is matched by its name, or by its description when its name has no words to match (e.g. "8in" does)
         const scored = [...options].map(([option, lines]) => {
             const name = matchWords(option).length ? option : lines[0].description;
@@ -4482,8 +4789,73 @@ function suggestBundleLines(quote, group, bundles) {
             else unmatched.push(`${part} (${s.lines.length} choices)`);
         }
     }
+    // An upgrade chosen in the builder that nothing in this build's bundle answers (a 14" wheel the bundle doesn't carry,
+    // a floor mat on a build without one): its line too, as chosen, to be filled in. "None", "Standard", "No
+    // headlight" and the like aren't choices
+    const pickedParts = new Set(picked.map(b => (b.part || '').trim().toLowerCase()));
+    const labels = new Map();
+    Object.entries(BUNDLE_PART_ROWS).forEach(([p, ls]) => ls.forEach(l => labels.set(l, [...(labels.get(l) || []), p])));
+    for (const [label, partsFor] of labels) {
+        const value = rowValue(quote.rows, label);
+        if (!value || /^(none|no\b|standard|not included|included\b)/i.test(value.trim())) continue;
+        if (!partsFor.some(p => pickedParts.has(p))) missing.push(missingLine(label, value));
+    }
+    missing.forEach(m => unmatched.push(`${m.part}: ${m.description} (not in the bundles; add its SKU and price)`));
     picked.sort((a, b) => a.sheet_row - b.sheet_row);
-    return { lines: picked.map(bundleToQuotationLine), unmatched };
+    return { lines: [...picked.map(bundleToQuotationLine), ...missing], unmatched };
+}
+
+// A quotation's lines from the bundles (2026-11-18, the builder following the bundles). With the admin's own bundles
+// loaded (Builds tab): the options the request chose by id (body, seat, canopy, battery) take exactly their parts;
+// the other choices (upgrades, until they carry ids too) are matched by name as before; and every slot with an
+// Included option the request didn't choose another for takes that one, so the build's standard parts are always in.
+// Without them, the old sheet lines as before
+function quotationBundleLines(quote, group) {
+    const basis = pageData.basis;
+    const build = group && basis && basis.builds.find(b => bundleGroupName(b) === group);
+    if (!build) return group && pageData.bundles ? suggestBundleLines(quote, group, pageData.bundles) : { lines: [], unmatched: [] };
+    // The build's options as lines (the shape the old sheet lines had)
+    const items = new Map(basis.items.map(i => [i.id, i]));
+    const lines = [];
+    basis.options.filter(o => o.build_id === build.id).forEach(o => basis.links.filter(l => l.option_id === o.id).forEach((l, k) => {
+        const it = items.get(l.item_id);
+        if (it) lines.push({ sheet_row: o.id * 1000 + k, product: build.product, config: build.config, type: build.type, part: o.slot, color: o.option,
+            description: it.description, sku: it.sku, qty: Number(l.qty), cost_usd: it.cost == null ? null : Number(it.cost), currency: it.currency,
+            option_id: o.id, is_default: o.is_default });
+    }));
+    const slotOf = l => String(l.part || '').trim().toLowerCase();
+    // A slot's answer to a row of the request: the wheels and the 14in wheels answer the same "Wheels and tires"
+    const rowKey = p => (BUNDLE_PART_ROWS[p] || [BUNDLE_CHOICE_ROWS[p] || p]).join('|');
+    const ids = new Set((quote.bundle_options || []).map(Number));
+    const direct = lines.filter(l => ids.has(l.option_id));
+    // An option chosen that has no parts yet (a paint added to the builder before its SKU and cost): its line as
+    // chosen, to be filled in
+    const empty = basis.options.filter(o => o.build_id === build.id && ids.has(o.id) && !lines.some(l => l.option_id === o.id));
+    const chosenSlots = new Set([...direct.map(slotOf), ...empty.map(o => String(o.slot).trim().toLowerCase())]);
+    const rows = (quote.rows || []).filter(([k]) => ![...chosenSlots].some(s => BUNDLE_CHOICE_ROWS[s] === k || (BUNDLE_PART_ROWS[s] || []).includes(k)));
+    const res = suggestBundleLines({ ...quote, rows }, group, lines.filter(l => !chosenSlots.has(slotOf(l))));
+    const answered = new Set([...direct, ...res.lines.filter(l => !l.missing)].map(l => rowKey(slotOf(l))));
+    empty.forEach(o => answered.add(rowKey(String(o.slot).trim().toLowerCase())));
+    // A choice kept as chosen (not in the bundles) answers its row too: the Included one doesn't go in beside it
+    res.lines.filter(l => l.missing).forEach(l => {
+        const p = Object.keys(BUNDLE_CHOICE_ROWS).find(k => BUNDLE_CHOICE_ROWS[k] === l.part || k === slotOf(l));
+        answered.add(rowKey(p || slotOf(l)));
+        Object.entries(BUNDLE_PART_ROWS).forEach(([k, ls]) => { if (ls.includes(l.part)) answered.add(rowKey(k)); });
+    });
+    const defaults = lines.filter(l => l.is_default && !answered.has(rowKey(slotOf(l))));
+    defaults.forEach(l => answered.add(rowKey(slotOf(l))));
+    const out = [...direct, ...defaults].map(bundleToQuotationLine);
+    const picked = res.lines.filter(l => !l.missing), missing = [...empty.map(o => missingLine(o.slot, o.option)), ...res.lines.filter(l => l.missing)];
+    empty.forEach(o => res.unmatched.push(`${o.slot}: ${o.option} (no parts in the bundles yet; add its SKU and price)`));
+    const all = [...out, ...picked].sort((x, y) => x.sheet_row - y.sheet_row);
+    // Choice parts the request didn't name ("Standard") are answered by the defaults: not a thing to check
+    const unmatched = res.unmatched.filter(u => !(BUNDLE_CHOICE_ROWS[String(u).toLowerCase()] && answered.has(rowKey(String(u).toLowerCase()))));
+    return { lines: [...all, ...missing], unmatched };
+}
+
+// A choice the bundles don't have, as the customer made it: no SKU, cost or price until someone adds them
+function missingLine(part, value) {
+    return { sheet_row: null, sku: '', part, option: value, description: value, qty: 1, cost_usd: null, price_php: null, manual: false, missing: true };
 }
 
 // Body and seat lines are always Qty 1 (2026-11-17): a colour picked is its pair of SKUs (front and rear panel, seat
@@ -4577,7 +4949,7 @@ async function prepareQuotation(quoteId) {
     const pricing = pageData.pricing;
     if (!quote || !pricing) { showToast('Quotations aren\'t set up in the database yet. Re-run supabase/schema.sql.'); return; }
     const group = bundleGroupForQuote(quote);
-    const suggested = group && pageData.bundles ? suggestBundleLines(quote, group, pageData.bundles) : { lines: [], unmatched: [] };
+    const suggested = quotationBundleLines(quote, group);
     const draft = repriceQuotation({
         quote_id: quote.id, reference: quote.reference,
         customer: { name: quote.name, email: quote.email, phone: quote.phone, branch: quote.branch },
@@ -4713,7 +5085,7 @@ function renderQuotationEditor(data) {
                 <td class="whitespace-nowrap">${escapeHtml(l.sku)}</td>
                 <td>${escapeHtml(l.part)}</td>
                 <td>${escapeHtml(l.option)}</td>
-                <td>${escapeHtml(l.description)}</td>
+                <td>${escapeHtml(l.description)}${l.missing ? '<p class="golfer-error text-xs">Not in the bundles: add its SKU and price</p>' : ''}</td>
                 <td class="text-center">${editable ? `<input type="checkbox" onchange="setQuotationUpgrade(${i}, this.checked)" aria-label="Upgrade"${l.upgrade ? ' checked' : ''}>` : (l.upgrade ? 'Yes' : '')}</td>
                 <td class="text-right">${num(`setQuotationLine(${i}, 'qty', this.value)`, l.qty)}</td>
                 <td class="whitespace-nowrap">${stockBadge(stockStatus(l.sku, stockNeeded(qt, l)))}</td>
@@ -4854,7 +5226,7 @@ function setQuotationGroup(group) {
 function rebuildQuotationLines() {
     if (quotationDraft.lines.length && !confirm('Replace the lines with the ones the request\'s build points at?')) return;
     const quote = pageData.quotes.find(q => q.id === quotationDraft.quote_id) || { rows: quotationDraft.build_rows, slug: null };
-    const suggested = suggestBundleLines(quote, quotationDraft.build_group, pageData.bundles || []);
+    const suggested = quotationBundleLines(quote, quotationDraft.build_group);
     quotationDraft.lines = suggested.lines;
     repriceQuotation(quotationDraft);
     renderApp();

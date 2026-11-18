@@ -1267,6 +1267,10 @@ function tempoBundleSpec(line, layout, i) {
 // `included` marks a single group whose pick comes with the build. `section` groups them on the page. A group's
 // title is the quote row the admin prices it from (account.js BUNDLE_PART_ROWS), so titles and ids stay put.
 function getTempoOptionGroups(product, i) {
+    return bundleTempoGroups(product, i, codeTempoOptionGroups(product, i));
+}
+
+function codeTempoOptionGroups(product, i) {
     if (isLegacyTempo(product)) return getTempoOptionGroupsLegacy(product, i);
     const m = TEMPO_MATRIX;
     const line = product.version;
@@ -1348,7 +1352,7 @@ function getTempoSubGroups(product, i, o) {
 function defaultTempoOptions(product, i) {
     const o = {};
     getTempoOptionGroups(product, i).forEach(g => {
-        if (g.type === 'single') o[g.id] = g.options[0];
+        if (g.type === 'single') o[g.id] = g.bundleDefault || g.options[0];
         if (g.type === 'optional') o[g.id] = '';
         if (g.type === 'multi') o[g.id] = [];
         if (g.type === 'qty') o[g.id] = 0;
@@ -1522,7 +1526,7 @@ function buildYourCart() {
 const HOME_LINEUP = [
     { name: 'Minibus', seats: '14 and 21 seats', image: 'image/lineup/minibus.png', slug: 'minibus-14', left: 0.5, width: 27.8, height: 82 },
     { name: 'Villager', seats: '6 to 8 seats', image: 'image/lineup/villager.png', slug: 'villager-8', left: 26.3, width: 23.2, height: 68 },
-    { name: 'Transporter', seats: '4 seats and a cargo bed', image: 'image/lineup/transporter-roof.png', slug: 'transporter-400', left: 47, width: 20.9, height: 65 },
+    { name: '', seats: '4 seats & cargo bed and 6 seats ', image: 'image/lineup/transporter-roof.png', slug: 'transporter-400', left: 47, width: 20.9, height: 65 },
     { name: 'Carryall', seats: '2 seats and a cargo bed', image: 'image/lineup/carryall.png', slug: 'carryall-500', left: 65.4, width: 20.1, height: 65 },
     { name: 'Tempo', seats: '2 to 6 seats', image: 'image/lineup/tempo.png', slug: 'golfer-tempo-2', left: 83.5, width: 13.8, height: 61 }
 ];
@@ -1607,21 +1611,125 @@ async function sendQuoteRequest(form, fields, slug) {
     }
 }
 
+// --- Before a cart quote is sent (2026-11-18): the Lift Kit offer; after: the request-sent message ---
+// The offer shows for a Tempo that isn't lifted and has no lift kit chosen yet, and whose build has a lift kit (in
+// the bundles, when its build is there). Upgrade adds the row "Lift kit" and, from the bundles, the lift kit option's
+// id, so the quotation takes exactly its parts; Continue sends it as it is; the close button (or Esc) goes back to the
+// form without sending
+const LIFT_OFFER = { row: 'Lift kit', value: 'GC premium lift kit', image: 'image/Options/lift-gc-35.jpg' };
+
+// The build's lift kit in the bundles ({ id, option }); null when the build isn't in the bundles; false when it is
+// there without a lift kit (then there's nothing to offer)
+function liftBundleOption(product, rows) {
+    const build = (rows.find(([k]) => k === 'Build') || [])[1];
+    const i = build && isTempoVersion(product) ? TEMPO_LINES[product.version].levels.findIndex(l => l.name === build) : -1;
+    if (i < 0 || !catalogBuild(product, i)) return null;
+    const o = (catalogOptions(product, i, 'lift kit upgrade') || [])[0];
+    return o ? { id: o.id, option: o.option } : false;
+}
+
+function liftOffer(slug, rows) {
+    const product = PRODUCTS_DATA.find(p => p.slug === slug);
+    if (!product || !isTempoVersion(product) || /lift/i.test(`${product.slug} ${product.name}`)) return null;
+    if ((rows || []).some(([label, value]) => /lift/i.test(`${label} ${value}`) && !/^no\b|none/i.test(String(value)))) return null;
+    const bundle = liftBundleOption(product, rows || []);
+    return bundle === false ? null : { bundle };
+}
+
+let requestDialogDone = null;
+function requestDialog(html, labelledBy) {
+    let box = document.getElementById('request-dialog');
+    if (!box) {
+        box = document.createElement('div');
+        box.id = 'request-dialog';
+        box.className = 'fixed inset-0 z-[60] hidden overflow-y-auto bg-[rgba(21,23,20,0.6)] p-4 flex items-center';
+        box.onclick = e => { if (e.target === box) closeRequestDialog(null); };
+        document.body.appendChild(box);
+    }
+    box.innerHTML = `<div role="dialog" aria-modal="true" aria-labelledby="${labelledBy}" class="request-dialog relative w-full max-w-md mx-auto bg-paper border border-line">
+        <button type="button" onclick="closeRequestDialog(null)" class="absolute top-2 right-2 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-paper/90 text-ink" aria-label="Close">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>${html}</div>`;
+    box.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+    const focus = box.querySelector('[data-autofocus]') || box.querySelector('button');
+    if (focus) setTimeout(() => focus.focus(), 0);
+    return new Promise(resolve => { requestDialogDone = resolve; });
+}
+
+function closeRequestDialog(answer) {
+    const box = document.getElementById('request-dialog');
+    if (!box || box.classList.contains('hidden')) return;
+    box.classList.add('hidden');
+    // The quote pop-up underneath keeps the page from scrolling while it's open
+    if (!document.querySelector('#quote-modal:not(.hidden)')) document.body.classList.remove('overflow-hidden');
+    const done = requestDialogDone;
+    requestDialogDone = null;
+    if (done) done(answer);
+}
+// First, and only this pop-up: Esc mustn't also close the quote form under it
+document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !document.querySelector('#request-dialog:not(.hidden)')) return;
+    e.stopImmediatePropagation();
+    closeRequestDialog(null);
+}, true);
+
+// Resolves 'upgrade', 'continue', or null (closed: don't send)
+function askLiftUpgrade() {
+    return requestDialog(`
+        <img src="${LIFT_OFFER.image}" alt="The GC Premium lift kit fitted under a Club Car Tempo" class="w-full aspect-[900/425] object-cover block">
+        <div class="p-6 space-y-3">
+            <h2 id="lift-offer-title" class="type-md text-ink">Want to upgrade with a Lift Kit?</h2>
+            <p class="text-sm text-ink-2 leading-relaxed">The GC Premium lift kit raises your cart for more ground clearance, a bolder stance and room for bigger wheels. We'll include it in your quotation.</p>
+            <div class="flex flex-wrap gap-3 pt-2">
+                <button type="button" onclick="closeRequestDialog('upgrade')" class="btn btn-primary min-h-[2.75rem]" data-autofocus>Upgrade</button>
+                <button type="button" onclick="closeRequestDialog('continue')" class="btn btn-outline min-h-[2.75rem]">Continue</button>
+            </div>
+        </div>`, 'lift-offer-title');
+}
+
+// Asks, and on Upgrade adds the lift kit to the rows (and its bundle option's id to ids). False: closed, don't send
+async function offerLiftKit(slug, rows, ids) {
+    const offer = liftOffer(slug, rows);
+    if (!offer) return true;
+    const answer = await askLiftUpgrade();
+    if (!answer) return false;
+    if (answer === 'upgrade') {
+        rows.push([LIFT_OFFER.row, offer.bundle ? offer.bundle.option : LIFT_OFFER.value]);
+        if (offer.bundle) ids.push(offer.bundle.id);
+    }
+    return true;
+}
+
+// The request-sent message, in place of a toast: what happens next and the reference to quote
+function showRequestSent(reference, next) {
+    requestDialog(`
+        <div class="p-7 text-center space-y-3">
+            <span class="request-sent-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+            <h2 id="request-sent-title" class="type-md text-ink">Request sent successfully</h2>
+            <p class="text-sm text-ink-2">Your reference is <b class="text-ink">${attrText(reference)}</b>.</p>
+            <p class="text-sm text-mute leading-relaxed">We emailed you a confirmation. ${attrText(next)}</p>
+            <div class="pt-2"><button type="button" onclick="closeRequestDialog(null)" class="btn btn-primary min-h-[2.75rem] px-8" data-autofocus>Done</button></div>
+        </div>`, 'request-sent-title');
+}
+
 async function handleHomeQuoteSubmit(e) {
     e.preventDefault();
     const form = e.target;
     const data = new FormData(form);
     const model = form.querySelector('#hq-model');
     const modelName = model ? model.options[model.selectedIndex].textContent : '';
+    const rows = [['Model', modelName]];
+    if (!await offerLiftKit(model && model.value, rows, [])) return;
     const reference = 'QT-' + Math.floor(100000 + Math.random() * 900000);
     const sent = await sendQuoteRequest(form, {
         reference, source: 'Home form', name: data.get('name'), email: data.get('email'), phone: data.get('phone'),
         model: modelName, quantity: data.get('quantity'), branch: data.get('branch'), notes: data.get('notes'),
-        rows: JSON.stringify([['Model', modelName]])
+        rows: JSON.stringify(rows)
     }, model && model.value);
     if (!sent) return;
     form.reset();
-    showToast(`Request sent. Your reference is ${reference}. We emailed you a confirmation; our sales team will send your quotation.`);
+    showRequestSent(reference, 'Our sales team will send your quotation.');
 }
 
 // Customer quotes on the About page
@@ -2463,21 +2571,24 @@ function closeQuoteModal() {
 async function handleModalQuoteSubmit(e) {
     e.preventDefault();
     const refCode = 'QT-' + Math.floor(100000 + Math.random() * 900000);
+    const select = document.getElementById('modal-product-select');
+    const rows = getQuoteSummaryRows();
+    const ids = [...(quoteBuild && select && select.value === quoteBuild.slug ? quoteBuild.bundleOptions || [] : [])];
+    if (!await offerLiftKit(select && select.value, rows, ids)) return;
     // Everything the visitor chose goes into the request alongside their own notes
     const details = document.getElementById('quote-details');
-    if (details) details.value = `Reference: ${refCode}\n${getQuoteSummaryText()}`;
+    if (details) details.value = `Reference: ${refCode}\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}`;
     const data = new FormData(e.target);
-    const select = document.getElementById('modal-product-select');
     const sent = await sendQuoteRequest(e.target, {
         reference: refCode, source: 'Quote pop-up', name: data.get('name'), email: data.get('email'), phone: data.get('phone'),
         model: select && select.selectedIndex >= 0 ? select.options[select.selectedIndex].textContent : '',
-        notes: data.get('notes'), rows: JSON.stringify(getQuoteSummaryRows())
+        notes: data.get('notes'), rows: JSON.stringify(rows), bundle_options: ids
     }, select && select.value);
     if (!sent) return;
     closeQuoteModal();
     const count = quoteAccessories.size;
     const accessoryNote = count ? ` with ${count} accessor${count === 1 ? 'y' : 'ies'}` : '';
-    showToast(`Request sent${accessoryNote}. Your reference is ${refCode}. We emailed you a confirmation; our sales team will send your quotation.`);
+    showRequestSent(refCode, `Our sales team will send your quotation${accessoryNote ? ` for your cart${accessoryNote}` : ''}.`);
     e.target.reset();
     quoteAccessories = new Set();
     quoteBuild = null;
@@ -2496,15 +2607,27 @@ function getBuildDetails() {
     // A Tempo is named by its seats ("2+2 Seater Club Car"), so the build is just its level ("Scratch")
     const rows = [['Model', isTempoVersion(product) ? `${product.layout} Seater Club Car` : `${product.name} (${categoryLabel(product.category)})`]];
     if (level) rows.push(['Build', level.name]);
-    if (detailBodyColors(product).length) rows.push(['Body color', detailBuild.body || 'Standard']);
-    if (getDetailSeatGroups(product).length) rows.push(['Seat', detailBuild.seat || 'Standard']);
-    if (getDetailCanopyOptions(product).length) rows.push(['Canopy', detailBuild.canopy || 'Standard']);
+    // Seat and canopy not picked yet: the build's own (the bundles' Included), as the quotation will price it
+    const li = detailLevelIndex(product);
+    const chosen = {
+        body: detailBuild.body,
+        seat: detailBuild.seat || catalogDefault(product, li, 'seat'),
+        canopy: detailBuild.canopy || catalogDefault(product, li, 'canopy')
+    };
+    if (detailBodyColors(product).length) rows.push(['Body color', chosen.body || 'Standard']);
+    if (getDetailSeatGroups(product).length) rows.push(['Seat', chosen.seat || 'Standard']);
+    if (getDetailCanopyOptions(product).length) rows.push(['Canopy', chosen.canopy || 'Standard']);
     if (isTempoVersion(product)) rows.push(...getTempoOptionRows(product));
+    // The bundle options chosen, by id (2026-11-18): body, seat, canopy and battery
+    const battery = (rows.find(([k]) => k === 'Battery') || [])[1];
+    const bundleOptions = [catalogOptionId(product, li, 'body', chosen.body), catalogOptionId(product, li, 'seat', chosen.seat),
+        catalogOptionId(product, li, 'canopy', chosen.canopy), catalogOptionId(product, li, 'battery', battery),
+        ...(isTempoVersion(product) ? tempoOptionIds(product, li, detailBuild.options || {}) : [])].filter(Boolean);
     // Build options decided on the model page; the quote's accessory list doesn't offer them again
     const covered = isTempoVersion(product)
         ? getTempoOptionGroups(product, detailLevelIndex(product)).flatMap(g => [g.id, ...(g.covers || [])])
         : [];
-    return { slug: product.slug, rows, covered, lifted: !!(detailBuild.options && detailBuild.options.lift) };
+    return { slug: product.slug, rows, covered, lifted: !!(detailBuild.options && detailBuild.options.lift), bundleOptions };
 }
 
 // Rows for the model currently selected in the quote form (the build only applies to the model it came from)
@@ -3196,9 +3319,10 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeWarrant
 function renderHomeInside() {
     return `
         <section class="rise home-inside" aria-labelledby="home-inside-title">
-            <!-- Centred (2026-11-17): the heading, the warranty's small print and its button in one column -->
-            <div class="max-w-3xl mx-auto px-5 sm:px-8 py-12 lg:py-[4.5rem] text-center space-y-6">
-                <h2 id="home-inside-title" class="type-xl text-ink">Warranty.</h2>
+            <!-- Centred (2026-11-17): the warranty's small print and its button in one column. The heading is for screen
+                 readers only (2026-11-18); it stays in place so the page editor's saved edits keep their positions -->
+            <div class="max-w-3xl mx-auto px-5 sm:px-8 py-12 lg:py-[4.5rem] text-center">
+                <h2 id="home-inside-title" class="sr-only">Warranty.</h2>
                 <div class="space-y-6">
                     <p class="text-[0.8125rem] leading-relaxed text-mute measure mx-auto">*The Club Car Golf Carts comes with comprehensive warranty coverage for added peace of mind, including a limited lifetime warranty on the vehicle mainframe, up to 5 years on lithium batteries, 4 years on FLA batteries, suspension, electric components, seats, canopy, and other major parts, and 3 years on the electric powertrain and body group. AGM batteries and other remaining components are covered for 2 years, while the lithium charger has a 1.5-year warranty. Warranty coverage is subject to applicable operating-hour limits and Club Car's terms and conditions.</p>
                     <button type="button" onclick="openWarrantyModal()" class="btn btn-primary btn-sm">Click for more info</button>
@@ -4370,6 +4494,7 @@ const SEAT_PHOTOS = {
 
 function getSeatPhotos(seatGroups, option) {
     if (seatGroups !== CLUB_CAR_SEAT_GROUPS) return [];
+    option = visualName('seat', option);
     return (SEAT_PHOTOS[SEAT_ALIASES[option] || option] || []).map(name => `image/Seats/${name}.jpg`);
 }
 const COLOR_FAMILIES = {
@@ -4452,11 +4577,13 @@ function getProductBodyGroups(product, level) {
     const family = COLOR_FAMILIES[product.colorFamily];
     if (!family) return [];
     if (!isTempoVersion(product)) return family.body;
-    const names = tempoBodyNames(product, level === undefined ? 2 : level);
+    // No level given: the build open on its page, else the top build
+    const names = tempoBodyNames(product, level === undefined ? (product.slug === currentSlug ? detailLevelIndex(product) : 2) : level);
     const known = Object.fromEntries(family.body.flatMap(g => g.colors).map(c => [c.name, c.hex]));
-    const colors = names.map(name => ({ name, hex: known[name] || TEMPO_EXTRA_BODY_HEX[name] }));
-    const custom = colors.filter(c => TEMPO_CUSTOM_BODY.includes(c.name));
-    const painted = colors.filter(c => TEMPO_PRO_PAINT.includes(c.name));
+    // A bundle colour shows its picture's swatch; a new one with no artwork yet, a neutral grey
+    const colors = names.map(name => { const v = visualName('body', name); return { name, hex: known[v] || TEMPO_EXTRA_BODY_HEX[v] || '#C9CCD1' }; });
+    const custom = colors.filter(c => TEMPO_CUSTOM_BODY.includes(visualName('body', c.name)));
+    const painted = colors.filter(c => TEMPO_PRO_PAINT.includes(visualName('body', c.name)));
     return [
         { tier: 'Standard Club Car Colors', colors: colors.filter(c => !custom.includes(c) && !painted.includes(c)) },
         { tier: 'Club Car Premium Painted Colors', colors: painted },
@@ -4467,15 +4594,183 @@ function getProductBodyGroups(product, level) {
 // A Tempo build's body colors: the document's, plus on Pro Golfer (the golfer line's top build) the Club Car
 // Premium Painted Colors (2026-11-17)
 const TEMPO_PRO_PAINT = ['Metallic Platinum', 'Atomic Orange', 'Synergy Green', 'Metallic Blue', 'Metallic Grey', 'Metallic Green', 'Metallic Glacier White', 'Metallic Black'];
-function tempoBodyNames(product, i) {
+function codeBodyNames(product, i) {
     const base = tempoMatrix(product).body[i];
     return product.version === 'golfer' && i === 2 ? [...TEMPO_STD_BODY, ...TEMPO_PRO_PAINT, ...base.filter(n => !TEMPO_STD_BODY.includes(n))] : base;
+}
+
+// --- The builder follows the bundles (2026-11-18, the user's choice "A") ---
+// A Tempo build's body colours, seats and canopies are its options in the admin's Bundles (Builds tab), by the same
+// names, in the same order, the ticked one (Included) chosen at the start; the request carries their ids, so its
+// quotation takes exactly those options' parts. The list comes from the database function bundle_catalog() (names
+// and ids only, no costs), loaded with the site (account.js loadBundleCatalog) and kept for the next visit. A build
+// the bundles don't have yet, or before the list arrives, keeps the code's own lists below.
+// The pictures: each bundle option shows the photo, swatch and live recolour of the code's option of the same thing
+// ("Camello" shows "Classic Premium Seat Camello"), found by its colour words; a new one shows a plain swatch until
+// it has artwork. This only picks the picture, never what's priced
+const BUNDLE_CATALOG_KEY = 'gcph-bundle-catalog';
+let BUNDLE_CATALOG = (() => { try { return JSON.parse(localStorage.getItem(BUNDLE_CATALOG_KEY) || 'null'); } catch (e) { return null; } })();
+const BUNDLE_VISUAL = { body: {}, seat: {}, canopy: {}, battery: {}, option: {} };
+const VISUAL_FILLER = {
+    body: ['body', 'panel', 'color', 'colors', 'colour'],
+    seat: ['classic', 'premium', 'seat', 'front', 'rear', 'bench', 'cushion', 'and'],
+    canopy: ['pass', 'passenger', 'canopy', 'onward', 'seater', 'top', '2+2', '4+2', 'gc'],
+    battery: ['battery', 'battlite', 'trojan', '8v', '48v', 'lead', 'acid', 'deep', 'cycle', '100ah', 'ion', 'upgrade', 'kit']
+};
+
+function catalogBuild(product, i) {
+    if (!BUNDLE_CATALOG || !product || !product.layout || !isTempoVersion(product) || typeof BUNDLE_PRODUCTS === 'undefined') return null;
+    const level = TEMPO_LINES[product.version].levels[i];
+    const name = BUNDLE_PRODUCTS[product.category];
+    return level && name ? BUNDLE_CATALOG.find(b => b.product === name && b.config === `${product.layout} seater` && b.type === level.name) || null : null;
+}
+
+function catalogOptions(product, i, slot) {
+    const b = catalogBuild(product, i);
+    const opts = b ? b.options.filter(o => String(o.slot).trim().toLowerCase() === slot) : [];
+    return opts.length ? opts : null;
+}
+
+function visualWords(slot, text) {
+    const filler = new Set(VISUAL_FILLER[slot] || []);
+    return [...new Set(String(text || '').toLowerCase().replace(/grey/g, 'gray').replace(/&/g, ' ')
+        .split(/[^a-z0-9+]+/).filter(w => w.length > 1 && !filler.has(w)))].sort();
+}
+
+// The code's option a bundle option is a picture of: the same colour words, else the one code option holding all of
+// its words ("Platinum" -> "Platinum Grey"); none when it isn't clear
+function bridgeName(slot, name, codeNames) {
+    const words = visualWords(slot, name);
+    if (!words.length) return null;
+    const exact = codeNames.find(c => visualWords(slot, c).join(' ') === words.join(' '));
+    if (exact) return exact;
+    const within = codeNames.filter(c => { const cw = visualWords(slot, c); return words.every(w => cw.includes(w)); });
+    return within.length === 1 ? within[0] : null;
+}
+
+// A slot's names from the bundles (and their pictures noted), or null to keep the code's list
+function catalogNames(product, i, slot, codeNames) {
+    const opts = catalogOptions(product, i, slot);
+    if (!opts) return null;
+    opts.forEach(o => { const v = bridgeName(slot, o.option, codeNames || []); if (v) BUNDLE_VISUAL[slot][o.option] = v; });
+    return opts.map(o => o.option);
+}
+
+// The picture name for a chosen name (itself when it's the code's own, or has no picture)
+function visualName(slot, name) {
+    return (name && BUNDLE_VISUAL[slot][name]) || name;
+}
+
+function catalogDefault(product, i, slot) {
+    const o = (catalogOptions(product, i, slot) || []).find(x => x.default);
+    return o ? o.option : null;
+}
+
+// The bundle option a choice is: by its name (body, seat, canopy come from the bundles), or the battery by its words
+function catalogOptionId(product, i, slot, name) {
+    const opts = catalogOptions(product, i, slot);
+    if (!opts || !name) return null;
+    const same = opts.find(o => o.option === name);
+    if (same) return same.id;
+    const words = visualWords(slot, name).join(' ');
+    const match = words ? opts.filter(o => visualWords(slot, o.option).join(' ') === words) : [];
+    return match.length === 1 ? match[0].id : null;
+}
+
+function tempoBodyNames(product, i) {
+    const code = codeBodyNames(product, i);
+    return catalogNames(product, i, 'body', code) || code;
+}
+
+function tempoSeatNames(product, i) {
+    const code = tempoMatrix(product).seat[i];
+    return catalogNames(product, i, 'seat', code) || code;
+}
+
+function tempoCanopyNames(product, i) {
+    const code = tempoMatrix(product).canopy[tempoLayoutRow(product)][i];
+    return catalogNames(product, i, 'canopy', code) || code;
+}
+
+// Phase 3 (2026-11-18): the upgrades follow the bundles too. Each builder group answers to the bundle slots below;
+// when the build's bundle has them, the group's options are the bundle's options (names, order, Included one first
+// chosen), each showing the photo of the code's option it's like, and a choice carries its option's id. A group whose
+// slots the bundle doesn't have keeps the code's options (and the quotation flags what's chosen there). Groups not
+// listed (golf sides, rear flip seat, rain enclosure, cooling, bag attachment) stay as they are
+const GROUP_SLOTS = {
+    wheels: ['wheel', '14in wheel'], lighting: ['light'], bagCover: ['bag cover'], sandBottle: ['accessories 1'],
+    caddyStand: ['caddy stand'], speedCode: ['speed code'], lift: ['lift kit upgrade'], audio: ['add-on'], storage: ['add-on'],
+    charging: ['charger'], steering: ['steeing wheel', 'steering wheel'], floorMat: ['floormat'], mirrors: ['mirror']
+};
+
+// How alike two option names are (the admin's word matching: "Kaken" is "Kraken", "GC floor mat" is "Floormat"),
+// both ways; 0 when it isn't loaded (pages drawn ahead, before the admin script)
+function optionLikeness(a, b) {
+    if (typeof matchScore !== 'function') return 0;
+    const ab = matchScore(a, b), ba = matchScore(b, a);
+    return Math.max(ab.share, ba.share) >= 0.6 ? ab.share * 2 + ba.share + ab.found / 100 : 0;
+}
+
+// The one name in a list most like a name (none when two are equally like it)
+function mostLike(name, list) {
+    const scored = list.map(x => ({ x, s: optionLikeness(name, x) })).filter(e => e.s > 0).sort((p, q) => q.s - p.s);
+    return scored.length && (scored.length === 1 || scored[0].s > scored[1].s) ? scored[0].x : null;
+}
+
+function bundleTempoGroups(product, i, groups) {
+    if (!catalogBuild(product, i)) return groups;
+    const codeOf = g => g.type === 'flag' ? [g.label] : g.type === 'fixed' ? [g.value] : (g.options || []);
+    // A slot two groups share (audio and storage: the bundle's Add-on): each option goes to the group whose code
+    // options it's like, else to the first of them
+    // (a shared slot's option like none of them goes only to the slot's main group: a speaker isn't storage)
+    const SHARED_MAIN = { 'add-on': 'audio' };
+    const owner = new Map();
+    groups.filter(g => GROUP_SLOTS[g.id]).forEach(g => GROUP_SLOTS[g.id].forEach(slot => (catalogOptions(product, i, slot) || []).forEach(o => {
+        const like = mostLike(o.option, codeOf(g));
+        if (!like && SHARED_MAIN[slot] && SHARED_MAIN[slot] !== g.id) return;
+        const had = owner.get(o.id);
+        if (!had || (like && !had.like)) owner.set(o.id, { group: g.id, like });
+    })));
+    return groups.map(g => {
+        const slots = GROUP_SLOTS[g.id];
+        if (!slots) return g;
+        const bySlot = slots.map(slot => (catalogOptions(product, i, slot) || []).filter(o => (owner.get(o.id) || {}).group === g.id));
+        const opts = bySlot.flat();
+        if (!opts.length) return g;
+        const ids = Object.fromEntries(opts.map(o => [o.option, o.id]));
+        opts.forEach(o => { const like = mostLike(o.option, codeOf(g)); if (like && like !== o.option) BUNDLE_VISUAL.option[o.option] = like; });
+        const def = opts.find(o => o.default);
+        if (g.type === 'flag') {
+            const o = opts.length === 1 ? opts[0] : opts.find(x => x.option === mostLike(g.label, opts.map(y => y.option)));
+            if (!o) return g;
+            if (o.option !== g.label && !BUNDLE_VISUAL.option[o.option]) BUNDLE_VISUAL.option[o.option] = g.label;
+            return { ...g, label: o.option, bundleIds: { [o.option]: o.id } };
+        }
+        if (g.type === 'fixed') {
+            const o = def || (opts.length === 1 ? opts[0] : null);
+            return o ? { ...g, value: o.option, bundleIds: { [o.option]: o.id } } : g;
+        }
+        const names = opts.map(o => o.option);
+        const out = { ...g, options: names, bundleIds: ids, bundleDefault: def ? def.option : undefined };
+        // Wheels: the bundle's 14" wheels are the upgrade, behind its switch, after the standard rims
+        if (g.id === 'wheels') out.upgradeFrom = bySlot[1].length ? bySlot[0].length : undefined;
+        return out;
+    });
+}
+
+// The bundle options a build's upgrade choices are, by id
+function tempoOptionIds(product, i, o) {
+    return getTempoOptionGroups(product, i).filter(g => g.bundleIds).flatMap(g => {
+        const v = o[g.id];
+        const chosen = g.type === 'flag' ? (v ? [g.label] : []) : g.type === 'fixed' ? [g.value] : Array.isArray(v) ? v : v ? [v] : [];
+        return chosen.map(n => g.bundleIds[n]).filter(Boolean);
+    });
 }
 
 // Flat list of a product's body colors, each with a photo when one exists for that color
 function getProductBodyColors(product, level) {
     const photos = product.colorPhotos || {};
-    return getProductBodyGroups(product, level).flatMap(group => group.colors.map(c => ({ ...c, tier: group.tier, image: photos[c.name] || null })));
+    return getProductBodyGroups(product, level).flatMap(group => group.colors.map(c => ({ ...c, tier: group.tier, image: photos[c.name] || photos[visualName('body', c.name)] || null })));
 }
 
 // Body colors, seat groups and canopies on the open model page (for Tempo models, those of the chosen build)
@@ -4488,13 +4783,13 @@ function detailBodyColors(product) {
 }
 
 function getDetailSeatGroups(product) {
-    if (isTempoVersion(product)) return [{ tier: null, options: tempoMatrix(product).seat[detailLevelIndex(product)] }];
+    if (isTempoVersion(product)) return [{ tier: null, options: tempoSeatNames(product, detailLevelIndex(product)) }];
     const family = COLOR_FAMILIES[product.colorFamily];
     return (family && family.seatGroups) || [];
 }
 
 function getDetailCanopyOptions(product) {
-    if (isTempoVersion(product)) return tempoMatrix(product).canopy[tempoLayoutRow(product)][detailLevelIndex(product)];
+    if (isTempoVersion(product)) return tempoCanopyNames(product, detailLevelIndex(product));
     return CANOPY_OPTIONS[product.canopyKey] || [];
 }
 
@@ -4783,6 +5078,7 @@ const SEAT_PATTERNS = {
 // matching seat (SEAT_ALIASES); a Tempo canopy takes the color named in it ("2 Pass Canopy Beige").
 function getTrimHex(type, option) {
     if (!option) return null;
+    option = visualName(type === 'canopy' ? 'canopy' : 'seat', option);
     if (type !== 'canopy') return TRIM_COLOR_HEX[SEAT_ALIASES[option] || option] || null;
     if (CANOPY_COLOR_HEX[option]) return CANOPY_COLOR_HEX[option];
     const word = (option.match(/\b(White|Beige|Black)\b/) || [])[1];
@@ -4790,6 +5086,7 @@ function getTrimHex(type, option) {
 }
 
 function getSeatPattern(option) {
+    option = visualName('seat', option);
     return option ? SEAT_PATTERNS[SEAT_ALIASES[option] || option] || null : null;
 }
 
@@ -5483,11 +5780,13 @@ function selectBuildLevel(id) {
     if (product && isTempoVersion(product)) {
         // Keep the colors the new build offers; otherwise fall back to its first body color / the standard trim
         const i = detailLevelIndex(product);
-        if (!tempoMatrix(product).seat[i].includes(detailBuild.seat)) detailBuild.seat = null;
+        if (!tempoSeatNames(product, i).includes(detailBuild.seat)) detailBuild.seat = null;
         if (!getDetailCanopyOptions(product).includes(detailBuild.canopy)) detailBuild.canopy = null;
         applyBuildLook(product);
         const bodies = detailBodyColors(product);
-        const bodyIdx = Math.max(0, bodies.findIndex(c => c.name === detailBuild.body));
+        // The body kept if the new build offers it, else the new build's own (Included in the bundles), else its first
+        const keep = bodies.findIndex(c => c.name === detailBuild.body);
+        const bodyIdx = keep >= 0 ? keep : Math.max(0, bodies.findIndex(c => c.name === catalogDefault(product, i, 'body')));
         detailBuild.options = carryTempoOptions(product, i, detailBuild.options || {});
         const pickers = document.getElementById('detail-color-pickers');
         if (pickers) pickers.innerHTML = renderDetailColorPickers(product);
@@ -5507,9 +5806,11 @@ function applyBuildLook(product) {
     const look = product.buildLooks && product.buildLooks[detailBuild.level];
     if (!look || detailBuild.colorsPicked) return;
     const i = detailLevelIndex(product);
-    if (look.body && tempoBodyNames(product, i).includes(look.body)) detailBuild.body = look.body;
-    if (look.seat && tempoMatrix(product).seat[i].includes(look.seat)) detailBuild.seat = look.seat;
-    if (look.canopy && getDetailCanopyOptions(product).includes(look.canopy)) detailBuild.canopy = look.canopy;
+    // The build's look is written in the code's names: the bundle option showing that picture
+    const pick = (slot, list, name) => list.find(n => n === name || visualName(slot, n) === name);
+    if (look.body) detailBuild.body = pick('body', tempoBodyNames(product, i), look.body) || detailBuild.body;
+    if (look.seat) detailBuild.seat = pick('seat', tempoSeatNames(product, i), look.seat) || detailBuild.seat;
+    if (look.canopy) detailBuild.canopy = pick('canopy', getDetailCanopyOptions(product), look.canopy) || detailBuild.canopy;
 }
 
 // --- Equipment and upgrades (Tempo builds) ---
@@ -5797,7 +6098,7 @@ const OPTION_PHOTOS = {
 
 // A photo for an option (by option name, or by the group's id for single-item groups such as the ball washer)
 function optionPhoto(key) {
-    const file = OPTION_PHOTOS[key];
+    const file = OPTION_PHOTOS[key] || OPTION_PHOTOS[BUNDLE_VISUAL.option[key]];
     return file ? `image/Options/${file}.jpg` : null;
 }
 
@@ -6340,7 +6641,9 @@ function renderProductDetailsPage() {
     const levelIdx = 0;
     const bodyColors = getProductBodyColors(product, tempo ? levelIdx : undefined);
     // Start on a color we have a photo for
-    const startColorIdx = Math.max(0, bodyColors.findIndex(c => c.image));
+    const bundleBody = tempo ? catalogDefault(product, levelIdx, 'body') : null;
+    const startColorIdx = bundleBody && bodyColors.some(c => c.name === bundleBody)
+        ? bodyColors.findIndex(c => c.name === bundleBody) : Math.max(0, bodyColors.findIndex(c => c.image));
     const startColor = bodyColors[startColorIdx];
     // Seat and canopy start as "Standard" (as photographed) until the visitor picks a color
     detailBuildFocus = false;
@@ -7377,7 +7680,7 @@ async function handleServiceRequestSubmit(e) {
     form.querySelector('#sr-fields').hidden = false;
     form.querySelector('#sr-review').hidden = true;
     updateServiceForm();
-    showToast(`Request sent. Your reference is ${reference}. We emailed you a confirmation; our service team will call you to set a schedule.`);
+    showRequestSent(reference, 'Our service team will call you to set a schedule.');
 }
 
 function renderServicePage() {

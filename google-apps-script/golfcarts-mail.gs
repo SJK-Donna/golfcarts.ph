@@ -66,7 +66,7 @@ const COMPANY = {
 const C = { ink: '#151714', green: '#749E35', greenText: '#4F6E22', stone: '#ECECE6', line: '#D6D6CE', mute: '#6B6C64' };
 const VALID_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Which copy of this script answered: the admin shows it after a PDF preview. Change it with each edit
-const SCRIPT_VERSION = '2026-11-16 rounded';
+const SCRIPT_VERSION = '2026-11-18 bundles';
 // What the last PDF's page 3 was made from, for that same message (set by quotationPdf)
 let lastPage3 = '';
 
@@ -86,6 +86,7 @@ function doPost(e) {
       if (body.event === 'quote_created') quoteCreated(body.record, staff);
       else if (body.event === 'quote_zoho') sendLead(body.record);
       else if (body.event === 'sku_photos') syncZohoPhotos();
+      else if (body.event === 'bundles_sync') syncBundles(true);
       else if (/^quotation_(submitted|approved|returned|sent)$/.test(body.event)) quotationEvent(body.record, body.event.slice(10), staff);
       else return json({ ok: false, error: 'Unknown event' });
       return json({ ok: true });
@@ -605,6 +606,140 @@ function syncStockSheet() {
   return error;
 }
 
+// ---------- Bundles, live from the team's sheet (2026-11-18) ----------
+// "Bundles and USD sku list.xlsx" in Drive (this Google account needs view access), read every hour when the file has
+// changed (from syncZohoPhotos' hourly run) and on the admin's "Sync from the sheet now" (event bundles_sync). The file
+// is an Excel file, which Apps Script can't read as it is: a temporary Google Sheets copy is made (its formulas
+// worked out), the Bundles tab read, and the copy deleted. The lines are shaped as the admin keeps them (each part
+// once; each build's options by slot, with the Included one) and saved by the database (save_bundles), costs and all.
+// Never logged: the costs stay between the sheet and the database
+const BUNDLES_FILE_ID = '1h0Eui8UnuDWRe17XabDfE8d97PDDxjBB';
+const BUNDLES_TAB = 'Bundles';
+
+function syncBundles(force) {
+  const props = PropertiesService.getScriptProperties();
+  let data = null, error = '', modified = '';
+  try {
+    const meta = driveApi('get', '/files/' + BUNDLES_FILE_ID + '?fields=modifiedTime&supportsAllDrives=true');
+    modified = meta.modifiedTime || '';
+    if (!force && modified && props.getProperty('BUNDLES_MODIFIED') === modified) return '';
+    const copy = driveApi('post', '/files/' + BUNDLES_FILE_ID + '/copy?supportsAllDrives=true',
+      { name: 'golfcarts.ph bundles sync (temporary)', mimeType: 'application/vnd.google-apps.spreadsheet' });
+    try {
+      const tab = SpreadsheetApp.openById(copy.id).getSheetByName(BUNDLES_TAB);
+      if (!tab) throw new Error('the tab "' + BUNDLES_TAB + '" is not in the bundles file');
+      data = bundlesFromRows(tab.getDataRange().getValues());
+    } finally {
+      try { driveApi('delete', '/files/' + copy.id + '?supportsAllDrives=true'); } catch (err) { console.error('Temporary copy not deleted: ' + err); }
+    }
+  } catch (err) {
+    error = 'Bundles sheet: ' + String((err && err.message) || err);
+  }
+  try {
+    supabase('/rest/v1/rpc/save_bundles', null, 'post', { secret: secret(), data: data, error_text: error, sheet_modified: modified });
+    if (!error && modified) props.setProperty('BUNDLES_MODIFIED', modified);
+  } catch (err) {
+    console.error('Bundles not saved: ' + String(err).slice(0, 300));
+    return String(err);
+  }
+  return error;
+}
+
+// Drive's own API (no extra setting needed: the script already uses Drive), for the copy that converts the file
+function driveApi(method, path, body) {
+  const res = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3' + path, {
+    method: method, headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, contentType: 'application/json',
+    payload: body ? JSON.stringify(body) : undefined, muteHttpExceptions: true
+  });
+  const code = res.getResponseCode(), text = res.getContentText();
+  if (code >= 300) throw new Error('Drive ' + code + ': ' + text.slice(0, 200));
+  return text ? JSON.parse(text) : null;
+}
+
+// The sheet's lines (Product, Config, Type, Part, Option, Description, SKU, Qty, USD, and "Pesos" beside a local
+// part's amount, which is in pesos) as the admin keeps them, by the same rules as scripts/bundles-v2.cjs:
+//   - competitor rows are price references, left out
+//   - Wheels: "wheel cover" is part of the 8" rims; Light: an option listing several kits is one option per kit
+//   - Included: Unit, 2+2 kit, Stretch kit, and the first Body, Seat, Canopy, Wheels, Windshield, Bag cover and Light
+//     option; the battery is lithium on Pro and Elite, lead-acid on the rest; the speed code on Pro and Elite
+function bundlesFromRows(rows) {
+  const clean = function (v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); };
+  const num = function (v) { return v === '' || v == null || isNaN(Number(v)) ? null : Number(v); };
+  const head = rows[0].map(function (h) { return clean(h).toLowerCase(); });
+  if (head[0] !== 'product' || head[3] !== 'part') throw new Error('the Bundles tab does not start with Product ... Part columns');
+  const ALWAYS = ['unit', '2+2 kit', 'stretch kit'], FIRST = ['body', 'seat', 'canopy', 'wheel', 'windshield', 'bag cover', 'light'], TOP = ['pro', 'elite'];
+  const items = {}, builds = [], byBuild = {};
+  rows.slice(1).forEach(function (r) {
+    const product = clean(r[0]), config = clean(r[1]), type = clean(r[2]), part = clean(r[3]), option = clean(r[4]) || part, description = clean(r[5]);
+    if (!description || !product || !config || !type || !part || /^competitor$/i.test(product)) return;
+    let sku = clean(r[6]); if (sku === '-' || /^#N\/A$/i.test(sku)) sku = '';
+    const key = sku + '|' + description;
+    const peso = /pesos?/i.test(clean(r[9]));
+    if (!items[key]) items[key] = { sku: sku, description: description, costs: {}, peso: false };
+    const cost = num(r[8]);
+    if (cost != null) items[key].costs[cost] = (items[key].costs[cost] || 0) + 1;
+    items[key].peso = items[key].peso || peso;
+    const bk = product + '|' + config + '|' + type;
+    if (!byBuild[bk]) { byBuild[bk] = { product: product, config: config, type: type, slots: {}, order: [] }; builds.push(byBuild[bk]); }
+    const b = byBuild[bk];
+    if (!b.slots[part]) { b.slots[part] = { names: [], parts: {} }; b.order.push(part); }
+    const slot = b.slots[part];
+    if (!slot.parts[option]) { slot.parts[option] = {}; slot.names.push(option); }
+    slot.parts[option][key] = (slot.parts[option][key] || 0) + (num(r[7]) || 1);
+  });
+  // The two shapes the builder can't use
+  builds.forEach(function (b) {
+    b.order.forEach(function (part) {
+      const slot = b.slots[part], s = part.toLowerCase();
+      if (s === 'wheel') {
+        const cover = slot.names.filter(function (n) { return /cover/i.test(n); })[0], rims = slot.names.filter(function (n) { return /^8\s*in/i.test(n); })[0];
+        if (cover && rims) {
+          Object.keys(slot.parts[cover]).forEach(function (k) { slot.parts[rims][k] = (slot.parts[rims][k] || 0) + slot.parts[cover][k]; });
+          delete slot.parts[cover];
+          slot.names = slot.names.filter(function (n) { return n !== cover; });
+        }
+      }
+      if (s === 'light') {
+        const names = [], parts = {};
+        slot.names.forEach(function (n) {
+          const keys = Object.keys(slot.parts[n]);
+          if (keys.length < 2) { names.push(n); parts[n] = slot.parts[n]; return; }
+          keys.forEach(function (k) { const d = items[k].description; names.push(d); parts[d] = {}; parts[d][k] = slot.parts[n][k]; });
+        });
+        slot.names = names; slot.parts = parts;
+      }
+    });
+  });
+  const options = [];
+  builds.forEach(function (b, bi) {
+    const top = TOP.indexOf(b.type.toLowerCase()) >= 0;
+    b.order.forEach(function (part, si) {
+      const slot = b.slots[part], s = part.toLowerCase(), names = slot.names;
+      let def = null;
+      if (ALWAYS.indexOf(s) >= 0 || FIRST.indexOf(s) >= 0) def = names[0];
+      else if (s === 'battery') def = names.filter(function (n) { return (top ? /lithium/i : /fla|lead/i).test(n); })[0] || names[0];
+      else if (s === 'speed code' && top) def = names[0];
+      names.forEach(function (n, oi) {
+        options.push({ product: b.product, config: b.config, type: b.type, build_sort: bi + 1, slot: part, option: n, is_default: n === def,
+          sort: (si + 1) * 1000 + oi + 1,
+          parts: Object.keys(slot.parts[n]).map(function (k) { return { sku: items[k].sku, description: items[k].description, qty: slot.parts[n][k] }; }) });
+      });
+    });
+  });
+  // Each part's cost: the one most of its lines have
+  const list = Object.keys(items).map(function (k) {
+    const it = items[k], ranked = Object.keys(it.costs).sort(function (a, b) { return it.costs[b] - it.costs[a]; });
+    return { sku: it.sku, description: it.description, cost: ranked.length ? Number(ranked[0]) : null, currency: it.peso ? 'PHP' : 'USD' };
+  });
+  return { items: list, options: options };
+}
+
+// Run once from the editor (Run > testBundlesSync) to grant Drive access and read the sheet now: logs the counts only
+function testBundlesSync() {
+  const result = syncBundles(true);
+  console.log(result ? 'Bundles not synced: ' + result : 'Bundles synced from the sheet.');
+}
+
 // Copies the list of active Zoho Inventory items (SKU, name, category, unit, stock; no prices) and each item's photo into
 // the Drive folder (once per photo: the file's name holds the SKU and Zoho's id for that photo, so only a new or
 // changed photo is copied), then saves both by SKU in the database. Stops copying photos after 4½ minutes, under Apps
@@ -615,6 +750,7 @@ function syncZohoPhotos() {
   const started = Date.now(), photos = [], items = [];
   let complete = false, listed = false, error = '';
   syncStockSheet(); // the team's stock sheet first: quick, and independent of Zoho
+  syncBundles(false); // and the bundles, when their file has changed
   try {
     const access = zohoAccess(), folder = zohoPhotoFolder(), files = {}, seen = {}, listedSku = {};
     const all = folder.getFiles();
