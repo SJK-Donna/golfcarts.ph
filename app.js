@@ -2634,7 +2634,31 @@ function findProductRef(ref) {
     return PRODUCTS_DATA.find(p => p.slug === ref) || PRODUCTS_DATA.find(p => p.name.toLowerCase() === lower) || null;
 }
 
+// A custom cart's quote (2026-11-18): the form shows the cart's photo and name in place of the model list and the
+// accessories, and the request says which cart (its name, its photo number and a link to the photo)
+let quoteCustomCart = null;
+
+function openCustomCartQuote(i) {
+    const ph = CUSTOM_CART_PHOTOS[i];
+    if (!ph) return;
+    openQuoteModal();
+    quoteCustomCart = { name: ph.name || 'Cart', number: i + 1, src: ph.src, alt: ph.alt };
+    setQuoteCustomCartMode();
+}
+
+// Shows or hides the model list for the custom cart quote, and redraws the summary
+function setQuoteCustomCartMode() {
+    const select = document.getElementById('modal-product-select');
+    const field = select && select.closest('.field');
+    if (field) field.classList.toggle('hidden', !!quoteCustomCart); // a class: .field sets its own display
+    if (select) { select.required = false; if (quoteCustomCart) select.value = ''; }
+    renderQuoteSummary();
+}
+
 function openQuoteModal(productName = '', notes = '') {
+    // Opened any other way: the usual form, with the model list
+    quoteCustomCart = null;
+    setQuoteCustomCartMode();
     const modal = document.getElementById('quote-modal');
     const select = document.getElementById('modal-product-select');
     const notesField = document.getElementById('modal-notes');
@@ -2675,18 +2699,21 @@ async function handleModalQuoteSubmit(e) {
     const select = document.getElementById('modal-product-select');
     const rows = getQuoteSummaryRows();
     const ids = [...(quoteBuild && select && select.value === quoteBuild.slug ? quoteBuild.bundleOptions || [] : [])];
-    if (!await offerLiftKit(select && select.value, rows, ids)) return;
+    const custom = quoteCustomCart;
+    if (!custom && !await offerLiftKit(select && select.value, rows, ids)) return;
     // Everything the visitor chose goes into the request alongside their own notes
     const details = document.getElementById('quote-details');
     if (details) details.value = `Reference: ${refCode}\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}`;
     const data = new FormData(e.target);
     const sent = await sendQuoteRequest(e.target, {
         reference: refCode, source: 'Quote pop-up', name: data.get('name'), email: data.get('email'), phone: data.get('phone'),
-        model: select && select.selectedIndex >= 0 ? select.options[select.selectedIndex].textContent : '',
+        model: custom ? `Custom cart: ${custom.name} (photo ${custom.number})` : select && select.selectedIndex >= 0 ? select.options[select.selectedIndex].textContent : '',
         notes: data.get('notes'), rows: JSON.stringify(rows), bundle_options: ids
-    }, select && select.value);
+    }, custom ? '' : select && select.value);
     if (!sent) return;
     closeQuoteModal();
+    quoteCustomCart = null;
+    setQuoteCustomCartMode();
     const count = quoteAccessories.size;
     const accessoryNote = count ? ` with ${count} accessor${count === 1 ? 'y' : 'ies'}` : '';
     showRequestSent(refCode, `Our sales team will send your quotation${accessoryNote ? ` for your cart${accessoryNote}` : ''}.`);
@@ -2733,6 +2760,10 @@ function getBuildDetails() {
 
 // Rows for the model currently selected in the quote form (the build only applies to the model it came from)
 function getQuoteSummaryRows() {
+    if (quoteCustomCart) {
+        const c = quoteCustomCart;
+        return [['Custom cart', `${c.name} (photo ${c.number} of the Custom carts page)`], ['Photo', new URL(c.src, document.baseURI).href]];
+    }
     const select = document.getElementById('modal-product-select');
     const rows = quoteBuild && select && select.value === quoteBuild.slug ? quoteBuild.rows.slice() : [];
     if (!rows.length && select && select.value) {
@@ -2751,6 +2782,16 @@ function getQuoteSummaryText() {
 function renderQuoteSummary() {
     const box = document.getElementById('quote-summary');
     if (!box) return;
+    if (quoteCustomCart) {
+        const c = quoteCustomCart;
+        box.innerHTML = `
+            <p class="text-sm font-medium text-ink mb-2">Your request</p>
+            <figure class="quote-custom-cart">
+                <img src="${c.src}" alt="${attrText(c.alt)}">
+                <figcaption><span class="cc-strip-name">${attrText(c.name)}</span><span class="text-sm text-mute">Custom cart, photo ${c.number}</span></figcaption>
+            </figure>`;
+        return;
+    }
     box.innerHTML = `
         <p class="text-sm font-medium text-ink mb-2">Your request</p>
         <dl class="border-y border-line divide-y divide-line text-sm">
@@ -6904,14 +6945,13 @@ const CUSTOM_CART_PHOTOS = [
 ];
 
 function renderCustomCartsStrip() {
-    // Each card: the photo, the cart's name ("Cart" until it has one, 2026-11-18) and a Get a quote button that says
-    // which photo it came from. The copy run's buttons work when clicked but are skipped by Tab (it is hidden from
+    // Each card: the photo, the cart's name ("Cart" until it has one, 2026-11-18) and a Get a quote button that opens
+    // the quote form on that cart (openCustomCartQuote). The copy run's buttons work when clicked but are skipped by Tab (it is hidden from
     // screen readers), so keyboard users meet each cart once
     const card = (ph, i, copy) => {
         const name = ph.name || 'Cart';
-        const note = `Asking about: ${name} (custom cart photo ${i + 1})`.replace(/'/g, "\\'");
         return `<figure class="cc-strip-card"><img src="${ph.src}" alt="${copy ? '' : attrText(ph.alt)}" loading="lazy" decoding="async" draggable="false">
-            <figcaption><span class="cc-strip-name">${attrText(name)}</span><button type="button" onclick="openQuoteModal('', '${attrText(note)}')" class="btn btn-primary btn-sm"${copy ? ' tabindex="-1"' : ''}>Get a quote<span class="sr-only"> for ${attrText(name)} ${i + 1}</span></button></figcaption></figure>`;
+            <figcaption><span class="cc-strip-name">${attrText(name)}</span><button type="button" onclick="openCustomCartQuote(${i})" class="btn btn-primary btn-sm"${copy ? ' tabindex="-1"' : ''}>Get a quote<span class="sr-only"> for ${attrText(name)} ${i + 1}</span></button></figcaption></figure>`;
     };
     return `
         <div class="cc-strip" role="region" aria-label="Custom carts we've built">

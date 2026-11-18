@@ -2693,6 +2693,10 @@
         aspect-ratio: auto;
         pointer-events: none;
     }
+    /* The quote form for a custom cart: its photo and name, in place of the model list */
+    .quote-custom-cart { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0.75rem 0; }
+    .quote-custom-cart img { display: block; width: 100%; max-height: 18rem; object-fit: cover; }
+    .quote-custom-cart figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding-top: 0.625rem; }
     /* Under each photo: the cart's name and its Get a quote button */
     .cc-strip-card figcaption {
         display: flex;
