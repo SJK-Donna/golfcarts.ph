@@ -1526,7 +1526,7 @@ function buildYourCart() {
 const HOME_LINEUP = [
     { name: 'Minibus', seats: '14 and 21 seats', image: 'image/lineup/minibus.png', slug: 'minibus-14', left: 0.5, width: 27.8, height: 82 },
     { name: 'Villager', seats: '6 to 8 seats', image: 'image/lineup/villager.png', slug: 'villager-8', left: 26.3, width: 23.2, height: 68 },
-    { name: '', seats: '4 seats with cargo bed and 6 seats ', image: 'image/lineup/transporter-roof.png', slug: 'transporter-400', left: 47, width: 20.9, height: 65 },
+    { name: 'Transporter', seats: '4 seats with cargo bed and 6 seats ', image: 'image/lineup/transporter-roof.png', slug: 'transporter-400', left: 47, width: 20.9, height: 65 },
     { name: 'Carryall', seats: '2 seats and a cargo bed', image: 'image/lineup/carryall.png', slug: 'carryall-500', left: 65.4, width: 20.1, height: 65 },
     { name: 'Tempo', seats: '2 to 6 seats', image: 'image/lineup/tempo.png', slug: 'golfer-tempo-2', left: 83.5, width: 13.8, height: 61 }
 ];
