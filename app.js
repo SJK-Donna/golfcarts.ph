@@ -3142,32 +3142,17 @@ const WARRANTY_GROUPS = [
         ['Cab assembly', 'Cab assembly and doors (if equipped)', '2 years or 2,000 hrs']
     ] }
 ];
-let warrantyGroup = 0; // the table shown, the same in the pop-up and on the Service page
 const WARRANTY_NOTE = 'Coverage by part. Warranty is subject to applicable operating-hour limits and Club Car\'s terms and conditions; ask our service team about your cart.';
 
-// The buttons to pick a table, then the table, in one box (.warranty-box) that redraws itself on a pick
+// The Tempo table only (2026-11-17, the user's choice): no model buttons. The other two tables stay in WARRANTY_GROUPS
+// for later
 function renderWarrantyTable() {
-    const g = WARRANTY_GROUPS[warrantyGroup];
+    const g = WARRANTY_GROUPS[0];
     return `
-        <div class="warranty-box">
-            <div class="warranty-tabs" role="group" aria-label="Warranty by model">
-                ${WARRANTY_GROUPS.map((x, i) => `<button type="button" aria-pressed="${i === warrantyGroup}" onclick="pickWarrantyGroup(${i})">${attrText(x.label)}</button>`).join('')}
-            </div>
-            <p class="text-sm text-mute mt-3 mb-2">For: ${attrText(g.models)}</p>
-            <div class="overflow-x-auto"><table class="warranty-table w-full min-w-[520px] text-left">
-                <thead><tr><th scope="col">Item</th><th scope="col">Covers</th><th scope="col">Coverage</th></tr></thead>
-                <tbody>${g.rows.map(([item, sub, cover]) => `<tr><th scope="row">${attrText(item)}</th><td>${attrText(sub) || '—'}</td><td>${attrText(cover)}</td></tr>`).join('')}</tbody>
-            </table></div>
-        </div>`;
-}
-
-function pickWarrantyGroup(i) {
-    warrantyGroup = i;
-    document.querySelectorAll('.warranty-box').forEach(box => {
-        const focused = box.contains(document.activeElement);
-        box.outerHTML = renderWarrantyTable();
-        if (focused) { const b = document.querySelectorAll('.warranty-tabs button')[i]; if (b) b.focus(); }
-    });
+        <div class="overflow-x-auto"><table class="warranty-table w-full min-w-[520px] text-left">
+            <thead><tr><th scope="col">Item</th><th scope="col">Covers</th><th scope="col">Coverage</th></tr></thead>
+            <tbody>${g.rows.map(([item, sub, cover]) => `<tr><th scope="row">${attrText(item)}</th><td>${attrText(sub) || '—'}</td><td>${attrText(cover)}</td></tr>`).join('')}</tbody>
+        </table></div>`;
 }
 
 let warrantyReturnFocus = null;
@@ -3185,7 +3170,7 @@ function openWarrantyModal() {
             <button type="button" onclick="closeWarrantyModal()" class="absolute top-3 right-3 w-10 h-10 flex items-center justify-center text-ink" aria-label="Close">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
             </button>
-            <h2 id="warranty-modal-title" class="type-md text-ink mb-1">Warranty coverage.</h2>
+            <h2 id="warranty-modal-title" class="type-md text-ink mb-1">Warranty coverage for Tempo.</h2>
             <p class="text-sm text-mute mb-4 pr-8">${WARRANTY_NOTE}</p>
             <div class="flex-1 min-h-0 overflow-auto">${renderWarrantyTable()}</div>
             <div class="flex flex-wrap gap-3 mt-4">
@@ -7559,7 +7544,7 @@ function renderServicePage() {
 
         <section id="warranty" class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12 scroll-mt-20" aria-labelledby="warranty-title">
             <div class="lg:col-span-4 space-y-4">
-                <h2 id="warranty-title" class="type-lg text-ink">Warranty coverage.</h2>
+                <h2 id="warranty-title" class="type-lg text-ink">Warranty coverage for Tempo.</h2>
                 <p class="measure">${WARRANTY_NOTE}</p>
             </div>
             <div class="lg:col-span-8">${renderWarrantyTable()}</div>

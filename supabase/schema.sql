@@ -197,6 +197,11 @@ alter table public.bundles add column if not exists updated_at timestamptz;
 -- (the sheet's USD column), and its formula is kept as text. total_php stays as the sheet had it, unused by the admin.
 alter table public.bundles add column if not exists cost_usd numeric;
 alter table public.bundles add column if not exists cost_usd_formula text;
+-- The cost's currency (2026-11-17): 'USD', or 'PHP' for a local brand's part (the sheet's "Pesos" lines), whose cost is
+-- in pesos and goes into quotations without the exchange rate or freight
+alter table public.bundles add column if not exists currency text not null default 'USD';
+alter table public.bundles drop constraint if exists bundles_currency_check;
+alter table public.bundles add constraint bundles_currency_check check (currency in ('USD', 'PHP'));
 
 -- A photo for the line (2026-11-11), uploaded in the admin; a line without one shows its SKU's photo
 alter table public.bundles add column if not exists photo text not null default '';
@@ -294,12 +299,13 @@ alter table public.quotations add column if not exists approvers text[] not null
 
 -- A quotation's gross profit after any discount, as the admin and the PSS show it (2026-11-16): the total includes
 -- 12% VAT, so (total / 1.12 - landed cost) / (total / 1.12), in %. Landed cost is USD x rate x (1 + freight), to the
--- centavo, per line
+-- centavo, per line; a local part's (currency PHP) is its peso cost as it is
 create or replace function public.quotation_margin(q public.quotations) returns numeric
 language sql immutable as $$
     with per_cart as (
         select coalesce(sum(coalesce((l ->> 'price_php')::numeric, 0) * coalesce((l ->> 'qty')::numeric, 1)), 0) as price,
-               coalesce(sum(coalesce(round((l ->> 'cost_usd')::numeric * q.exchange_rate * (1 + q.freight_pct / 100), 2), 0)
+               coalesce(sum(coalesce(case when l ->> 'currency' = 'PHP' then round((l ->> 'cost_usd')::numeric, 2)
+                   else round((l ->> 'cost_usd')::numeric * q.exchange_rate * (1 + q.freight_pct / 100), 2) end, 0)
                    * coalesce((l ->> 'qty')::numeric, 1)), 0) as cost
         from jsonb_array_elements(q.lines) as l
     )
@@ -340,7 +346,16 @@ begin
         new.sent_by := null; new.sent_at := null; new.review_note := '';
         return new;
     end if;
-    if old.status = 'sent' then raise exception 'This quotation was sent to the customer and can no longer change'; end if;
+    if old.status = 'sent' then
+        -- Its quote request being deleted (2026-11-18): the foreign key only unlinks it (quote_id set to null), and
+        -- nothing else on it changes. Without this, a request with a sent quotation (a test one) couldn't be deleted
+        if old.quote_id is not null and new.quote_id is null then
+            new := old;
+            new.quote_id := null;
+            return new;
+        end if;
+        raise exception 'This quotation was sent to the customer and can no longer change';
+    end if;
     -- Stamps are the trigger's to set
     new.prepared_by := old.prepared_by; new.created_at := old.created_at;
     new.submitted_by := old.submitted_by; new.submitted_at := old.submitted_at;

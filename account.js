@@ -3684,9 +3684,17 @@ let bundleFilter = { product: '', config: '', type: '', build: '', part: '', q: 
 const BUNDLE_PARTS = [['', 'All parts'], ['body', 'Body'], ['seat', 'Seat'], ['canopy', 'Canopy']];
 let bundleEditing = null; // a line's sheet_row, or { group } for a new line in that group
 
-// The sheet's Option column is kept in the color column; cost_usd is a line's unit cost
+// The sheet's Option column is kept in the color column; cost_usd is a line's unit cost, in its currency: USD, or PHP
+// for a local brand's part (2026-11-17: the sheet marks those "Pesos" beside the amount in its USD column)
 const BUNDLE_FIELDS = [['sku', 'SKU'], ['product', 'Product'], ['config', 'Config'], ['type', 'Type'], ['part', 'Part'], ['color', 'Option'],
-    ['description', 'Description'], ['qty', 'Qty'], ['cost_usd', 'Cost (USD)']];
+    ['description', 'Description'], ['qty', 'Qty'], ['cost_usd', 'Cost'], ['currency', 'Currency']];
+const isPesoLine = b => String((b && b.currency) || '').toUpperCase() === 'PHP';
+// A cost in its own currency: ₱ for a local part, $ for the rest
+function formatCost(n, b) {
+    return isPesoLine(b) ? formatPhp(n) : formatUsd(n);
+}
+// The mark under a local part's cost: priced in pesos, not converted from dollars
+const LOCAL_MARK = '<span class="cost-local" title="A local part, priced in pesos: no exchange rate or freight">Local ₱</span>';
 let bundleView = 'bundles'; // or 'usd', the USD SKU list
 
 function formatUsd(n) {
@@ -4219,7 +4227,12 @@ function renderBundleResults(bundles) {
     if (bundleEditing && bundleEditing.group && !groups.has(bundleGroupName(bundleEditing.group))) groups.set(bundleGroupName(bundleEditing.group), { sample: bundleEditing.group, lines: [] });
     if (!groups.size) return '<p class="measure">No lines match.</p>';
     // The lines' total in USD, once any of them has a cost
-    const cost = lines => lines.some(b => b.cost_usd != null) ? ` · ${formatUsd(lines.reduce((s, b) => s + (bundleLineUsd(b) || 0), 0))}` : '';
+    // The lines' totals once any has a cost: dollars and pesos apart (never added together)
+    const cost = lines => {
+        const sum = peso => lines.filter(b => b.cost_usd != null && isPesoLine(b) === peso).reduce((t, b) => t + (bundleLineUsd(b) || 0), 0);
+        const has = peso => lines.some(b => b.cost_usd != null && isPesoLine(b) === peso);
+        return [has(false) ? formatUsd(sum(false)) : '', has(true) ? formatPhp(sum(true)) : ''].filter(Boolean).map(t => ` · ${t}`).join('');
+    };
     const cols = 9;
     return `
         <p class="adm-count-line">${shown.length} line${shown.length === 1 ? '' : 's'} in ${groups.size} group${groups.size === 1 ? '' : 's'}${cost(shown)}</p>
@@ -4231,7 +4244,7 @@ function renderBundleResults(bundles) {
                         <button type="button" data-group="${escapeHtml(name)}" onclick="addBundleLine(this.dataset.group)" class="link text-xs">Add a line here</button>
                     </div>
                 </th></tr>
-                <tr class="bundle-columns"><th scope="col">Photo</th><th scope="col">SKU</th><th scope="col">Part</th><th scope="col">Option</th><th scope="col">Description</th><th scope="col" class="text-right">Qty</th><th scope="col" class="text-right">Cost (USD)</th><th scope="col" class="text-right">Total (USD)</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
+                <tr class="bundle-columns"><th scope="col">Photo</th><th scope="col">SKU</th><th scope="col">Part</th><th scope="col">Option</th><th scope="col">Description</th><th scope="col" class="text-right">Qty</th><th scope="col" class="text-right" title="USD, or pesos for a local part (marked Local ₱)">Cost</th><th scope="col" class="text-right">Total</th><th scope="col"><span class="sr-only">Actions</span></th></tr>
                 ${lines.map(b => bundleEditing === b.sheet_row ? renderBundleForm(b, cols) : renderBundleLine(b)).join('')}
                 ${bundleEditing && bundleEditing.group && bundleGroupName(bundleEditing.group) === name ? renderBundleForm(bundleEditing.group, cols) : ''}
             </tbody>`).join('')}
@@ -4255,8 +4268,8 @@ function renderBundleLine(b) {
         <td>${escapeHtml(b.color)}</td>
         <td>${escapeHtml(b.description)}${extra.length ? `<p class="text-xs text-mute mt-1">${extra.map(([col, cell]) => `${col}: ${escapeHtml(bundleExtraText(cell))}`).join(' · ')}</p>` : ''}${edited ? `<p class="text-xs text-mute mt-1">${edited}${b.updated_by ? ` by ${escapeHtml(adminName(b.updated_by))}` : ''}</p>` : ''}</td>
         <td class="text-right">${b.qty == null ? '' : Number(b.qty)}</td>
-        <td class="text-right whitespace-nowrap">${formatUsd(b.cost_usd)}</td>
-        <td class="text-right whitespace-nowrap">${formatUsd(bundleLineUsd(b))}</td>
+        <td class="text-right whitespace-nowrap">${formatCost(b.cost_usd, b)}${isPesoLine(b) ? LOCAL_MARK : ''}</td>
+        <td class="text-right whitespace-nowrap">${formatCost(bundleLineUsd(b), b)}</td>
         <td class="whitespace-nowrap"><button type="button" onclick="editBundleLine(${b.sheet_row})" class="link text-xs mr-3">Edit</button><button type="button" onclick="deleteBundleLine(${b.sheet_row})" class="link text-xs">Delete</button></td>
     </tr>`;
 }
@@ -4267,10 +4280,11 @@ function renderBundleForm(b, cols) {
     return `<tr class="bundle-editing"><td colspan="${cols}">
         <form data-no-prefill onsubmit="saveBundleLine(event, ${isNew ? 'null' : b.sheet_row})" class="grid sm:grid-cols-3 lg:grid-cols-6 gap-4 items-end">
             <p class="text-sm font-semibold text-ink sm:col-span-3 lg:col-span-6">${isNew ? 'New line' : 'Edit line'}</p>
-            ${BUNDLE_FIELDS.map(([key, label]) => `<div class="field${key === 'description' ? ' sm:col-span-3 lg:col-span-3' : ''}"><label for="be-${key}">${label}</label>
+            ${BUNDLE_FIELDS.map(([key, label]) => key === 'currency' ? `<div class="field"><label for="be-currency">Currency</label><select id="be-currency" name="currency">${[['USD', 'USD ($)'], ['PHP', 'PHP (₱), a local part']].map(([v, t]) => `<option value="${v}"${(isPesoLine(b) ? 'PHP' : 'USD') === v ? ' selected' : ''}>${t}</option>`).join('')}</select></div>` : `<div class="field${key === 'description' ? ' sm:col-span-3 lg:col-span-3' : ''}"><label for="be-${key}">${label}</label>
                 <input id="be-${key}" name="${key}" type="text"${key === 'sku' ? ' list="zoho-skus" autocomplete="off" oninput="previewSkuPhoto(this)"' : ''}${key === 'qty' || key === 'cost_usd' ? ' inputmode="decimal"' : ''} value="${escapeHtml(b[key] == null ? '' : key === 'cost_usd' ? Math.round(Number(b[key]) * 100) / 100 : key === 'qty' ? Number(b[key]) : b[key])}"></div>`).join('')}
             ${skuPhotoField(b.sku, 'sm:col-span-3 lg:col-span-6')}
             ${b.cost_usd_formula ? `<p class="text-xs text-mute sm:col-span-3 lg:col-span-6">In the sheet this cost came from ${escapeHtml(b.cost_usd_formula)}. Cost is per unit; the total is cost × qty.</p>` : ''}
+            <p class="text-xs text-mute sm:col-span-3 lg:col-span-6">A PHP cost goes into quotations as it is; a USD cost is converted with the exchange rate and freight.</p>
             <p id="bundle-error" class="golfer-error sm:col-span-3 lg:col-span-6" role="alert"></p>
             <div class="flex gap-4 items-center sm:col-span-3 lg:col-span-6">
                 <button type="submit" class="btn btn-primary min-h-[2.5rem] px-4 text-sm">${isNew ? 'Add line' : 'Save'}</button>
@@ -4312,6 +4326,7 @@ async function saveBundleLine(e, sheetRow) {
     const data = new FormData(e.target);
     const line = {};
     BUNDLE_FIELDS.forEach(([key]) => { const v = String(data.get(key) || '').trim(); line[key] = v === '' ? null : v; });
+    line.currency = String(line.currency || '').toUpperCase() === 'PHP' ? 'PHP' : 'USD';
     for (const key of ['qty', 'cost_usd']) {
         line[key] = parseAmount(line[key] || '');
         if (Number.isNaN(line[key])) { document.getElementById('bundle-error').textContent = `${key === 'qty' ? 'Qty' : 'Cost'} must be a number.`; return; }
@@ -4479,15 +4494,18 @@ const BUNDLE_QTY_ONE = new Set(['body', 'seat']);
 function bundleToQuotationLine(b) {
     const qty = BUNDLE_QTY_ONE.has(String(b.part || '').trim().toLowerCase()) || b.qty == null ? 1 : Number(b.qty);
     return { sheet_row: b.sheet_row, sku: b.sku || '', part: b.part || '', option: b.color || '', description: b.description || '',
-        qty, cost_usd: b.cost_usd == null ? null : Number(b.cost_usd), price_php: null, manual: false };
+        qty, cost_usd: b.cost_usd == null ? null : Number(b.cost_usd), ...(isPesoLine(b) ? { currency: 'PHP' } : {}), price_php: null, manual: false };
 }
 
 // A line's peso cost (USD x rate x (1 + freight), net of VAT), to the centavo, and its unit selling price, VAT
 // inclusive (2026-11-16): the margin is the gross profit on the price net of VAT, so price = cost / (1 - margin) x 1.12,
 // to the centavo, as on the team's sheet (no rounding to hundreds, which moved the GP off the one entered); none at
 // 100% or more
+// A local part's cost is in pesos already (currency PHP, 2026-11-17): no exchange rate and no import freight
 function quotationCostPhp(qt, line) {
-    return line.cost_usd == null ? null : Math.round(Number(line.cost_usd) * Number(qt.exchange_rate) * (1 + Number(qt.freight_pct) / 100) * 100) / 100;
+    if (line.cost_usd == null) return null;
+    if (isPesoLine(line)) return Math.round(Number(line.cost_usd) * 100) / 100;
+    return Math.round(Number(line.cost_usd) * Number(qt.exchange_rate) * (1 + Number(qt.freight_pct) / 100) * 100) / 100;
 }
 
 function quotationFormulaPrice(qt, line) {
@@ -4690,7 +4708,7 @@ function renderQuotationEditor(data) {
         ${editable && qt.build_group ? `<p class="text-sm mt-3"><button type="button" onclick="rebuildQuotationLines()" class="link">Fill lines from this bundle again</button> <span class="text-mute">(replaces the lines below with the ones the request's build points at)</span></p>` : ''}
 
         <div class="admin-table-wrap mt-6"><table class="admin-table bundle-table">
-            <thead><tr><th>SKU</th><th>Part</th><th>Option</th><th>Description</th><th title="Shown with its own price in the PDF. The other lines are one package price.">Upgrade</th><th class="text-right">Qty</th><th title="Stock on hand on the team's stock sheet (all branches), against qty x number of carts">Stock</th><th class="text-right">Cost (USD)</th><th class="text-right">Cost (₱)</th><th class="text-right">Price (₱)</th><th class="text-right">Amount (₱)</th>${editable ? '<th><span class="sr-only">Remove</span></th>' : ''}</tr></thead>
+            <thead><tr><th>SKU</th><th>Part</th><th>Option</th><th>Description</th><th title="Shown with its own price in the PDF. The other lines are one package price.">Upgrade</th><th class="text-right">Qty</th><th title="Stock on hand on the team's stock sheet (all branches), against qty x number of carts">Stock</th><th class="text-right" title="USD, or pesos for a local part (marked Local ₱)">Cost</th><th class="text-right" title="In pesos: a USD cost x rate x (1 + freight); a local part's as it is">Cost (₱)</th><th class="text-right">Price (₱)</th><th class="text-right">Amount (₱)</th>${editable ? '<th><span class="sr-only">Remove</span></th>' : ''}</tr></thead>
             <tbody>${qt.lines.map((l, i) => `<tr>
                 <td class="whitespace-nowrap">${escapeHtml(l.sku)}</td>
                 <td>${escapeHtml(l.part)}</td>
@@ -4699,7 +4717,7 @@ function renderQuotationEditor(data) {
                 <td class="text-center">${editable ? `<input type="checkbox" onchange="setQuotationUpgrade(${i}, this.checked)" aria-label="Upgrade"${l.upgrade ? ' checked' : ''}>` : (l.upgrade ? 'Yes' : '')}</td>
                 <td class="text-right">${num(`setQuotationLine(${i}, 'qty', this.value)`, l.qty)}</td>
                 <td class="whitespace-nowrap">${stockBadge(stockStatus(l.sku, stockNeeded(qt, l)))}</td>
-                <td class="text-right whitespace-nowrap">${formatUsd(l.cost_usd)}</td>
+                <td class="text-right whitespace-nowrap">${formatCost(l.cost_usd, l)}${isPesoLine(l) ? LOCAL_MARK : ''}</td>
                 <td class="text-right whitespace-nowrap text-mute">${formatPhp(quotationCostPhp(qt, l))}</td>
                 <td class="text-right whitespace-nowrap">${editable ? num(`setQuotationLine(${i}, 'price_php', this.value)`, l.price_php) : formatPhp(l.price_php)}${l.manual ? `<p class="text-xs text-mute">typed${editable ? ` · <button type="button" onclick="useFormulaPrice(${i})" class="link">use formula</button>` : ''}</p>` : ''}${l.price_php == null ? '<p class="golfer-error text-xs">No price</p>' : ''}</td>
                 <td class="text-right whitespace-nowrap">${formatPhp(Number(l.price_php || 0) * Number(l.qty == null ? 1 : l.qty))}</td>
@@ -4750,7 +4768,7 @@ function renderQuotationEditor(data) {
             ${(qt.status === 'submitted' || qt.status === 'approved') && prepares ? `<button type="button" onclick="reopenQuotation()" class="link text-sm">Edit (needs approval again)</button>` : ''}
             <button type="button" onclick="previewQuotation()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Preview PDF</button>
             ${qt.status === 'approved' || qt.status === 'sent' ? '<button type="button" onclick="downloadPss()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">PSS.xlsx</button>' : ''}
-            ${can('quotes.delete') && qt.status !== 'sent' ? `<button type="button" onclick="deleteQuotation()" class="link text-sm">Delete</button>` : ''}
+            ${canDeleteQuotation(qt) ? `<button type="button" onclick="deleteQuotation()" class="link text-sm">Delete</button>` : ''}
         </div>
         ${dirty && editable ? '<p class="text-xs text-mute mt-3">Unsaved changes. The PDF preview shows the last saved version.</p>' : ''}
         ${renderQuotationEmails(qt)}`;
@@ -5135,8 +5153,20 @@ function reopenQuotation() {
     return writeQuotation({ status: 'draft' }, 'Back to draft.');
 }
 
+// Who may delete a quotation: super admins, until it's sent; a sent one only by the accounts in
+// QUOTATION_DELETE_SENT (2026-11-18, the user's request: Donna, to clear test quotations). The database lets any
+// super admin delete (quotations_delete), so this is the admin's own guard against removing a real customer's record
+const QUOTATION_DELETE_SENT = ['donnavalonda@sjkguahan.com'];
+function canDeleteQuotation(qt) {
+    if (!can('quotes.delete')) return false;
+    return qt.status !== 'sent' || QUOTATION_DELETE_SENT.includes(String((account.staff && account.staff.email) || '').toLowerCase());
+}
+
 async function deleteQuotation() {
-    if (!confirm(`Delete quotation ${quotationDraft.reference}? This can't be undone.`)) return;
+    const sent = quotationDraft.status === 'sent';
+    if (!confirm(sent
+        ? `Delete quotation ${quotationDraft.reference}? It was already emailed to the customer. Only delete it if it's a test. This can't be undone.`
+        : `Delete quotation ${quotationDraft.reference}? This can't be undone.`)) return;
     const { error } = await sb.from('quotations').delete().eq('id', quotationOpen);
     if (error) { showToast(`Not deleted: ${error.message}`); return; }
     pageData.quotations = pageData.quotations.filter(x => x.id !== quotationOpen);
