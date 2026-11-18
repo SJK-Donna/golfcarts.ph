@@ -2824,6 +2824,24 @@ function renderHomeBatteryCompare() {
     `;
 }
 
+// Why Club Car (2026-11-18): the logo, then why its aluminum frames outlast steel. Between the battery comparison and
+// the client logos. Its own id, so the page editor's saved edits on the other sections keep their places
+function renderHomeClubCar() {
+    return `
+        <section id="home-clubcar" class="rise home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12" aria-labelledby="home-clubcar-title">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+                <div class="lg:col-span-5">
+                    <img src="image/Brand/club-car-logo.png" alt="Club Car" width="800" height="271" loading="lazy" class="w-full max-w-[15rem] sm:max-w-[22rem] lg:max-w-[26rem] h-auto">
+                </div>
+                <div class="lg:col-span-7 space-y-6">
+                    <h2 id="home-clubcar-title" class="type-lg text-ink">Why Club Car Stood Out</h2>
+                    <p class="measure">While most other major manufacturers traditionally relied on welded tubular steel frames, Club Car committed early to extruded aluminum. Because aluminum resists rust and corrosion, older Club Car chassis—especially the 1980–2004 DS—became favorites for secondary-market rebuilders, hunting buggies, and custom neighborhood carts long after their golf course leases ended.</p>
+                </div>
+            </div>
+        </section>
+    `;
+}
+
 // "2 Seats (Forward Facing)" + "85 km per charge" + "30 km/h max" -> "2 seats · 85 km range · 30 km/h"
 function homeSpecLine(p) {
     const seats = (p.seating || '').replace(/\s*\(.*\)/, '').replace('Seats', 'seats').replace('Cargo Box', 'cargo bed');
@@ -4237,6 +4255,7 @@ function renderHomePage() {
         ${renderHomeStage()}
         ${renderHomeInside()}
         ${renderHomeBatteryCompare()}
+        ${renderHomeClubCar()}
         ${renderHomeTrust()}
         ${renderHomeEvents()}
         ${renderHomeQuote()}
