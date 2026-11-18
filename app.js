@@ -3514,11 +3514,12 @@ const HOME_STAGE_FEATURE = {
     mirror: { image: 'image/Banners/golfer-features/mirror.jpg', alt: 'Side mirrors' },
     sand: { image: 'image/Banners/golfer-features/sand-bottle.jpg', alt: 'Sand bottle' },
     steering: { image: 'image/Banners/golfer-features/steering-premium.jpg', alt: 'Premium steering wheel' },
-    carplay: { image: 'image/Banners/golfer-features/carplay.jpg', alt: 'Overhead entertainment with Apple CarPlay' }
+    carplay: { image: 'image/Banners/golfer-features/carplay.jpg', alt: 'Overhead entertainment with Apple CarPlay' },
+    speaker: { image: 'image/Banners/golfer-features/gc-bluetooth-speaker.jpg', alt: 'GC Bluetooth speaker' }
 };
 const HOME_STAGE_FEATURES = {
     golf: ['dashboard', 'charger', 'ballHolder', 'cups'],
-    scratch: ['dashboard', 'charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand'],
+    scratch: ['dashboard', 'charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'speaker'],
     pro: ['dashboard', 'charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'steering', 'carplay']
 };
 const homeStageFeats = level => (HOME_STAGE_FEATURES[level.id] || []).map(k => HOME_STAGE_FEATURE[k])
