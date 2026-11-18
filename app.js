@@ -7143,7 +7143,8 @@ const SERVICE_LIST = SERVICE_GROUPS.flatMap(g => g.items);
 
 // The hero's white Tempo Base (Golfer 2 · Golfer build photo, with its depth map in image/depth) and the parts of it
 // we service, as points on the photo (% of its width and height). Each opens the service that looks after that part
-const SERVICE_STAGE_PHOTO = 'image/Products/builds/golfer-2-golfer.jpg';
+// The old Golfer photo stays here (2026-11-18): image/depth/golfer-2-golfer.jpg and the pings are drawn for it
+const SERVICE_STAGE_PHOTO = 'image/Products/builds/golfer-2-golfer-service.jpg';
 const SERVICE_PINGS = [
     { x: 51.3, y: 81.7, part: 'Wheels and tires', service: 'Mobile home service', photo: 'image/Service/wheel-service.jpg' },
     { x: 32.5, y: 65.6, part: 'Battery', service: 'Lithium battery conversion', photo: 'image/Service/lithium-install.jpg' },
