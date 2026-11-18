@@ -2200,7 +2200,93 @@ window.addEventListener('DOMContentLoaded', () => {
     applyPageMeta(currentPage, currentSlug);
     updateNavState();
     renderApp();
+    showSiteIntro();
 });
+
+// ==========================================
+// SITE INTRO (2026-11-18): a short video over the page when someone opens the site, once per visit (the tab's
+// session), on whatever page the link opened. It plays muted (browsers only start video on their own without
+// sound), with a sound button; it closes at its end, or with Skip, Escape or a click outside it. Not on the admin
+// pages, not for anyone who asked for less motion, and not after `until` (the season's last day, Manila time), so
+// it retires on its own. To change it, replace the video and poster, and the dates
+// ==========================================
+const SITE_INTRO = {
+    video: 'video/intro-christmas.mp4',
+    poster: 'image/Holiday/intro-christmas-poster.jpg',
+    label: 'Happy holidays from Golfcarts.ph',
+    until: '2027-01-07',
+    key: 'gcph-intro-christmas-2026'
+};
+
+function showSiteIntro() {
+    const intro = SITE_INTRO;
+    if (!intro || !intro.video || currentPage === 'admin') return;
+    // Not while the build pre-renders the pages (JSDOM): the intro would be saved into every page's HTML
+    if (/jsdom/i.test(navigator.userAgent)) return;
+    const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10); // Manila date
+    if (intro.until && today > intro.until) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    try { if (sessionStorage.getItem(intro.key)) return; sessionStorage.setItem(intro.key, '1'); } catch (e) { /* private mode: shows once per page load */ }
+
+    const box = document.createElement('div');
+    box.className = 'site-intro';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', intro.label);
+    box.innerHTML = `
+        <div class="site-intro-frame">
+            <video src="${attrText(intro.video)}" poster="${attrText(intro.poster)}" muted autoplay playsinline preload="auto" aria-label="${attrText(intro.label)}"></video>
+            <div class="site-intro-bar">
+                <button type="button" class="site-intro-sound" aria-pressed="false">Sound on</button>
+                <button type="button" class="site-intro-skip">Skip</button>
+            </div>
+        </div>`;
+    document.body.appendChild(box);
+    document.body.classList.add('overflow-hidden');
+    const video = box.querySelector('video');
+    const sound = box.querySelector('.site-intro-sound');
+    const skip = box.querySelector('.site-intro-skip');
+    const returnFocus = document.activeElement;
+
+    let closed = false;
+    const close = () => {
+        if (closed) return;
+        closed = true;
+        document.removeEventListener('keydown', onKey, true);
+        box.classList.add('is-leaving');
+        video.pause();
+        setTimeout(() => {
+            box.remove();
+            // Another pop-up may have opened meanwhile; it keeps the page's scroll locked
+            const otherOpen = [...document.querySelectorAll('[aria-modal="true"]')].some(d => d.getClientRects().length);
+            if (!otherOpen) document.body.classList.remove('overflow-hidden');
+            if (returnFocus && returnFocus.focus) returnFocus.focus();
+        }, 400);
+    };
+    const onKey = e => {
+        if (e.key === 'Escape') { e.stopPropagation(); close(); }
+        // Tab stays on the intro's two buttons while it shows
+        if (e.key === 'Tab') { e.preventDefault(); (document.activeElement === skip ? sound : skip).focus(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    box.addEventListener('click', e => { if (e.target === box) close(); });
+    skip.addEventListener('click', close);
+    sound.addEventListener('click', () => {
+        video.muted = !video.muted;
+        sound.setAttribute('aria-pressed', String(!video.muted));
+        sound.textContent = video.muted ? 'Sound on' : 'Sound off';
+        if (video.paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
+    });
+    video.addEventListener('ended', close);
+    // A video that can't load or play doesn't keep the page covered
+    video.addEventListener('error', close);
+    const started = video.play();
+    if (started && started.catch) started.catch(() => close());
+    // Safety net: never longer than the video plus a few seconds, even if it stalls
+    setTimeout(close, 20000);
+    requestAnimationFrame(() => box.classList.add('is-open'));
+    skip.focus({ preventScroll: true });
+}
 
 function initMobileMenu() {
     const btn = document.getElementById('mobile-menu-btn');

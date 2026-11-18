@@ -9,6 +9,7 @@
 //
 //   node scripts/build-masks.mjs            writes the masks
 //   node scripts/build-masks.mjs <dir>      also writes overlays of each mask on its photo into <dir>
+//   ONLY=golfer-2-golfer node scripts/build-masks.mjs    just that photo's maps
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,6 +33,9 @@ const MASKS = {
         // solid: the hood and roof highlights are pure white like the backdrop, so these outlines follow the
         // cart's real edge and the backdrop search stays out of them
         body: { refs: ['#f1f0ee', '#dbdad6', '#c9c8c4', '#b4b3ae'], kL: 2.5, tol: 9, minL: 55, full: true, solid: true,
+            // addPolys (2026-11-18, on the new photo): the cowl's lit top edge, up to the first light pixel under the
+            // windshield's black seal (measured column by column), which the moved outline stopped short of
+            addPolys: [[[840, 630], [860, 619], [880, 619], [900, 611], [920, 612], [940, 609], [960, 607], [980, 606], [1000, 607], [1020, 608], [1040, 610], [1060, 612], [1080, 619], [1100, 629], [1100, 652], [840, 652]]],
             exclude: [[[1054, 716], [1148, 716], [1148, 762], [1054, 762]]],
             polys: [
             // Front cowl, below the dash line, down to the black bumper
@@ -41,15 +45,23 @@ const MASKS = {
         ] },
         // fringeLight: the white seat's outermost pixels, blended with the post or trim beside them, are taken in too
         // Below the hip restraint bar's lower edge is the side panel, not seat: the same white, so the outline stops there
-        seat: { refs: ['#d4d1cc', '#dedcd8', '#e9e8e5', '#bdbab5'], kL: 2.5, tol: 10, minL: 50, fringeLight: true, polys: [
+        // addPolys (2026-11-18, on the new photo): the seat back's rounded right edge, beside the windshield post
+        seat: { refs: ['#d4d1cc', '#dedcd8', '#e9e8e5', '#bdbab5'], kL: 2.5, tol: 10, minL: 50, fringeLight: true,
+            addPolys: [[[800, 498], [814, 520], [821, 548], [822, 575], [818, 598], [800, 600]]], polys: [
             [[225, 248], [240, 233], [420, 235], [445, 258], [445, 330], [418, 345], [410, 392], [289, 392], [234, 364], [226, 343]]
         ] },
-        canopy: { refs: ['#9d9c98', '#a5a4a0', '#d9d8d4', '#eeeeec', '#c0bfbb'], kL: 2.5, tol: 10, minL: 45, full: true, solid: true, allowWhite: true, polys: [
-            [[340, 190], [450, 125], [600, 80], [700, 72], [900, 85], [1100, 135], [1115, 150], [1100, 153], [1000, 162], [800, 190], [600, 208], [400, 205], [345, 196]]
+        // The whole roof: top, front lip and the underside seen below it (2026-11-18, traced on the new photo, so
+        // native: not moved by AT). The white roof is a shade darker than the backdrop (L* 92-97 against 99-100), so
+        // inside a loose outline it is every neutral pixel between the backdrop and the black posts, bag and brackets
+        canopy: { native: true, refs: [], seed: (L, a, b) => L > 32 && L < 97.8 && Math.hypot(a, b) < 12, keep: (L, a, b) => L > 32 && L < 97.8 && Math.hypot(a, b) < 12,
+            growMinL: 0, full: true, solid: true, allowWhite: true, polys: [
+            [[392, 262], [392, 200], [440, 165], [560, 135], [720, 120], [900, 128], [1060, 160], [1130, 185], [1130, 212], [1085, 224], [1010, 240], [930, 262], [860, 285], [700, 290], [600, 285], [520, 283], [470, 274], [430, 268]]
         ] },
     },
     'golfer-2-scratch-right': {
-        body: { refs: ['#ddd6cc', '#c3b8af', '#eeeadf', '#d2c9bd', '#b3a79c', '#9d9185', '#8a7f74', '#a8a097'], kL: 2.5, tol: 8, minL: 38, full: true,
+        // noBackdropWhite (2026-11-18): the backdrop shows through gaps the backdrop search can't reach (inside the steering
+        // wheel, between the seat back and cushion); nothing on this cart is that white, so pure white never counts
+        body: { refs: ['#ddd6cc', '#c3b8af', '#eeeadf', '#d2c9bd', '#b3a79c', '#9d9185', '#8a7f74', '#a8a097'], kL: 2.5, tol: 8, minL: 38, full: true, noBackdropWhite: true,
             // Left headlight: its white LED bars match the paint, so nothing there starts the body, but the paint runs up
             // to its black frame (see guarded)
             guard: [[[958, 684], [1082, 688], [1106, 740], [1094, 766], [994, 756], [960, 722]]],
@@ -72,7 +84,7 @@ const MASKS = {
         ] },
         // tones: the Tsunami seat's grey panels and silver stripes, traced (light from the left makes the black
         // outer bolsters as bright as the panels, so lightness can't tell them apart); the rest is black bolster
-        seat: { refs: ['#a19c98', '#b0aba7', '#bfbcb7', '#3a3938', '#232222', '#d8d6d2', '#6e6b68'], kL: 2, tol: 12,
+        seat: { refs: ['#a19c98', '#b0aba7', '#bfbcb7', '#3a3938', '#232222', '#d8d6d2', '#6e6b68'], kL: 2, tol: 12, noBackdropWhite: true,
             tones: {
                 panel: [
                     [[257.5, 245], [306, 245], [310, 262.5], [316, 295], [320, 312.5], [322.5, 335], [280, 337], [275, 312.5], [266, 275]],
@@ -93,8 +105,12 @@ const MASKS = {
             [[248, 222], [262, 214], [300, 214], [308, 228], [350, 226], [356, 216], [400, 216], [408, 232], [422, 248], [440, 258], [444, 300], [440, 340], [452, 352], [452, 384], [420, 392], [350, 396], [326, 396], [297, 387.5], [286, 388], [246, 348], [232, 334], [230, 300], [232, 255]]
         ] },
         // The roof and its underside, down to where the side curtains hang from it
-        canopy: { refs: ['#a18d72', '#7a6850', '#c4b294', '#d6c7aa', '#8f7c62'], kL: 2.5, tol: 10, full: true, polys: [
-            [[340, 160], [450, 110], [700, 55], [900, 62], [1100, 108], [1162, 140], [1150, 158], [1100, 166], [1000, 190], [950, 200], [700, 205], [400, 205], [345, 200]]
+        // The roof and its underside, down to the bag and posts (2026-11-18, traced on the new photo, so native): every
+        // warm (beige) pixel inside a loose outline. The backdrop, the black bag and posts, the headrests and the grey
+        // seats are all neutral, so they stay out; the shaded underside is still beige (b* 9 and up)
+        canopy: { native: true, refs: [], seed: (L, a, b) => b >= 8 && L >= 12 && L < 97.5, keep: (L, a, b) => b >= 4 && L >= 10 && L < 97.5,
+            growMinL: 0, full: true, polys: [
+            [[348, 252], [350, 180], [420, 138], [560, 102], [760, 86], [960, 92], [1080, 112], [1160, 140], [1195, 165], [1195, 200], [1100, 216], [1010, 228], [920, 246], [800, 256], [600, 256], [430, 244]]
         ] }
     },
     'golfer-2-pro': {
@@ -303,6 +319,28 @@ const MASKS = {
     }
 };
 
+// New photos of the same carts (2026-11-18): the Golfer and Scratch photos were replaced by ones framed differently.
+// Their outlines stay as traced on the old photos; `at` moves them onto the new ones, using the scale and shift
+// scripts/align-photos.mjs measures (node scripts/align-photos.mjs <new photo> <old photo>): an old photo's point
+// (x, y) is the new photo's ((x + dx - W/2) * scale + W/2, (y + dy - H/2) * scale + H/2). The colors inside each
+// outline are then read from the new photo, as for any other.
+const AT = {
+    'golfer-2-golfer': { scale: 0.9215, dx: 24, dy: 35.5 },
+    'golfer-2-scratch-right': { scale: 1.0285, dx: 31.5, dy: 38.5 }
+};
+for (const [name, t] of Object.entries(AT)) {
+    const move = ([x, y]) => [(x + t.dx - W / 2) * t.scale + W / 2, (y + t.dy - H / 2) * t.scale + H / 2];
+    const toFull = (list, full) => list && list.map(poly => poly.map(([x, y]) => move(full ? [x, y] : [x * K, y * K])));
+    for (const spec of Object.values(MASKS[name])) {
+        if (spec.native) continue; // traced on the new photo already
+        for (const key of ['polys', 'exclude', 'include', 'guard', 'fill']) spec[key] = toFull(spec[key], spec.full && key !== 'fill');
+        if (spec.addPolys) spec.polys.push(...spec.addPolys); // outlines traced on the new photo, added as they are
+        if (spec.fill) spec.fillFull = true;
+        if (spec.tones) spec.tones = { full: true, panel: toFull(spec.tones.panel, false), silver: toFull(spec.tones.silver, false) };
+        spec.full = true;
+    }
+}
+
 function toLab(r, g, b) {
     const f = c => { c /= 255; return c > 0.04045 ? ((c + 0.055) / 1.055) ** 2.4 : c / 12.92; };
     const [R, G, B] = [f(r), f(g), f(b)];
@@ -406,7 +444,10 @@ const overlayDir = process.argv[2];
 // Photos that borrow another photo's body map come after it
 const built = {};
 const order = Object.entries(MASKS).sort(([, p], [, q]) => Boolean(p.body.from) - Boolean(q.body.from));
+// ONLY=<photo>[,<photo>] rebuilds just those photos' maps (2026-11-18)
+const onlyPhotos = process.env.ONLY ? process.env.ONLY.split(',') : null;
 for (const [name, parts] of order) {
+    if (onlyPhotos && !onlyPhotos.includes(name)) continue;
     const { data } = await sharp(path.join(root, 'image', 'Products', 'builds', `${name}.jpg`)).resize(W, H).raw().toBuffer({ resolveWithObject: true });
     const mask = Buffer.alloc(W * H * 3);
     const solid = Object.values(parts).filter(spec => spec.solid).flatMap(spec => spec.polys);
@@ -431,6 +472,7 @@ for (const [name, parts] of order) {
             const [L, a, b] = toLab(data[i], data[i + 1], data[i + 2]);
             if (spec.minL && L < spec.minL) continue;
             if (blownWhite(part, spec, L, a, b)) continue;
+            if (spec.noBackdropWhite && L >= 98.5 && Math.hypot(a, b) < 5) continue;
             if (cutOut(spec, x, y) || guarded(spec, x, y)) continue;
             if (part === 'body' && (mask[i + 1] || mask[i + 2])) continue;
             if (spec.seed) {
@@ -458,6 +500,7 @@ for (const [name, parts] of order) {
                 if (part === 'body' && (mask[i + 1] || mask[i + 2])) continue;
                 const v = toLab(data[i], data[i + 1], data[i + 2]);
                 if (v[0] < floorL || blownWhite(part, spec, ...v) || (spec.keep && !spec.keep(...v))) continue;
+                if (spec.noBackdropWhite && v[0] >= 98.5 && Math.hypot(v[1], v[2]) < 5) continue;
                 lab[i] = v[0]; lab[i + 1] = v[1]; lab[i + 2] = v[2];
                 allowed[p] = 1;
             }
@@ -522,12 +565,31 @@ for (const [name, parts] of order) {
         return polys.some(q => inPoly(x, y, q)) && !(exclude && exclude.some(q => inPoly(x, y, q)));
     });
     if (parts.body.fill) {
-        const fill = parts.body.fill.map(poly => poly.map(([x, y]) => [x * K, y * K]));
-        const exclude = (parts.body.exclude || []).map(poly => poly.map(([x, y]) => [x * K, y * K]));
+        const fill = parts.body.fillFull ? parts.body.fill : parts.body.fill.map(poly => poly.map(([x, y]) => [x * K, y * K]));
+        const exclude = parts.body.full ? (parts.body.exclude || []) : (parts.body.exclude || []).map(poly => poly.map(([x, y]) => [x * K, y * K]));
         for (let p = 0; p < W * H; p++) {
             if (backdrop[p] || mask[p * 3 + 1] || mask[p * 3 + 2]) continue;
             const x = p % W, y = (p / W) | 0;
             if (fill.some(q => inPoly(x, y, q)) && !exclude.some(q => inPoly(x, y, q))) mask[p * 3] = 255;
+        }
+    }
+    // Stray specks (2026-11-18, the photos moved with `at`): a few pixels on their own, such as one on the backdrop
+    // behind the rear fender, showed as colored dots. Any part of a channel smaller than 10 pixels is dropped
+    if (AT[name]) {
+        for (let c = 0; c < 3; c++) {
+            const seen = new Uint8Array(W * H);
+            for (let p = 0; p < W * H; p++) {
+                if (seen[p] || !mask[p * 3 + c]) continue;
+                const blob = [p], stack = [p];
+                seen[p] = 1;
+                while (stack.length) {
+                    const q = stack.pop(), x = q % W, y = (q / W) | 0;
+                    for (const r of [x > 0 ? q - 1 : -1, x < W - 1 ? q + 1 : -1, y > 0 ? q - W : -1, y < H - 1 ? q + W : -1]) {
+                        if (r >= 0 && !seen[r] && mask[r * 3 + c]) { seen[r] = 1; stack.push(r); blob.push(r); }
+                    }
+                }
+                if (blob.length < 10) for (const q of blob) mask[q * 3 + c] = 0;
+            }
         }
     }
     built[name] = mask;
@@ -544,7 +606,8 @@ for (const [name, parts] of order) {
     // whole. `tones` holds the traced panel and silver outlines; the rest of the seat is bolster. A blur softens
     // the edges between tones.
     if (parts.seat.tones) {
-        const panel = traced(parts.seat.tones.panel), silver = traced(parts.seat.tones.silver);
+        const tn = parts.seat.tones;
+        const panel = tn.full ? tn.panel : traced(tn.panel), silver = tn.full ? tn.silver : traced(tn.silver);
         const tones = Buffer.alloc(W * H * 3);
         for (let p = 0; p < W * H; p++) {
             if (!mask[p * 3 + 1]) continue;

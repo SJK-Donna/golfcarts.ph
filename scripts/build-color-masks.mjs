@@ -417,11 +417,13 @@ for (const [name, a] of Object.entries(ALIGNED)) {
 // angle, framed 0.97 times as large and moved (measured on the body, seat and roof paint maps, in the 1600 px
 // photos): each of its seat pixels takes the Scratch seat's tone at the same place, and a seat pixel the Scratch
 // seat doesn't cover (its edges) takes the nearest one's. recolor.js paints a patterned seat tone by tone with it
-const WARPED_TONES = { 'lifestyle-2-essential': { from: 'golfer-2-scratch-right', scale: 0.97, dx: -136, dy: 36.4 } };
+// The Scratch photo was replaced 2026-11-18 (framed differently); the measurements are for the old one, whose stripe
+// map is kept as golfer-2-scratch-right-old-tones.png (tones)
+const WARPED_TONES = { 'lifestyle-2-essential': { from: 'golfer-2-scratch-right', tones: 'golfer-2-scratch-right-old', scale: 0.97, dx: -136, dy: 36.4 } };
 for (const [name, t] of Object.entries(WARPED_TONES)) {
     if (only && name !== only && t.from !== only) continue;
     const masks = path.join(root, 'image/Products/builds/masks');
-    const { data: src, info: si } = await sharp(path.join(masks, `${t.from}-tones.png`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { data: src, info: si } = await sharp(path.join(masks, `${t.tones || t.from}-tones.png`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     const { data: map, info } = await sharp(path.join(masks, `${name}.png`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     const { width: w, height: h } = info;
     const out = Buffer.alloc(w * h * 3);

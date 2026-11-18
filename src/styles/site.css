@@ -2640,17 +2640,74 @@
         object-fit: cover;
     }
 
-    /* Why Club Car (renderHomeClubCar in app.js): a panel in the bronze of the Club Car logo. Its text stays dark ink
-       in both themes (ink on the bronze is 5.3:1; the softer ink-2 would be only 3:1) */
+    /* Why Club Car (renderHomeClubCar in app.js): framed above and below in the bronze of the Club Car logo
+       (the filled panel was tried 2026-11-18 and taken back) */
     .clubcar-band {
-        --ink: #151714;
-        --ink-2: #151714;
-        background: #AF815C;
-        color: var(--ink);
-        padding: 2.5rem 1.5rem;
+        padding: 2.5rem 0;
+        border-top: 6px solid #AF815C;
+        border-bottom: 6px solid #AF815C;
     }
     @media (min-width: 1024px) {
-        .clubcar-band { padding: 3.5rem 4rem; }
+        .clubcar-band { padding: 3.5rem 0; }
+    }
+
+    /* ---- Site intro (showSiteIntro in app.js): the season's video over the page, once per visit ---- */
+    .site-intro {
+        position: fixed;
+        inset: 0;
+        z-index: 80;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(11, 12, 10, 0.88);
+        opacity: 0;
+        transition: opacity 0.4s var(--ease);
+    }
+    .site-intro.is-open { opacity: 1; }
+    .site-intro.is-leaving { opacity: 0; }
+    .site-intro-frame {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+        max-width: 100%;
+        transform: scale(0.96);
+        transition: transform 0.5s var(--ease);
+    }
+    .site-intro.is-open .site-intro-frame { transform: none; }
+    /* The video keeps its own shape (858 x 1072), as large as fits above its buttons */
+    .site-intro video {
+        display: block;
+        width: auto;
+        height: auto;
+        max-width: min(92vw, 640px);
+        max-height: calc(100dvh - 6rem);
+        aspect-ratio: 858 / 1072;
+        background: #7A0F14;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    }
+    .site-intro-bar {
+        display: flex;
+        gap: 0.75rem;
+    }
+    .site-intro-bar button {
+        min-height: 2.75rem;
+        padding: 0 1.25rem;
+        border: 1px solid rgba(246, 246, 242, 0.6);
+        border-radius: var(--radius);
+        color: #F6F6F2;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        transition: background-color 0.25s var(--ease), color 0.25s var(--ease);
+    }
+    .site-intro-bar button:hover {
+        background: #F6F6F2;
+        color: #151714;
+    }
+    .site-intro-bar .site-intro-skip {
+        background: #F6F6F2;
+        color: #151714;
     }
 
     /* ---- Branch map (renderBranchMap / initBranchMap in app.js) ---- */
