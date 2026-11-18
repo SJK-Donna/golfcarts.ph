@@ -33,6 +33,9 @@
     /* Details that change with the theme */
     --field-border: #8A8B83; /* 3.2:1 on paper; form controls need 3:1 */
     --swatch-ring: rgba(21, 23, 20, 0.2);
+    --map-dot: #A3A59C;
+    --map-grid: rgba(21, 23, 20, 0.06);
+    --map-coast: rgba(79, 110, 34, 0.55);
 
     /* Admin (back office): a cool workspace behind white panels, a stone sidebar, and status colours. Each status
        pair is text on its fill, 7:1 or better. */
@@ -63,6 +66,9 @@
 
     --field-border: #6E7068;
     --swatch-ring: rgba(246, 246, 242, 0.25);
+    --map-dot: #3F423B;
+    --map-grid: rgba(246, 246, 242, 0.05);
+    --map-coast: rgba(116, 158, 53, 0.5);
 
     --adm-canvas: #0F110E;
     --adm-panel: #171915;

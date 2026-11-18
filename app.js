@@ -2829,7 +2829,7 @@ function renderHomeBatteryCompare() {
 function renderHomeClubCar() {
     return `
         <section id="home-clubcar" class="rise home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12" aria-labelledby="home-clubcar-title">
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            <div class="clubcar-band grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
                 <div class="lg:col-span-5">
                     <img src="image/Brand/club-car-logo.png" alt="Club Car" width="800" height="271" loading="lazy" class="w-full max-w-[15rem] sm:max-w-[22rem] lg:max-w-[26rem] h-auto">
                 </div>
@@ -2860,9 +2860,13 @@ const HOME_BANNERS = [
     { image: 'image/Hero/hero6.jpg', alt: 'A fleet of white golf carts lined up at a resort entrance', cta: 'Plan Your Fleet', route: 'solutions', slug: null },
     { image: 'image/Hero/hero4.jpg', alt: 'Two Tempo golf carts, red and silver, on a golf course', cta: 'Build Your Cart', route: 'product-details', slug: 'golfer-tempo-2' },
     { image: 'image/Hero/hero5.jpg', alt: 'More than just golf carts. We keep you rolling. Message us to learn how we can help!', cta: 'Book a Service', route: 'service', slug: null },
-    { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' }
+    { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' },
+    // A video banner (2026-11-18): "video" plays while the slide shows; "image" is its first frame, shown while it
+    // loads and when motion is turned down. The slide lasts as long as the video
+    { image: 'image/Hero/hero-rebuilds.jpg', video: 'image/Hero/hero-rebuilds.mp4', alt: 'Shop now: our rebuilds. Browse our rebuilt golf carts and find the one that fits your game.', cta: 'Shop Our Rebuilds', route: 'segment', slug: 'remanufactured' }
 ];
 const HOME_BANNER_MS = 3000;
+const HOME_BANNER_VIDEO_MS = 4300; // until the video says how long it is
 let homeBanners = null;
 
 function renderHomeBanners() {
@@ -2873,7 +2877,9 @@ function renderHomeBanners() {
             <div id="home-banners" class="banner-stage">
                 ${HOME_BANNERS.map((b, i) => `
                     <div class="banner-slide ${i === 0 ? 'is-active' : ''}" role="group" aria-roledescription="slide" aria-label="${i + 1} of ${total}" ${i === 0 ? '' : 'aria-hidden="true" inert'}>
-                        <img src="${attrText(b.image)}" alt="${attrText(b.alt)}" width="2880" height="864" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">
+                        ${b.video
+                            ? `<video src="${attrText(b.video)}" poster="${attrText(b.image)}" muted playsinline preload="${i === 0 ? 'auto' : 'metadata'}" width="2880" height="864" aria-label="${attrText(b.alt)}"></video>`
+                            : `<img src="${attrText(b.image)}" alt="${attrText(b.alt)}" width="2880" height="864" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`}
                     </div>
                 `).join('')}
             </div>
@@ -2945,6 +2951,25 @@ function initHomeBanners() {
     const dots = [...section.querySelectorAll('.banner-dot')];
     const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const state = { index: 0, paused: reduceMotion, hovered: false, focused: false, onScreen: true, timer: 0 };
+    // How long a slide shows: a video slide, as long as its video (2026-11-18); a photo, HOME_BANNER_MS
+    const videoOf = i => slides[i] && slides[i].querySelector('video');
+    const slideMs = i => {
+        const v = videoOf(i);
+        if (!v) return HOME_BANNER_MS;
+        return v.duration && isFinite(v.duration) ? Math.max(HOME_BANNER_MS, Math.round(v.duration * 1000)) : HOME_BANNER_VIDEO_MS;
+    };
+    // The showing slide's video plays from the start (not when motion is turned down: its first frame stays); the
+    // others stop, so only one video uses the phone's data and battery at a time
+    const syncVideos = () => slides.forEach((s, k) => {
+        const v = s.querySelector('video');
+        if (!v) return;
+        if (k === state.index && !reduceMotion && state.onScreen && !document.hidden) {
+            if (v.paused) { const p = v.play(); if (p && p.catch) p.catch(() => {}); }
+        } else if (!v.paused || (k !== state.index && v.currentTime)) {
+            v.pause();
+            if (k !== state.index) v.currentTime = 0;
+        }
+    });
 
     const show = (i, announce) => {
         state.index = (i + slides.length) % slides.length;
@@ -2954,6 +2979,8 @@ function initHomeBanners() {
             if (on) { s.removeAttribute('aria-hidden'); s.inert = false; }
             else { s.setAttribute('aria-hidden', 'true'); s.inert = true; }
         });
+        const v = videoOf(state.index);
+        if (v && !reduceMotion) v.currentTime = 0;
         ctas.forEach((a, k) => a.classList.toggle('hidden', k !== state.index));
         dots.forEach((d, k) => d.classList.toggle('is-active', k === state.index));
         document.getElementById('home-banner-index').textContent = state.index + 1;
@@ -2962,12 +2989,17 @@ function initHomeBanners() {
     };
     const running = () => !state.paused && !state.hovered && !state.focused && state.onScreen && !document.hidden;
     // The progress bar of the active banner fills over the interval while the slider runs
+    // (The bar's length follows the slide's own time; it was fixed at 6 s while slides changed every 3)
     const restart = () => {
         clearTimeout(state.timer);
         section.classList.toggle('is-running', running());
-        dots.forEach(d => { const bar = d.firstElementChild; bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = ''; });
-        if (running()) state.timer = setTimeout(() => show(state.index + 1, false), HOME_BANNER_MS);
+        const ms = slideMs(state.index);
+        dots.forEach(d => { const bar = d.firstElementChild; bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = ''; bar.style.animationDuration = `${ms}ms`; });
+        syncVideos();
+        if (running()) state.timer = setTimeout(() => show(state.index + 1, false), ms);
     };
+    // A video's length is known once its details load; if it is showing, its timer starts again with the real length
+    slides.forEach((s, k) => { const v = s.querySelector('video'); if (v) v.addEventListener('loadedmetadata', () => { if (k === state.index) restart(); }); });
     const setPaused = paused => {
         state.paused = paused;
         restart();
@@ -2999,6 +3031,7 @@ function initHomeBanners() {
         pause: () => setPaused(true),
         stop() {
             clearTimeout(state.timer);
+            slides.forEach(s => { const v = s.querySelector('video'); if (v) v.pause(); });
             if (observer) observer.disconnect();
             document.removeEventListener('visibilitychange', onVisibility);
             section.removeEventListener('click', onClick);
@@ -4080,37 +4113,54 @@ function renderHomeQuote() {
 }
 
 // ==========================================
-// BRANCH MAP: a street map (OpenStreetMap, drawn with Leaflet) with the four branches. Choosing a branch in
-// the list, or its pin, flies the map to it; "Show all branches" zooms back out. Leaflet (vendor/leaflet,
-// copied from node_modules by the build) loads only on pages with the map.
-// Without JavaScript the branch list beside the map carries everything.
+// BRANCH MAP (back 2026-11-18, replacing the Leaflet street map): a dot-matrix map of the Philippines with the four branches. Routes run from Manila to the
+// other branches; choosing a branch flies the camera to it. The coastline (image/map/philippines.svg) is
+// Natural Earth 1:10m data, projected with the same formula as branchMapPoint() so the pins line up.
+// Without JavaScript the branch list below the map carries everything.
 // ==========================================
+const BRANCH_MAP = {
+    lon0: 116, lat0: 21.5,
+    kx: 100 * Math.cos(12.5 * Math.PI / 180), ky: 100,
+    hub: 0,               // Manila: routes start here
+    focusWidth: 110,      // view width when flying to one branch (about 1.1 degrees: the city, its bay and nearby branches)
+    flyMs: 1400
+};
 let branchMap = null;
-let leafletLoading = null;
+
+// lat / lon -> map units (1 degree of latitude = 100 units)
+function branchMapPoint(b) {
+    return [(b.lon - BRANCH_MAP.lon0) * BRANCH_MAP.kx, (BRANCH_MAP.lat0 - b.lat) * BRANCH_MAP.ky];
+}
+
+function branchMapLatLon(x, y) {
+    return [BRANCH_MAP.lat0 - y / BRANCH_MAP.ky, x / BRANCH_MAP.kx + BRANCH_MAP.lon0];
+}
 
 function formatLatLon(lat, lon) {
     return `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? 'N' : 'S'} ${Math.abs(lon).toFixed(2)}°${lon >= 0 ? 'E' : 'W'}`;
 }
 
-function loadLeaflet() {
-    if (window.L) return Promise.resolve(window.L);
-    if (!leafletLoading) {
-        leafletLoading = new Promise((resolve, reject) => {
-            const css = document.createElement('link');
-            css.rel = 'stylesheet';
-            css.href = 'vendor/leaflet/leaflet.css';
-            document.head.appendChild(css);
-            const script = document.createElement('script');
-            script.src = 'vendor/leaflet/leaflet.js';
-            script.onload = () => resolve(window.L);
-            script.onerror = reject;
-            document.head.appendChild(script);
-        }).catch(err => { leafletLoading = null; throw err; });
-    }
-    return leafletLoading;
+// A view that fits every branch, with room around it, at the given width / height ratio
+function branchMapOverview(aspect) {
+    const pts = BRANCHES.map(branchMapPoint);
+    const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const w = (Math.max(...xs) - Math.min(...xs)) * 1.6, h = (Math.max(...ys) - Math.min(...ys)) * 1.35;
+    const width = Math.max(w, h * aspect);
+    return { cx, cy, w: width, h: width / aspect };
+}
+
+// Curved route from the hub to a branch: a quadratic curve bowed to one side
+function branchRoutePath(from, to) {
+    const [x1, y1] = from, [x2, y2] = to;
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = x2 - x1, dy = y2 - y1;
+    return `M${x1.toFixed(1)} ${y1.toFixed(1)}Q${(mx - dy * 0.22).toFixed(1)} ${(my + dx * 0.22).toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}`;
 }
 
 function renderBranchMap(sectionId = 'home-branches') {
+    const view = branchMapOverview(4 / 3);
+    const pts = BRANCHES.map(branchMapPoint);
+    const hub = pts[BRANCH_MAP.hub];
     return `
         <section id="${sectionId}" class="branch-map-section scroll-mt-16" aria-labelledby="${sectionId}-title">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 py-12 lg:py-[4.5rem]">
@@ -4120,7 +4170,34 @@ function renderBranchMap(sectionId = 'home-branches') {
                 </div>
                 <div class="grid lg:grid-cols-12 gap-6 lg:gap-8">
                     <div id="branch-map" class="branch-map lg:col-span-8">
-                        <div id="branch-map-canvas" class="branch-map-canvas" role="region" aria-label="Map of the four Golfcarts.ph branches"></div>
+                        <svg id="branch-map-svg" viewBox="${(view.cx - view.w / 2).toFixed(1)} ${(view.cy - view.h / 2).toFixed(1)} ${view.w.toFixed(1)} ${view.h.toFixed(1)}"
+                             role="img" aria-label="Map of the Philippines showing the four Golfcarts.ph branches">
+                            <defs>
+                                <pattern id="branch-map-dots" width="6" height="6" patternUnits="userSpaceOnUse">
+                                    <circle cx="3" cy="3" r="1.1"></circle>
+                                </pattern>
+                            </defs>
+                            <g id="branch-map-land"></g>
+                            <g class="branch-map-routes">
+                                ${pts.map((p, i) => i === BRANCH_MAP.hub ? '' : `
+                                    <path id="branch-route-${i}" d="${branchRoutePath(hub, p)}" class="branch-route"></path>
+                                    <circle class="branch-packet" r="2.5">
+                                        <animateMotion dur="${3 + i * 0.6}s" repeatCount="indefinite"><mpath href="#branch-route-${i}"></mpath></animateMotion>
+                                    </circle>`).join('')}
+                            </g>
+                            <g class="branch-map-pins">
+                                ${BRANCHES.map((b, i) => `
+                                    <g class="branch-pin" data-branch="${i}" transform="translate(${pts[i][0].toFixed(1)} ${pts[i][1].toFixed(1)})">
+                                        <circle class="branch-pin-pulse" r="6"></circle>
+                                        <circle class="branch-pin-pulse branch-pin-pulse-late" r="6"></circle>
+                                        <circle class="branch-pin-core" r="5"></circle>
+                                        <text class="branch-pin-label" x="12" y="4">${b.name.replace(' Branch', '')}</text>
+                                    </g>`).join('')}
+                            </g>
+                        </svg>
+                        <div class="branch-map-grid" aria-hidden="true"></div>
+                        <div class="branch-map-sweep" aria-hidden="true"></div>
+                        <p class="branch-map-hud" aria-hidden="true"><span id="branch-map-readout">${formatLatLon(...branchMapLatLon(view.cx, view.cy))}</span><span id="branch-map-zoom">1.0×</span></p>
                         <button type="button" id="branch-map-reset" class="branch-map-reset" hidden>Show all branches</button>
                     </div>
 
@@ -4149,71 +4226,124 @@ function renderBranchMap(sectionId = 'home-branches') {
     `;
 }
 
+// cubic-bezier(0.22, 1, 0.36, 1), the site's easing curve, as a function of time 0..1
+function branchMapEase(t) {
+    const p1x = 0.22, p1y = 1, p2x = 0.36, p2y = 1;
+    const bez = (a, b, s) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
+    let s = t;
+    for (let i = 0; i < 6; i++) {
+        const x = bez(p1x, p2x, s) - t;
+        const dx = 3 * p1x * (1 - s) ** 2 + 6 * (p2x - p1x) * s * (1 - s) + 3 * (1 - p2x) * s * s;
+        if (Math.abs(dx) < 1e-6) break;
+        s = Math.min(1, Math.max(0, s - x / dx));
+    }
+    return bez(p1y, p2y, s);
+}
+
 function initBranchMap() {
     if (branchMap) branchMap.stop();
     branchMap = null;
-    const canvas = document.getElementById('branch-map-canvas');
-    // Pre-rendered pages and old browsers keep the branch list only
-    if (!canvas || !window.Promise) return;
-    const section = canvas.closest('section');
-    const items = [...section.querySelectorAll('.branch-item')];
-    const reset = document.getElementById('branch-map-reset');
-    const animate = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    let map = null, markers = [], selected = null, stopped = false;
+    const box = document.getElementById('branch-map');
+    const svg = document.getElementById('branch-map-svg');
+    // The camera needs a real browser; pre-rendered pages keep the static overview
+    if (!box || !svg || !('ResizeObserver' in window)) return;
+    const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) svg.querySelectorAll('animateMotion').forEach(a => a.remove());
 
-    const fitAll = () => map.flyToBounds(BRANCHES.map(b => [b.lat, b.lon]), { padding: [48, 48], animate, duration: 1.2 });
+    const pins = [...svg.querySelectorAll('.branch-pin')];
+    const items = [...document.querySelectorAll('.branch-item')];
+    const pattern = svg.querySelector('#branch-map-dots');
+    const readout = document.getElementById('branch-map-readout');
+    const zoomLabel = document.getElementById('branch-map-zoom');
+    const reset = document.getElementById('branch-map-reset');
+    const pts = BRANCHES.map(branchMapPoint);
+    let overview = null, view = null, frame = 0, selected = null;
+
+    // Draws the camera: viewBox, plus pins, dots and packets kept at a constant size on screen
+    const draw = v => {
+        view = v;
+        svg.setAttribute('viewBox', `${v.cx - v.w / 2} ${v.cy - v.h / 2} ${v.w} ${v.h}`);
+        const unit = v.w / Math.max(1, box.clientWidth); // map units per screen pixel
+        pins.forEach((pin, i) => pin.setAttribute('transform', `translate(${pts[i][0]} ${pts[i][1]}) scale(${unit})`));
+        svg.querySelectorAll('.branch-packet').forEach(p => p.setAttribute('r', 2.5 * unit));
+        const dot = 7 * unit;
+        pattern.setAttribute('width', dot);
+        pattern.setAttribute('height', dot);
+        pattern.firstElementChild.setAttribute('cx', dot / 2);
+        pattern.firstElementChild.setAttribute('cy', dot / 2);
+        pattern.firstElementChild.setAttribute('r', 1.2 * unit);
+        readout.textContent = formatLatLon(...branchMapLatLon(v.cx, v.cy));
+        zoomLabel.textContent = `${(overview.w / v.w).toFixed(1)}×`;
+    };
+
+    // Smooth camera move: centre eases linearly, zoom eases on a log scale so it feels even
+    const flyTo = target => {
+        cancelAnimationFrame(frame);
+        if (reduceMotion) { draw(target); return; }
+        const from = { ...view }, start = performance.now();
+        const step = now => {
+            const t = Math.min(1, (now - start) / BRANCH_MAP.flyMs), e = branchMapEase(t);
+            const w = Math.exp(Math.log(from.w) + (Math.log(target.w) - Math.log(from.w)) * e);
+            draw({ cx: from.cx + (target.cx - from.cx) * e, cy: from.cy + (target.cy - from.cy) * e, w, h: w * (target.h / target.w) });
+            if (t < 1) frame = requestAnimationFrame(step);
+        };
+        frame = requestAnimationFrame(step);
+    };
+
+    const aspect = () => box.clientWidth / Math.max(1, box.clientHeight);
+    const focusView = i => ({ cx: pts[i][0], cy: pts[i][1], w: BRANCH_MAP.focusWidth, h: BRANCH_MAP.focusWidth / aspect() });
+
     const select = i => {
         selected = i;
         items.forEach((li, k) => {
             li.classList.toggle('is-selected', k === i);
             li.querySelector('.branch-item-select').setAttribute('aria-pressed', String(k === i));
         });
-        markers.forEach((m, k) => m.getElement() && m.getElement().classList.toggle('is-selected', k === i));
+        pins.forEach((pin, k) => pin.classList.toggle('is-selected', k === i));
         reset.hidden = i === null;
-        if (!map) return;
-        if (i === null) fitAll();
-        else map.flyTo([BRANCHES[i].lat, BRANCHES[i].lon], 16, { animate, duration: 1.2 });
+        flyTo(i === null ? overview : focusView(i));
     };
-    const highlight = (i, on) => markers[i] && markers[i].getElement() && markers[i].getElement().classList.toggle('is-hovered', on);
+    const highlight = (i, on) => pins[i] && pins[i].classList.toggle('is-hovered', on);
 
     const onClick = e => {
         const btn = e.target.closest('.branch-item-select');
         if (btn) select(selected === +btn.dataset.branch ? null : +btn.dataset.branch);
+        const pin = e.target.closest('.branch-pin');
+        if (pin) select(+pin.dataset.branch);
         if (e.target.closest('#branch-map-reset')) select(null);
     };
     const onOver = e => { const li = e.target.closest('.branch-item'); if (li) highlight(+li.dataset.branch, true); };
     const onOut = e => { const li = e.target.closest('.branch-item'); if (li) highlight(+li.dataset.branch, false); };
+    const section = box.closest('section');
     section.addEventListener('click', onClick);
     section.addEventListener('mouseover', onOver);
     section.addEventListener('mouseout', onOut);
 
-    loadLeaflet().then(L => {
-        if (stopped) return;
-        // Scroll-wheel zoom stays off so scrolling the page past the map doesn't zoom it; the +/- buttons,
-        // pinch and double-click still zoom
-        map = L.map(canvas, { scrollWheelZoom: false });
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors'
-        }).addTo(map);
-        map.fitBounds(BRANCHES.map(b => [b.lat, b.lon]), { padding: [48, 48] });
-        markers = BRANCHES.map((b, i) => L.marker([b.lat, b.lon], {
-            title: b.name,
-            alt: b.name,
-            icon: L.divIcon({ className: 'branch-marker', iconSize: null, html: `<span class="branch-marker-dot"></span><span class="branch-marker-label">${b.name.replace(' Branch', '')}</span>` })
-        }).addTo(map).on('click', () => select(i)));
-    }).catch(() => {
-        // Leaflet couldn't load (offline, blocked): the list still has every address and directions link
-        canvas.hidden = true;
-    });
+    const layout = () => {
+        overview = branchMapOverview(aspect());
+        cancelAnimationFrame(frame);
+        draw(selected === null ? overview : focusView(selected));
+    };
+    layout();
+    const resized = new ResizeObserver(layout);
+    resized.observe(box);
+
+    // The coastline loads separately so pages without the map don't download it
+    if (window.fetch) {
+        fetch('image/map/philippines.svg').then(r => (r.ok ? r.text() : '')).then(text => {
+            const d = (text.match(/\sd="([^"]+)"/) || [])[1];
+            const land = document.getElementById('branch-map-land');
+            if (d && land) land.innerHTML = `<path class="branch-map-land" d="${d}"></path>`;
+        }).catch(() => {});
+    }
 
     branchMap = {
         stop() {
-            stopped = true;
+            cancelAnimationFrame(frame);
+            resized.disconnect();
             section.removeEventListener('click', onClick);
             section.removeEventListener('mouseover', onOver);
             section.removeEventListener('mouseout', onOut);
-            if (map) map.remove();
         }
     };
 }
@@ -7866,7 +7996,7 @@ function renderServicePage() {
             </ol>
         </section>
 
-        <section id="warranty" class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-10 lg:gap-12 scroll-mt-20" aria-labelledby="warranty-title">
+        <section id="warranty" class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 scroll-mt-20" aria-labelledby="warranty-title">
             <div class="lg:col-span-4 space-y-4">
                 <h2 id="warranty-title" class="type-lg text-ink">Warranty coverage for Tempo.</h2>
                 <p class="measure">${WARRANTY_NOTE}</p>

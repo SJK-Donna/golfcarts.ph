@@ -17,15 +17,12 @@
     <script>try { if (localStorage.getItem('theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}</script>
     <!-- Hides the built-in homepage banners until the saved ones are known (account.js); the timer is a safety net -->
     <script>document.documentElement.classList.add('edits-pending'); setTimeout(function () { document.documentElement.classList.remove('edits-pending'); }, 4000);</script>
-    <!-- No pinch or Ctrl+scroll zoom on desktop: a touchpad pinch magnifies the page like a loupe (the header
-         slides out of view and the banner looks blown up). Browsers report it as a wheel event with ctrlKey;
-         Safari as gesture events. Keyboard zoom (Ctrl + / Ctrl -) and the browser's zoom menu still work, so
-         visitors who need larger text can still get it; the layout reflows at those sizes. -->
+    <!-- No touchpad pinch or Ctrl+scroll zoom on desktop: it magnifies the page like a loupe (the header slides out of
+         view and the banner looks blown up). Browsers report it as a wheel event with ctrlKey. Safari's gesture
+         events are left alone (2026-11-18): blocking them also stopped pinch-zoom on iPhones and iPads, which
+         visitors need to enlarge text (WCAG 1.4.4). Keyboard zoom (Ctrl + / Ctrl -) and the zoom menu still work. -->
     <script>
         window.addEventListener('wheel', function (e) { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
-        ['gesturestart', 'gesturechange'].forEach(function (type) {
-            document.addEventListener(type, function (e) { e.preventDefault(); }, { passive: false });
-        });
     </script>
     <!-- SEO:HEAD (per-page canonical, Open Graph and structured data are written here by the build) -->
 

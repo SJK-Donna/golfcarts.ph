@@ -2576,7 +2576,9 @@
     .banner-slide.is-active {
         opacity: 1;
     }
-    .banner-slide img {
+    .banner-slide img,
+    .banner-slide video {
+        display: block;
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -2610,9 +2612,10 @@
     .banner-dot.is-active span {
         width: 100%;
     }
-    /* While the slider runs, the active segment fills over the interval (6 s, HOME_BANNER_MS) */
+    /* While the slider runs, the active segment fills over the slide's time (initHomeBanners sets the duration:
+       HOME_BANNER_MS for a photo, the video's length for a video) */
     .is-running .banner-dot.is-active span {
-        animation: banner-fill 6s linear;
+        animation: banner-fill 3s linear;
     }
     @keyframes banner-fill {
         from { width: 0; }
@@ -2637,6 +2640,19 @@
         object-fit: cover;
     }
 
+    /* Why Club Car (renderHomeClubCar in app.js): a panel in the bronze of the Club Car logo. Its text stays dark ink
+       in both themes (ink on the bronze is 5.3:1; the softer ink-2 would be only 3:1) */
+    .clubcar-band {
+        --ink: #151714;
+        --ink-2: #151714;
+        background: #AF815C;
+        color: var(--ink);
+        padding: 2.5rem 1.5rem;
+    }
+    @media (min-width: 1024px) {
+        .clubcar-band { padding: 3.5rem 4rem; }
+    }
+
     /* ---- Branch map (renderBranchMap / initBranchMap in app.js) ---- */
     .branch-map-section {
         background: var(--paper);
@@ -2655,61 +2671,114 @@
     @media (min-width: 1024px) {
         .branch-map { aspect-ratio: auto; min-height: 560px; }
     }
-    /* The street map (Leaflet). Its own stacking context, so Leaflet's layers (z-index 400-1000) stay under
-       the sticky header. The tiles are toned down to sit with the site's palette, and dimmed in dark mode
-       (set by the header toggle). */
-    .branch-map-canvas {
+    .branch-map svg {
         position: absolute;
         inset: 0;
-        isolation: isolate;
-        background: var(--stone);
-        font-family: var(--font-text);
+        width: 100%;
+        height: 100%;
     }
-    .branch-map-canvas .leaflet-tile-pane {
-        filter: grayscale(0.85) contrast(0.95);
+    .branch-map-land {
+        fill: url(#branch-map-dots);
+        stroke: var(--map-coast);
+        stroke-width: 1;
+        vector-effect: non-scaling-stroke;
     }
-    :root[data-theme="dark"] .branch-map-canvas .leaflet-tile-pane {
-        filter: grayscale(0.85) invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+    #branch-map-dots circle {
+        fill: var(--map-dot);
     }
-    /* Branch pins: a green dot with the branch name; larger when chosen or hovered in the list. Leaflet's
-       stylesheet loads after this one and sets its markers to display: block, hence the extra class. */
-    .leaflet-marker-icon.branch-marker {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        width: max-content;
-        translate: -7px -7px;
+    .branch-route {
+        fill: none;
+        stroke: var(--green);
+        stroke-width: 1.25;
+        stroke-dasharray: 4 6;
+        vector-effect: non-scaling-stroke;
+        opacity: 0.8;
+        animation: branch-route-flow 1.6s linear infinite;
+    }
+    @keyframes branch-route-flow {
+        to { stroke-dashoffset: -20; }
+    }
+    .branch-packet {
+        fill: var(--green-text);
+    }
+    .branch-pin {
         cursor: pointer;
     }
-    .branch-marker-dot {
-        flex: none;
-        display: block;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        background: var(--green);
-        border: 2px solid #fff;
-        box-shadow: 0 0 0 4px rgba(116, 158, 53, 0.3);
-        transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+    .branch-pin-core {
+        fill: var(--green);
+        stroke: var(--paper);
+        stroke-width: 2;
+        transition: r 0.3s var(--ease);
     }
-    .branch-marker.is-selected .branch-marker-dot,
-    .branch-marker.is-hovered .branch-marker-dot {
-        transform: scale(1.35);
-        box-shadow: 0 0 0 7px rgba(116, 158, 53, 0.35);
+    .branch-pin.is-selected .branch-pin-core,
+    .branch-pin.is-hovered .branch-pin-core {
+        r: 7;
     }
-    .branch-marker-label {
-        padding: 0.125rem 0.5rem;
-        border-radius: var(--radius);
-        background: var(--paper);
-        color: var(--ink);
+    .branch-pin-pulse {
+        fill: none;
+        stroke: var(--green);
+        stroke-width: 1.5;
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: branch-pulse 2.4s var(--ease) infinite;
+    }
+    .branch-pin-pulse-late {
+        animation-delay: 1.2s;
+    }
+    @keyframes branch-pulse {
+        from { transform: scale(1); opacity: 0.9; }
+        to { transform: scale(4.5); opacity: 0; }
+    }
+    .branch-pin-label {
+        fill: var(--ink);
+        font-family: var(--font-text);
         font-size: 13px;
         font-weight: 500;
-        line-height: 1.5;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+        paint-order: stroke;
+        stroke: var(--stone);
+        stroke-width: 4px;
+        stroke-linejoin: round;
     }
-    .branch-marker.is-selected .branch-marker-label {
-        color: var(--green-text);
+    .branch-pin.is-selected .branch-pin-label {
+        fill: var(--green-text);
         font-weight: 600;
+    }
+    /* Overlays: fixed to the frame, so they stay put while the map moves underneath */
+    .branch-map-grid {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+            linear-gradient(var(--map-grid) 1px, transparent 1px),
+            linear-gradient(90deg, var(--map-grid) 1px, transparent 1px);
+        background-size: 48px 48px;
+    }
+    .branch-map-sweep {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 160%;
+        aspect-ratio: 1;
+        translate: -50% -50%;
+        pointer-events: none;
+        background: conic-gradient(from 0deg, rgba(116, 158, 53, 0.14), rgba(116, 158, 53, 0) 70deg, rgba(116, 158, 53, 0) 360deg);
+        border-radius: 50%;
+        animation: branch-sweep 9s linear infinite;
+    }
+    @keyframes branch-sweep {
+        to { rotate: 360deg; }
+    }
+    .branch-map-hud {
+        position: absolute;
+        left: 1rem;
+        top: 1rem;
+        display: flex;
+        gap: 1rem;
+        font-size: 0.75rem;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+        color: var(--ink-2);
+        pointer-events: none;
     }
     .branch-map-reset {
         position: absolute;
@@ -3083,7 +3152,7 @@
     .admin-banners { display: grid; gap: 1.5rem; }
     .admin-banner { display: grid; gap: 0.75rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
     .admin-banner-img { display: flex; align-items: center; justify-content: center; aspect-ratio: 2880 / 864; overflow: hidden; border-radius: 6px; background: var(--stone); }
-    .admin-banner-img img { width: 100%; height: 100%; object-fit: cover; }
+    .admin-banner-img img, .admin-banner-img video { width: 100%; height: 100%; object-fit: cover; }
     .admin-banner-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem; }
     .admin-banner-bar button:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -3116,7 +3185,7 @@
     .zoho-name { min-width: 9rem; overflow-wrap: break-word; }
 
     /* Until the saved banners are known, the built-in ones stay hidden so they don't flash */
-    .edits-pending .banner-slide img { visibility: hidden; }
+    .edits-pending .banner-slide img, .edits-pending .banner-slide video { visibility: hidden; }
     .edits-pending .home-banners .banner-stage { background: var(--stone); }
 
     /* Stories and Guides page: a lead story, more stories, then the guides in their own band */
@@ -3549,8 +3618,15 @@
     .lineup .lineup-cart:focus-visible {
         transform: none;
     }
-    .branch-marker-dot {
-        transition: none;
+    .branch-map-sweep {
+        display: none;
+    }
+    .branch-route,
+    .branch-pin-pulse {
+        animation: none;
+    }
+    .branch-pin-pulse {
+        opacity: 0;
     }
     .battery-bar,
     .battery-row {

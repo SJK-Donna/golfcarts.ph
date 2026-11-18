@@ -752,10 +752,10 @@ async function saveSiteEdit(key, value, message) {
 // line is its own edit); orig: its text as shipped, so an edit only lands on the text it was made for: if the code's
 // text changes, the edit is skipped (and listed as out of date while editing). Left out: the forms, the stage's build
 // cards, its color and its specs (edited in the admin's Products), and the parts that count or switch on their own (the
-// banners' counter, the event's Read more). The banners, the Red Series and the event (2026-11-17) are edited on the
+// banners' counter, the event's Read more, the branch map's live coordinates). The banners, the Red Series and the event (2026-11-17) are edited on the
 // page too; their admin editors (Site content) stay, and an edit made here goes out of date if the admin changes the
 // text or photo underneath. Text is set as plain text (never as HTML)
-const PAGE_TEXT_SKIP = '.home-stage-cards, .home-stage-swatches, .home-stage-shown > p, .home-stage-facts, .home-banners h1, .banner-bar .tabular-nums, #home-banner-status, #home-promo-title, [aria-controls="home-events-more"], form';
+const PAGE_TEXT_SKIP = '.home-stage-cards, .home-stage-swatches, .home-stage-shown > p, .home-stage-facts, .home-banners h1, .banner-bar .tabular-nums, #home-banner-status, #home-promo-title, [aria-controls="home-events-more"], .branch-map-hud, form';
 // Photos (2026-11-17, the homepage): any photo is clicked and replaced (uploaded to site-photos/page-photos) and its
 // description changed. key: the section's name and "img<n>", n the place of the first photo with the same address (the
 // event's scrolling photos repeat, and both copies change together), plus "@<build>" in the stage's features; orig: the
@@ -2974,11 +2974,11 @@ function renderBannerEditor() {
             </div>
             <ol class="admin-banners">${slides.map((b, i) => `
                 <li class="admin-banner" onfocusin="contentPreviewChanged({ section: 'banners', slide: ${i} })">
-                    <div class="admin-banner-img">${b.image ? `<img src="${escapeHtml(b.image)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
+                    <div class="admin-banner-img">${b.video ? `<video src="${escapeHtml(b.video)}" poster="${escapeHtml(b.image || '')}" muted loop playsinline autoplay></video>` : b.image ? `<img src="${escapeHtml(b.image)}" alt="" loading="lazy">` : '<span class="text-xs text-mute">No photo yet</span>'}</div>
                     <div class="admin-banner-bar">
-                        <span class="text-sm font-semibold text-ink">Banner ${i + 1} ${photoSize('banner')}</span>
+                        <span class="text-sm font-semibold text-ink">Banner ${i + 1}${b.video ? ' (video)' : ''} ${photoSize('banner')}</span>
                         <span class="admin-photo-actions">
-                            <label for="ab-photo-${i}" class="link text-xs">${photoBusy === `banner:${i}` ? 'Uploading…' : b.image ? 'Replace photo' : 'Add photo'}</label>
+                            <label for="ab-photo-${i}" class="link text-xs">${photoBusy === `banner:${i}` ? 'Uploading…' : b.video ? 'Replace with a photo' : b.image ? 'Replace photo' : 'Add photo'}</label>
                             <input id="ab-photo-${i}" type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" onchange="chooseBannerPhoto(${i}, this)">
                             <button type="button" onclick="moveBanner(${i}, -1)" class="link text-xs"${i === 0 ? ' disabled' : ''}>Move up</button>
                             <button type="button" onclick="moveBanner(${i}, 1)" class="link text-xs"${i === slides.length - 1 ? ' disabled' : ''}>Move down</button>
@@ -3012,6 +3012,7 @@ async function chooseBannerPhoto(i, input) {
     renderApp();
     try {
         slide.image = await uploadSitePhoto(file, 'banners', { max: BANNER_PHOTO_MAX, jpeg: true });
+        delete slide.video; // a video banner (2026-11-18) becomes a photo banner when its photo is replaced
         showToast('Photo uploaded. Save the carousel to put it on the site.');
     } catch (err) {
         showToast(`Not uploaded: ${err.message}.`);
