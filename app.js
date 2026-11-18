@@ -2206,7 +2206,9 @@ window.addEventListener('DOMContentLoaded', () => {
 // ==========================================
 // SITE INTRO (2026-11-18): a short video over the page when someone opens the site, once per visit (the tab's
 // session), on whatever page the link opened. It plays muted (browsers only start video on their own without
-// sound), with a sound button; it closes at its end, or with Skip, Escape or a click outside it. Not on the admin
+// sound), so it tries with sound first, and if the browser says no, plays muted and turns the sound on at the
+// visitor's first tap, click or key (2026-11-18: no sound or skip buttons, the user's choice). It closes at its end,
+// or with the small x at its top right, Escape or a click outside it. Not on the admin
 // pages, not for anyone who asked for less motion, and not after `until` (the season's last day, Manila time), so
 // it retires on its own. To change it, replace the video and poster, and the dates
 // ==========================================
@@ -2235,17 +2237,15 @@ function showSiteIntro() {
     box.setAttribute('aria-label', intro.label);
     box.innerHTML = `
         <div class="site-intro-frame">
-            <video src="${attrText(intro.video)}" poster="${attrText(intro.poster)}" muted autoplay playsinline preload="auto" aria-label="${attrText(intro.label)}"></video>
-            <div class="site-intro-bar">
-                <button type="button" class="site-intro-sound" aria-pressed="false">Sound on</button>
-                <button type="button" class="site-intro-skip">Skip</button>
-            </div>
+            <video src="${attrText(intro.video)}" poster="${attrText(intro.poster)}" playsinline preload="auto" aria-label="${attrText(intro.label)}"></video>
+            <button type="button" class="site-intro-close" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>`;
     document.body.appendChild(box);
     document.body.classList.add('overflow-hidden');
     const video = box.querySelector('video');
-    const sound = box.querySelector('.site-intro-sound');
-    const skip = box.querySelector('.site-intro-skip');
+    const closeBtn = box.querySelector('.site-intro-close');
+    // Browsers count a tap as the visitor's own action when the finger lifts (pointerup / touchend), not when it lands
+    const unmuteEvents = ['pointerup', 'touchend', 'click', 'keydown'];
     const returnFocus = document.activeElement;
 
     let closed = false;
@@ -2253,6 +2253,7 @@ function showSiteIntro() {
         if (closed) return;
         closed = true;
         document.removeEventListener('keydown', onKey, true);
+        unmuteEvents.forEach(type => document.removeEventListener(type, unmute, true));
         box.classList.add('is-leaving');
         video.pause();
         setTimeout(() => {
@@ -2265,27 +2266,39 @@ function showSiteIntro() {
     };
     const onKey = e => {
         if (e.key === 'Escape') { e.stopPropagation(); close(); }
-        // Tab stays on the intro's two buttons while it shows
-        if (e.key === 'Tab') { e.preventDefault(); (document.activeElement === skip ? sound : skip).focus(); }
+        // Tab stays on the intro's close button while it shows
+        if (e.key === 'Tab') { e.preventDefault(); closeBtn.focus(); }
     };
     document.addEventListener('keydown', onKey, true);
     box.addEventListener('click', e => { if (e.target === box) close(); });
-    skip.addEventListener('click', close);
-    sound.addEventListener('click', () => {
-        video.muted = !video.muted;
-        sound.setAttribute('aria-pressed', String(!video.muted));
-        sound.textContent = video.muted ? 'Sound on' : 'Sound off';
-        if (video.paused) { const p = video.play(); if (p && p.catch) p.catch(() => {}); }
-    });
+    closeBtn.addEventListener('click', close);
+    // Sound: if the video had to start muted, the first tap, click or key anywhere (except the x) turns it on
+    function unmute(e) {
+        if (closed || (e.target && e.target.closest && e.target.closest('.site-intro-close'))) return;
+        video.muted = false;
+        const p = video.play();
+        // Still refused: back to muted so it keeps playing, and the next tap tries again
+        const refused = () => { video.muted = true; const q = video.play(); if (q && q.catch) q.catch(() => {}); };
+        if (p && p.then) p.then(() => unmuteEvents.forEach(type => document.removeEventListener(type, unmute, true)), refused);
+    }
     video.addEventListener('ended', close);
     // A video that can't load or play doesn't keep the page covered
     video.addEventListener('error', close);
+    // With sound first; a browser that blocks that plays it muted, and the first tap brings the sound in
+    const playMuted = () => {
+        if (closed) return;
+        video.muted = true;
+        const p = video.play();
+        if (p && p.catch) p.catch(() => close());
+        unmuteEvents.forEach(type => document.addEventListener(type, unmute, true));
+    };
+    video.muted = false;
     const started = video.play();
-    if (started && started.catch) started.catch(() => close());
+    if (started && started.catch) started.catch(playMuted);
     // Safety net: never longer than the video plus a few seconds, even if it stalls
     setTimeout(close, 20000);
     requestAnimationFrame(() => box.classList.add('is-open'));
-    skip.focus({ preventScroll: true });
+    closeBtn.focus({ preventScroll: true });
 }
 
 function initMobileMenu() {
@@ -6867,6 +6880,36 @@ function renderDetailColorPickers(product) {
         ` : ''}`;
 }
 
+// Custom carts (2026-11-18): on the Golfer 2 page (where the menu's Custom Carts goes), a flat strip of photo cards
+// of carts we've built, gliding left without end under the hero, like the Service page's photo strips without the
+// turning ring in the middle. The strip pauses under the pointer; with reduced motion it stands still and scrolls
+// by hand. The photos are web copies (image/custom-carts) of the originals in image/carousel
+const CUSTOM_CART_PHOTOS = [
+    { src: 'image/custom-carts/custom-01.jpg', alt: 'A lifted four-seat Tempo in grey and black on a lawn' },
+    { src: 'image/custom-carts/custom-02.jpg', alt: 'A lifted black Tempo with a brush guard and off-road wheels' },
+    { src: 'image/custom-carts/custom-03.jpg', alt: 'A white Tempo with a beige roof and beige seats' },
+    { src: 'image/custom-carts/custom-04.jpg', alt: 'A white Tempo with a black roof, black seats and LED lights' },
+    { src: 'image/custom-carts/custom-05.jpg', alt: 'A blue Tempo with caramel seats and a black roof' },
+    { src: 'image/custom-carts/custom-06.jpg', alt: 'A lifted white Tempo with a brush guard, red wheels and caramel seats' },
+    { src: 'image/custom-carts/custom-07.jpg', alt: 'A white Tempo with a beige roof among trees' },
+    { src: 'image/custom-carts/custom-08.jpg', alt: 'A two-tone black and teal Tempo in the Club Car showroom' },
+    { src: 'image/custom-carts/custom-09.jpg', alt: 'A dark blue Tempo with caramel seats and a black roof' },
+    { src: 'image/custom-carts/custom-10.jpg', alt: 'A champagne Tempo with caramel seats and a black roof' },
+    { src: 'image/custom-carts/custom-11.jpg', alt: 'A cream Tempo with caramel seats and a beige roof' },
+    { src: 'image/custom-carts/custom-12.jpg', alt: 'A red Tempo with caramel seats and a black roof' }
+];
+
+function renderCustomCartsStrip() {
+    const card = (ph, copy) => `<figure class="cc-strip-card"><img src="${ph.src}" alt="${copy ? '' : attrText(ph.alt)}" loading="lazy" decoding="async" draggable="false"></figure>`;
+    return `
+        <div class="cc-strip" role="region" aria-label="Custom carts we've built">
+            <div class="cc-strip-track">
+                ${CUSTOM_CART_PHOTOS.map(ph => card(ph, false)).join('')}
+                <div class="cc-strip-copy" aria-hidden="true">${CUSTOM_CART_PHOTOS.map(ph => card(ph, true)).join('')}</div>
+            </div>
+        </div>`;
+}
+
 function renderProductDetailsPage() {
     const product = PRODUCTS_DATA.find(p => p.slug === currentSlug) || PRODUCTS_DATA[0];
     const isVehicle = product.category !== 'Accessories';
@@ -6973,6 +7016,7 @@ function renderProductDetailsPage() {
                     ` : ''}
                 </div>
             </div>
+            ${product.slug === 'golfer-tempo-2' ? renderCustomCartsStrip() : ''}
         </section>
 
         <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">

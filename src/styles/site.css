@@ -2651,6 +2651,56 @@
         .clubcar-band { padding: 3.5rem 0; }
     }
 
+    /* ---- Custom carts strip (renderCustomCartsStrip in app.js): photo cards gliding left without end, in the
+       Service page strip's card style, on the Golfer 2 page under its hero. The track holds the photos twice; moving
+       it by half its width brings the second run exactly where the first began, so the loop has no seam ---- */
+    .cc-strip {
+        position: relative;
+        overflow: hidden;
+        padding: 0.5rem 0 3.5rem;
+        -webkit-mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+        mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+    }
+    .cc-strip-track,
+    .cc-strip-copy {
+        display: flex;
+        align-items: flex-start;
+    }
+    .cc-strip-track {
+        width: max-content;
+        animation: cc-strip-glide 70s linear infinite;
+        will-change: transform;
+    }
+    .cc-strip:hover .cc-strip-track { animation-play-state: paused; }
+    @keyframes cc-strip-glide {
+        to { transform: translateX(-50%); }
+    }
+    .cc-strip-card {
+        flex: 0 0 auto;
+        margin: 0 18px 0 0;
+        padding: 8px;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        box-shadow: 0 18px 40px -18px rgba(21, 23, 20, 0.45);
+    }
+    .cc-strip-card img {
+        display: block;
+        height: 190px;
+        width: auto;
+        aspect-ratio: auto;
+        pointer-events: none;
+    }
+    @media (min-width: 1024px) {
+        .cc-strip { padding-bottom: 4.5rem; }
+        .cc-strip-card img { height: 260px; }
+    }
+    /* Less motion: the strip stands still and scrolls sideways by hand; the copy run is not needed */
+    @media (prefers-reduced-motion: reduce) {
+        .cc-strip { overflow-x: auto; -webkit-mask-image: none; mask-image: none; }
+        .cc-strip-track { animation: none; padding: 0 1.25rem; }
+        .cc-strip-copy { display: none; }
+    }
+
     /* ---- Site intro (showSiteIntro in app.js): the season's video over the page, once per visit ---- */
     .site-intro {
         position: fixed;
@@ -2667,47 +2717,46 @@
     .site-intro.is-open { opacity: 1; }
     .site-intro.is-leaving { opacity: 0; }
     .site-intro-frame {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.75rem;
+        position: relative;
         max-width: 100%;
         transform: scale(0.96);
         transition: transform 0.5s var(--ease);
     }
     .site-intro.is-open .site-intro-frame { transform: none; }
-    /* The video keeps its own shape (858 x 1072), as large as fits above its buttons */
+    /* The video keeps its own shape (858 x 1072), as large as fits the screen */
     .site-intro video {
         display: block;
         width: auto;
         height: auto;
         max-width: min(92vw, 640px);
-        max-height: calc(100dvh - 6rem);
+        max-height: calc(100dvh - 2rem);
         aspect-ratio: 858 / 1072;
         background: #7A0F14;
         box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
     }
-    .site-intro-bar {
+    /* Close: a small round x at the video's top right corner, with a 44 px tap area around it */
+    .site-intro-close {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
         display: flex;
-        gap: 0.75rem;
-    }
-    .site-intro-bar button {
-        min-height: 2.75rem;
-        padding: 0 1.25rem;
-        border: 1px solid rgba(246, 246, 242, 0.6);
-        border-radius: var(--radius);
+        align-items: center;
+        justify-content: center;
+        width: 2.75rem;
+        height: 2.75rem;
+        border-radius: 50%;
         color: #F6F6F2;
-        font-size: 0.9375rem;
-        font-weight: 600;
-        transition: background-color 0.25s var(--ease), color 0.25s var(--ease);
     }
-    .site-intro-bar button:hover {
-        background: #F6F6F2;
-        color: #151714;
+    .site-intro-close svg {
+        box-sizing: content-box;
+        padding: 0.375rem;
+        border-radius: 50%;
+        background: rgba(11, 12, 10, 0.55);
+        transition: background-color 0.25s var(--ease);
     }
-    .site-intro-bar .site-intro-skip {
-        background: #F6F6F2;
-        color: #151714;
+    .site-intro-close:hover svg,
+    .site-intro-close:focus-visible svg {
+        background: rgba(11, 12, 10, 0.85);
     }
 
     /* ---- Branch map (renderBranchMap / initBranchMap in app.js) ---- */

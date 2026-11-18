@@ -29,3 +29,6 @@ Thumbs.db
 
 # Private data for Supabase (supplier costs): loaded by hand, never committed
 supabase/private/
+
+# Full-size originals of the custom carts strip (about 150 MB); the site uses the web copies in image/custom-carts
+image/carousel/
