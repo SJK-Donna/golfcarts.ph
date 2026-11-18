@@ -215,7 +215,7 @@ const data = run(probe, `({
 probe.window.close();
 
 const routes = [
-    ['home', null], ['products', null], ['solutions', null], ['service', null], ['blogs', null], ['about', null], ['contact', null],
+    ['home', null], ['products', null], ['solutions', null], ['custom-carts', null], ['service', null], ['blogs', null], ['about', null], ['contact', null],
     ...data.segments.map(id => ['segment', id]),
     ...data.products.map(slug => ['product-details', slug]),
     ...data.posts.map(slug => ['blog-details', slug])

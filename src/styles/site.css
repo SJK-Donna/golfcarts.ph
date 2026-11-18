@@ -2675,6 +2675,9 @@
     @keyframes cc-strip-glide {
         to { transform: translateX(-50%); }
     }
+    /* At the top of the Custom carts page, the strip is the hero: room above it, under the header */
+    .custom-carts-hero .cc-strip { padding-top: 2.5rem; }
+    @media (min-width: 1024px) { .custom-carts-hero .cc-strip { padding-top: 3.5rem; } }
     .cc-strip-card {
         flex: 0 0 auto;
         margin: 0 18px 0 0;
@@ -2689,6 +2692,19 @@
         width: auto;
         aspect-ratio: auto;
         pointer-events: none;
+    }
+    /* Under each photo: the cart's name and its Get a quote button */
+    .cc-strip-card figcaption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.625rem 0.125rem 0.125rem;
+    }
+    .cc-strip-name {
+        font-family: var(--font-display);
+        font-size: 1.25rem;
+        color: var(--ink);
     }
     @media (min-width: 1024px) {
         .cc-strip { padding-bottom: 4.5rem; }

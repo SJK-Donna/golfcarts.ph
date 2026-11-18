@@ -1500,7 +1500,7 @@ const NAV_SEGMENTS = [
 const MAIN_NAV = [
     { segment: 'private' },
     { label: 'Fleet Solutions', href: 'fleet/', page: 'solutions' },
-    { label: 'Custom Carts', href: 'models/golfer-tempo-2/', action: 'buildYourCart()' },
+    { label: 'Custom Carts', href: 'custom-carts/', page: 'custom-carts' },
     { segment: 'resort' },
     { segment: 'remanufactured' },
     { label: 'Service and Support', href: 'service/', page: 'service' },
@@ -1930,6 +1930,7 @@ function routeToPath(page, slug = null) {
         case 'product-details': return `models/${slug}/`;
         case 'segment': return `use/${slug}/`;
         case 'solutions': return 'fleet/';
+        case 'custom-carts': return 'custom-carts/';
         case 'service': return 'service/';
         case 'blogs': return 'blog/';
         case 'blog-details': return `blog/${slug}/`;
@@ -1952,7 +1953,7 @@ function pathToRoute(pathname, search = '') {
     const base = siteBasePath();
     const rel = pathname.startsWith(base) ? pathname.slice(base.length) : pathname.replace(/^\//, '');
     const [first, second] = rel.split('/').filter(Boolean);
-    const simple = { carts: 'products', fleet: 'solutions', service: 'service', blog: 'blogs', about: 'about', contact: 'contact', golfer: 'golfer', admin: 'admin' };
+    const simple = { carts: 'products', fleet: 'solutions', 'custom-carts': 'custom-carts', service: 'service', blog: 'blogs', about: 'about', contact: 'contact', golfer: 'golfer', admin: 'admin' };
     if (first === 'models' && PRODUCTS_DATA.some(p => p.slug === second)) return { page: 'product-details', slug: second };
     if (first === 'use' && NAV_SEGMENTS.some(s => s.id === second)) return { page: 'segment', slug: second };
     if (first === 'blog' && second && BLOGS_DATA.some(b => b.slug === second)) return { page: 'blog-details', slug: second };
@@ -1989,6 +1990,7 @@ function getPageMeta(page, slug = null) {
         home: { title: `${site} | Low-speed electric vehicles for private roads`, description: defaultDescription },
         products: { title: `All carts | ${site}`, description: 'Every Golfcarts.ph cart: golf, lifestyle, resort and utility models, with colors, seats and accessories.' },
         solutions: { title: `Fleet solutions | ${site}`, description: 'Fleet proposals for golf courses, resorts, estates and industrial sites: guest transport, utility and fit-to-task carts.' },
+        'custom-carts': { title: `Custom carts | ${site}`, description: 'Club Car carts we have rebuilt and made our customers\' own: colors, seats, roofs, lift kits and wheels, built to order.' },
         service: { title: `Service and support | ${site}`, description: 'Book a service, order parts and get maintenance and charging advice from the Golfcarts.ph team.' },
         blogs: { title: `Stories and Guides | ${site}`, description: 'Company stories, buying guides and maintenance tips for low-speed electric vehicles.' },
         about: { title: `About | ${site}`, description: 'Golfcarts.ph, run by SJK Guahan Inc., sells, customizes and services low-speed electric vehicles for private roads.' },
@@ -2205,9 +2207,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
 // ==========================================
 // SITE INTRO (2026-11-18): a short video over the page when someone opens the site, once per visit (the tab's
-// session), on whatever page the link opened. It plays muted (browsers only start video on their own without
-// sound), so it tries with sound first, and if the browser says no, plays muted and turns the sound on at the
-// visitor's first tap, click or key (2026-11-18: no sound or skip buttons, the user's choice). It closes at its end,
+// session), on whatever page the link opened. Sound: it starts with sound where the browser allows it; most only
+// let a page play sound after the visitor's first tap, click or key, so there it starts muted and the sound comes on
+// at that first tap, click or key (2026-11-18: no sound or skip buttons, the user's choice). It closes at its end,
 // or with the small x at its top right, Escape or a click outside it. Not on the admin
 // pages, not for anyone who asked for less motion, and not after `until` (the season's last day, Manila time), so
 // it retires on its own. To change it, replace the video and poster, and the dates
@@ -2784,6 +2786,8 @@ function renderApp() {
         viewport.innerHTML = renderSegmentPage();
     } else if (currentPage === 'solutions') {
         viewport.innerHTML = renderSolutionsPage();
+    } else if (currentPage === 'custom-carts') {
+        viewport.innerHTML = renderCustomCartsPage();
     } else if (currentPage === 'service') {
         viewport.innerHTML = renderServicePage();
         initServicePage();
@@ -6880,10 +6884,10 @@ function renderDetailColorPickers(product) {
         ` : ''}`;
 }
 
-// Custom carts (2026-11-18): on the Golfer 2 page (where the menu's Custom Carts goes), a flat strip of photo cards
-// of carts we've built, gliding left without end under the hero, like the Service page's photo strips without the
-// turning ring in the middle. The strip pauses under the pointer; with reduced motion it stands still and scrolls
-// by hand. The photos are web copies (image/custom-carts) of the originals in image/carousel
+// Custom carts (2026-11-18): the menu's Custom Carts page (custom-carts/), the carts we've rebuilt and customised.
+// Its hero is a flat strip of photo cards gliding left without end, like the Service page's photo strips without
+// the turning ring in the middle. The strip pauses under the pointer; with reduced motion it stands still and
+// scrolls by hand. The photos are web copies (image/custom-carts) of the originals in image/carousel
 const CUSTOM_CART_PHOTOS = [
     { src: 'image/custom-carts/custom-01.jpg', alt: 'A lifted four-seat Tempo in grey and black on a lawn' },
     { src: 'image/custom-carts/custom-02.jpg', alt: 'A lifted black Tempo with a brush guard and off-road wheels' },
@@ -6900,14 +6904,43 @@ const CUSTOM_CART_PHOTOS = [
 ];
 
 function renderCustomCartsStrip() {
-    const card = (ph, copy) => `<figure class="cc-strip-card"><img src="${ph.src}" alt="${copy ? '' : attrText(ph.alt)}" loading="lazy" decoding="async" draggable="false"></figure>`;
+    // Each card: the photo, the cart's name ("Cart" until it has one, 2026-11-18) and a Get a quote button that says
+    // which photo it came from. The copy run's buttons work when clicked but are skipped by Tab (it is hidden from
+    // screen readers), so keyboard users meet each cart once
+    const card = (ph, i, copy) => {
+        const name = ph.name || 'Cart';
+        const note = `Asking about: ${name} (custom cart photo ${i + 1})`.replace(/'/g, "\\'");
+        return `<figure class="cc-strip-card"><img src="${ph.src}" alt="${copy ? '' : attrText(ph.alt)}" loading="lazy" decoding="async" draggable="false">
+            <figcaption><span class="cc-strip-name">${attrText(name)}</span><button type="button" onclick="openQuoteModal('', '${attrText(note)}')" class="btn btn-primary btn-sm"${copy ? ' tabindex="-1"' : ''}>Get a quote<span class="sr-only"> for ${attrText(name)} ${i + 1}</span></button></figcaption></figure>`;
+    };
     return `
         <div class="cc-strip" role="region" aria-label="Custom carts we've built">
             <div class="cc-strip-track">
-                ${CUSTOM_CART_PHOTOS.map(ph => card(ph, false)).join('')}
-                <div class="cc-strip-copy" aria-hidden="true">${CUSTOM_CART_PHOTOS.map(ph => card(ph, true)).join('')}</div>
+                ${CUSTOM_CART_PHOTOS.map((ph, i) => card(ph, i, false)).join('')}
+                <div class="cc-strip-copy" aria-hidden="true">${CUSTOM_CART_PHOTOS.map((ph, i) => card(ph, i, true)).join('')}</div>
             </div>
         </div>`;
+}
+
+function renderCustomCartsPage() {
+    return `
+        <section class="custom-carts-hero" aria-labelledby="custom-carts-title">
+            ${renderCustomCartsStrip()}
+            <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pb-16 lg:pb-24 grid lg:grid-cols-12 gap-8 lg:gap-12 items-end">
+                <div class="lg:col-span-7 space-y-4">
+                    <p class="text-sm text-mute">Custom carts</p>
+                    <h1 id="custom-carts-title" class="type-xl text-ink">Rebuilt, and made yours.</h1>
+                </div>
+                <div class="lg:col-span-5 space-y-6">
+                    <p class="measure">Club Car carts we've rebuilt and customized for our customers: colors, seats, roofs, lift kits and wheels, built to order. Tell us what you have in mind.</p>
+                    <div class="flex flex-wrap gap-4">
+                        <button type="button" onclick="openQuoteModal('', 'Asking about: a custom cart')" class="btn btn-primary">Get a quote</button>
+                        <a href="${routeHref('segment', 'remanufactured')}" data-route="segment" data-slug="remanufactured" class="btn btn-outline">See rebuilt carts</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    `;
 }
 
 function renderProductDetailsPage() {
@@ -7016,7 +7049,6 @@ function renderProductDetailsPage() {
                     ` : ''}
                 </div>
             </div>
-            ${product.slug === 'golfer-tempo-2' ? renderCustomCartsStrip() : ''}
         </section>
 
         <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
