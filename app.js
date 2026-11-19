@@ -3014,7 +3014,7 @@ const HOME_BANNERS = [
     { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' },
     // A video banner (2026-11-18): "video" plays while the slide shows; "image" is its first frame, shown while it
     // loads and when motion is turned down. The slide lasts as long as the video
-    { image: 'image/Hero/hero-rebuilds.jpg', video: 'image/Hero/hero-rebuilds.mp4', alt: 'Shop now: our rebuilds. Browse our rebuilt golf carts and find the one that fits your game.', cta: 'Shop Our Rebuilds', route: 'segment', slug: 'remanufactured' }
+    { image: 'image/Hero/hero-rebuilds.jpg', video: 'image/Hero/hero-rebuilds.mp4', alt: 'Shop now: reman or your cart? Browse our reman golf carts and find the one that fits your game.', cta: 'Shop Our Rebuilds', route: 'segment', slug: 'remanufactured' }
 ];
 const HOME_BANNER_MS = 3000;
 const HOME_BANNER_VIDEO_MS = 4300; // until the video says how long it is
@@ -3376,7 +3376,9 @@ function togglePromoCover(open, quiet) {
 // Pre Owned and Resort and Hospitality in a row of two. The photos are this section's own (image/Banners); the
 // segment pages keep theirs (HOME_USES)
 const HOME_USE_TILES = [
-    { route: 'segment', slug: 'private', image: 'image/Banners/Private Golf Carts.jpg', alt: 'A white Tempo 2 on a fairway, hills and palms behind', width: 5328, height: 4000 },
+    // New photo 2026-11-19: a privately owned, customized Tempo at a home (the user's choice; it was a cart on a fairway).
+    // whole: a tall photo shown complete in the landscape tile, on a blurred copy of itself (the user's choice)
+    { route: 'segment', slug: 'private', image: 'image/Banners/private-golf-carts-tempo.jpg', alt: 'A white Tempo with caramel seats, a brush guard and alloy wheels in a home driveway under bougainvillea', width: 1200, height: 1600, whole: true },
     { route: 'segment', slug: 'golfer', image: 'image/Banners/b2c golf.JPG', alt: 'Two Tempo carts on a golf course cart path', width: 5328, height: 4000 },
     { route: 'solutions', label: 'Fleet Solutions', tagline: 'Fleets for golf courses, resorts and sites.', image: 'image/Banners/Fleet Solutions1.JPG', alt: 'Five numbered fleet carts lined up under a clubhouse', width: 5328, height: 4000 },
     { route: 'segment', slug: 'remanufactured', tagline: 'Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.', image: 'image/Banners/Rebuilt and Pre Owned.png', alt: 'A red lifted rebuilt cart on a village street', width: 2390, height: 1792 },
@@ -3388,8 +3390,9 @@ function renderHomeUses() {
         const seg = t.slug ? NAV_SEGMENTS.find(s => s.id === t.slug) : null;
         return `
             <a href="${routeHref(t.route, t.slug)}" data-route="${t.route}"${t.slug ? ` data-slug="${t.slug}"` : ''} class="group block">
-                <div class="media-zoom edge-light ${aspect}">
-                    <img src="${t.image}" alt="${t.alt}" width="${t.width}" height="${t.height}" loading="lazy" decoding="async" class="w-full h-full object-cover">
+                <div class="media-zoom edge-light ${aspect}${t.whole ? ' media-whole' : ''}">
+                    ${t.whole ? `<span class="media-whole-bg" style="background-image: url('${t.image}')" aria-hidden="true"></span>` : ''}
+                    <img src="${t.image}" alt="${t.alt}" width="${t.width}" height="${t.height}" loading="lazy" decoding="async" class="w-full h-full ${t.whole ? 'object-contain' : 'object-cover'}">
                 </div>
                 <div class="pt-5 space-y-2">
                     <h3 class="type-lg text-ink">${t.label || seg.label}</h3>

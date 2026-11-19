@@ -8,7 +8,7 @@ set value = jsonb_set(
     coalesce(value -> 'slides', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
         'image', 'image/Hero/hero-rebuilds.jpg',
         'video', 'image/Hero/hero-rebuilds.mp4',
-        'alt', 'Shop now: our rebuilds. Browse our rebuilt golf carts and find the one that fits your game.',
+        'alt', 'Shop now: reman or your cart? Browse our reman golf carts and find the one that fits your game.',
         'cta', 'Shop Our Rebuilds',
         'route', 'segment',
         'slug', 'remanufactured'

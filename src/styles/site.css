@@ -3037,6 +3037,23 @@
     .media-zoom {
         overflow: hidden;
     }
+    /* A tall photo shown whole in a wide frame (HOME_USE_TILES whole): a blurred, darkened copy of it fills the sides */
+    .media-whole {
+        position: relative;
+        isolation: isolate;
+    }
+    /* Its own element, so the photo's address resolves against the page (in a CSS variable it would be the stylesheet's) */
+    .media-whole-bg {
+        position: absolute;
+        inset: -24px;
+        z-index: -1;
+        background-position: center;
+        background-size: cover;
+        filter: blur(18px) brightness(0.8);
+    }
+    .media-whole img {
+        position: relative;
+    }
     .media-zoom img {
         transition: transform 0.9s var(--ease);
     }
