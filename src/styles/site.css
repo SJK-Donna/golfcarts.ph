@@ -1782,6 +1782,23 @@
         .build-tiers > .build-card-active { z-index: 1; transform: scale(1.04); opacity: 1; box-shadow: inset 0 0 0 1px var(--ink), 0 28px 50px -24px rgba(21, 23, 20, 0.45); }
     }
     .build-card-confirm { margin-top: auto; }
+    /* Compact (2026-11-19): the three cards fit on one screen, so they can be compared at a glance */
+    .build-tiers .build-card-photo { aspect-ratio: 5 / 2; margin-bottom: -0.25rem; }
+    .build-tiers .build-card > button { padding: 1rem 1.25rem 0.75rem; gap: 0.625rem; }
+    .build-tiers .build-card .type-md { font-size: 1.5rem; }
+    .build-tiers .build-card .home-list { font-size: 0.8125rem; line-height: 1.4; }
+    .build-tiers .build-card .home-list li + li { margin-top: 0.25rem; }
+    .build-tiers .build-card > button > .text-sm { font-size: 0.75rem; }
+    .build-tiers .build-card > label { padding: 0 1.25rem 0.75rem; font-size: 0.75rem; }
+    .build-tiers .build-card-confirm { padding: 0 1.25rem 1rem; }
+    .build-tiers .build-card-confirm .btn { min-height: 2.75rem; font-size: 0.875rem; }
+    /* The chosen one: a green top band, its check and button green, the others muted */
+    .build-tiers > .build-card-active { border-top: 6px solid var(--green); }
+    @media (min-width: 768px) {
+        .build-tiers { padding: 0.75rem 0; }
+        .build-tiers > .build-card:not(.build-card-active) { opacity: 0.8; }
+        .build-tiers > .build-card:not(.build-card-active):hover { opacity: 1; }
+    }
     /* The chosen build, large (renderFocusedBuilds in app.js): its photo beside the list from tablet width up */
     .build-card-focus .build-card-photo { aspect-ratio: 3 / 2; }
     @media (min-width: 768px) { .build-card-focus .build-card-photo { margin: 0 0 0 -0.5rem; align-self: center; aspect-ratio: 4 / 3; } }
