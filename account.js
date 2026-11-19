@@ -906,6 +906,11 @@ function applyPageTextEl(el, e) {
         if (src && el.tagName === 'IMG') { el.setAttribute('src', src); el.removeAttribute('srcset'); }
         else if (src) el.style.setProperty(el.dataset.pageBgVar, `url(${JSON.stringify(new URL(src, document.baseURI).href)})`);
         if (e.alt != null && el.tagName === 'IMG') el.setAttribute('alt', e.alt);
+        // How it sits in its frame (2026-11-18): the whole photo, or the frame filled with the chosen part showing
+        if (el.tagName === 'IMG') {
+            if (e.fit === 'contain') el.style.objectFit = 'contain';
+            if (e.px != null || e.py != null) el.style.objectPosition = `${e.px != null ? e.px : 50}% ${e.py != null ? e.py : 50}%`;
+        }
         return;
     }
     if (e.text != null && pageTextNorm(e.text) && pageTextNorm(e.text) !== el.dataset.txtOrig) el.textContent = e.text;
@@ -1132,6 +1137,8 @@ function setPageTextFields(fields, quiet) {
     ['x', 'y'].forEach(k => { if (!e[k]) delete e[k]; });
     if (!e.x && !e.y) delete e.ref;
     if (pageTextIsPhoto(el)) {
+        ['px', 'py'].forEach(k => { if (k in fields) e[k] = Math.max(0, Math.min(100, Number(fields[k]) || 0)); if (e[k] === 50) delete e[k]; });
+        if (e.fit !== 'contain') delete e.fit;
         if (!e.src || e.src === e.orig) delete e.src;
         if (e.alt != null && e.alt === ((pageTextOriginal.get(el) || {}).alt || '')) delete e.alt;
     }
@@ -1139,7 +1146,10 @@ function setPageTextFields(fields, quiet) {
     if (Object.keys(e).length > 1) pageTextDraft[key] = e; else delete pageTextDraft[key];
     if (pageTextIsPhoto(el)) {
         applyPageText();
-        if (field !== 'alt') renderPageTextTools();
+        if (field === 'px' || field === 'py') {
+            const out = document.getElementById(`page-photo-${field}`);
+            if (out) out.textContent = pagePhotoPlace(field, e[field] != null ? e[field] : 50);
+        } else if (field !== 'alt') renderPageTextTools();
         return;
     }
     applyPageTextEl(el, pageTextDraft[key] || null);
@@ -1246,6 +1256,13 @@ function renderPagePhotoTools(el) {
             <label class="page-text-file"><span>${pagePhotoBusy || 'Replace ' + what}</span><input type="file" accept="image/jpeg,image/png,image/webp" onchange="replacePagePhoto(this)"${pagePhotoBusy ? ' disabled' : ''}></label>
             ${e.src ? `<button type="button" onclick="setPageText('src', '')">Use the original</button>` : ''}
         </div>
+        ${bg ? '' : `<div class="page-text-row"><span class="page-text-label">Fit</span>
+            <button type="button" aria-pressed="${e.fit !== 'contain'}" onclick="setPageText('fit', '')">Fill the frame</button>
+            <button type="button" aria-pressed="${e.fit === 'contain'}" onclick="setPageText('fit', 'contain')">Show the whole photo</button></div>
+        ${e.fit === 'contain' ? '' : `<div class="page-text-row">
+            <label>Across: <span id="page-photo-px">${pagePhotoPlace('px', e.px != null ? e.px : 50)}</span><input type="range" min="0" max="100" step="1" value="${e.px != null ? e.px : 50}" oninput="setPageText('px', this.value)"></label>
+            <label>Up and down: <span id="page-photo-py">${pagePhotoPlace('py', e.py != null ? e.py : 50)}</span><input type="range" min="0" max="100" step="1" value="${e.py != null ? e.py : 50}" oninput="setPageText('py', this.value)"></label></div>
+            <p class="page-text-label">Which part of the photo shows when the frame crops it.</p>`}`}
         ${bg ? '' : `<label>Description (for screen readers and search)<input type="text" value="${escapeHtml(e.alt != null ? e.alt : el.getAttribute('alt') || '')}" placeholder="What the photo shows" oninput="setPageText('alt', this.value)"></label>`}
         ${cover && e.src ? '<button type="button" onclick="pagePhotoBehindCarts()">Use this photo behind the carts too</button>' : ''}
         ${promo ? `<div class="page-text-row"><span class="page-text-label">Red Series</span>
@@ -1258,6 +1275,13 @@ function renderPagePhotoTools(el) {
                     .map(([v, label]) => `<button type="button" onclick="setPageTextDelete('${v}')">${v === 'self' ? 'This ' + what : label}</button>`).join('')}</div>
         <div class="page-text-row page-text-end"><button type="button" onclick="resetPageTextItem()">Reset this</button><button type="button" onclick="closePageTextTools()">Done</button></div>`, 'page-text-tools');
     placePageTextTools();
+}
+
+// "Left", "Middle", "Right" (or Top / Bottom) with the number, for the position sliders
+function pagePhotoPlace(field, v) {
+    const n = Number(v);
+    const word = n <= 15 ? (field === 'px' ? 'Left' : 'Top') : n >= 85 ? (field === 'px' ? 'Right' : 'Bottom') : n === 50 ? 'Middle' : '';
+    return word ? `${word} (${n}%)` : `${n}%`;
 }
 
 async function replacePagePhoto(input) {

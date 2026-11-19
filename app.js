@@ -964,13 +964,14 @@ const TEMPO_MATRIX_LEGACY = {
     },
     // Golfer 2 and 4 golf accessories, all included: Golf the black GC bag cover only; Scratch a GC bag cover (black,
     // beige, white) or a CC magnetic one (black, beige); Pro a CC magnetic one. From Scratch, a sand bottle (max 2)
-    // and ball washers and Caddy Master coolers (the document's 1+1, 2+0 or 0+2). Golfer 2+2 has a golf bag
-    // attachment instead.
+    // and a ball washer and Caddy Master cooler on either side, or two coolers; never two ball washers (2026-11-18, the
+    // user's rule; golfSideItems says what goes on each side). Golfer 2+2 has a golf bag attachment instead.
     bagCover: [['GC Bag Cover, Black'],
         ['GC Bag Cover, Black', 'GC Bag Cover, Beige', 'GC Bag Cover, White', 'CC Magnetic Bag Cover, Black', 'CC Magnetic Bag Cover, Beige'],
         ['CC Magnetic Bag Cover, Black', 'CC Magnetic Bag Cover, Beige']],
     sandBottles: ['Sand bottle with mounting bracket', 'Two sand bottles with mounting brackets'],
-    golfSides: ['Ball washer and Caddy Master cooler', 'Two ball washers', 'Two Caddy Master coolers'],
+    golfSides: ['Ball washer left, Caddy Master cooler right', 'Caddy Master cooler left, ball washer right', 'Two Caddy Master coolers'],
+    golfSideItems: [['washer', 'cooler'], ['cooler', 'washer'], ['cooler', 'cooler']],
     golfExtras: [false, true, true],
     lifestyleCooler: [false, true, true], // an add-on on the Lifestyle builds
     lift: [true, true, true],            // Lifted 3.5" GC lift kit, an option on every level
@@ -1079,9 +1080,15 @@ function getTempoOptionGroupsLegacy(product, i) {
             else include('bagCover', 'Bag cover', bags[0]);
             if (m.golfExtras[i]) {
                 add({ id: 'sandBottle', section: 'Accessories', title: 'Sand bottle', type: 'single', options: m.sandBottles, included: true });
-                // The document's ball washer / cooler pairs; the group also stands for the cooler among the quote accessories
-                add({ id: 'ballWasher', covers: ['cooler'], section: 'Accessories', title: 'Ball and club cleaner or cooler', type: 'single',
-                    options: m.golfSides, included: true });
+                // A ball washer and a cooler on either side, or two coolers; never two washers. `sides`: what each choice
+                // puts left and right (priced from the bundles' Accessories 2 and 3, see bundleTempoGroups); the quote
+                // gets a row per side. The group also stands for the cooler among the quote accessories
+                const sideName = { washer: 'Ball and club washer', cooler: 'Caddy Master cooler' };
+                const sides = Object.fromEntries(m.golfSides.map((name, k) => [name, m.golfSideItems[k]]));
+                add({ id: 'ballWasher', covers: ['cooler'], section: 'Accessories', title: 'Ball washer and cooler', type: 'single',
+                    hint: 'Included, choose one. One ball washer per cart, on the left or the right', options: m.golfSides, included: true, sides,
+                    quoteRows: Object.fromEntries(Object.entries(sides).map(([name, [left, right]]) =>
+                        [name, [['Golf accessory, left side', sideName[left]], ['Golf accessory, right side', sideName[right]]]])) });
             }
         }
         if (layout === '2') add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
@@ -5026,6 +5033,14 @@ function bundleTempoGroups(product, i, groups) {
         if (!had || (like && !had.like)) owner.set(o.id, { group: g.id, like });
     })));
     return groups.map(g => {
+        // A choice made of a left and a right item (the ball washer / cooler sides): both ids, from Accessories 2 (left)
+        // and Accessories 3 (right), the washer by "washer" or "cleaner", the cooler by "cooler" (2026-11-18)
+        if (g.sides) {
+            const find = (slot, kind) => (catalogOptions(product, i, slot) || []).find(o => kind === 'cooler' ? /cooler/i.test(o.option) : /washer|cleaner/i.test(o.option));
+            const ids = Object.fromEntries(Object.entries(g.sides).map(([name, [left, right]]) =>
+                [name, [find('accessories 2', left), find('accessories 3', right)].filter(Boolean).map(o => o.id)]));
+            return Object.values(ids).some(list => list.length) ? { ...g, bundleIds: ids } : g;
+        }
         const slots = GROUP_SLOTS[g.id];
         if (!slots) return g;
         const bySlot = slots.map(slot => (catalogOptions(product, i, slot) || []).filter(o => (owner.get(o.id) || {}).group === g.id));
@@ -5057,7 +5072,7 @@ function tempoOptionIds(product, i, o) {
     return getTempoOptionGroups(product, i).filter(g => g.bundleIds).flatMap(g => {
         const v = o[g.id];
         const chosen = g.type === 'flag' ? (v ? [g.label] : []) : g.type === 'fixed' ? [g.value] : Array.isArray(v) ? v : v ? [v] : [];
-        return chosen.map(n => g.bundleIds[n]).filter(Boolean);
+        return chosen.flatMap(n => g.bundleIds[n] || []).filter(Boolean); // an id, or a list (a left and a right item)
     });
 }
 
@@ -6357,6 +6372,8 @@ const OPTION_PHOTOS = {
     sandBottle: 'sand-bottle',
     'Ball and club cleaner': 'ball-washer',
     'Ball and club cleaner and a cooler': 'ball-washer',
+    'Ball washer left, Caddy Master cooler right': 'ball-washer',
+    'Caddy Master cooler left, ball washer right': 'ball-washer',
     'Two Caddy Master coolers': 'caddy-cooler',
     'Caddy Master cooler': 'caddy-cooler',
     cooler: 'caddy-cooler',
