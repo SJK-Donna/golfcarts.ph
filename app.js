@@ -1498,7 +1498,15 @@ const NAV_SEGMENTS = [
                 intro: 'Availability changes as units are rebuilt. Ask for the current units, photos and rebuild details.',
                 groups: [{ label: 'Available Builds', items: ['r-tempo-2', 'r-tempo-2-custom', 'r-tempo-2-2', 'r-tempo-2-2-lifted', 'r-tempo-4'] }]
             }
-        ]
+        ],
+        // Coming soon (2026-11-19): Golfers (account holders) will post and sell their own carts here; until then the
+        // section says so, and the menu lists it marked as coming
+        comingSoon: {
+            id: 'sell',
+            label: 'Sell your cart',
+            title: 'Sell your cart here, as a Golfer.',
+            text: 'Soon, Golfers will be able to post their own carts on this page, with photos and details, for other buyers to see. Sign up as a Golfer now and you\'ll be ready when it opens.'
+        }
     }
 ];
 
@@ -2567,6 +2575,11 @@ function renderSegmentDropdown(seg) {
                                 ${group.items.map(key => modelMenuItem(seg, sub, key, 'segment-dropdown-item')).join('')}
                             </div>
                         `).join('')}
+                        ${sub === seg.subcategories[seg.subcategories.length - 1] && seg.comingSoon ? `
+                            <div class="pt-3 mt-2 border-t border-line">
+                                <button type="button" onclick="openSegment('${seg.id}', '${seg.id}-${seg.comingSoon.id}')" class="segment-dropdown-item" role="menuitem">${seg.comingSoon.label} <span class="soon-tag">Coming soon</span></button>
+                            </div>
+                        ` : ''}
                         ${sub === seg.subcategories[0] && seg.links ? `
                             <div class="pt-3 mt-2 border-t border-line space-y-0.5">
                                 ${seg.links.map(l => `<button type="button" onclick="openSegment('${seg.id}', '${seg.id}-${l.anchor}')" class="segment-dropdown-item" role="menuitem">${l.label}</button>`).join('')}
@@ -2618,6 +2631,7 @@ function renderSegmentMenus() {
                         ${seg.subcategories.length > 1 ? `<p class="pt-3 text-[0.8125rem] font-medium text-mute">${sub.label}</p>` : ''}
                         ${sub.groups.flatMap(group => group.items).map(key => modelMenuItem(seg, sub, key, '')).join('')}
                     `).join('')}
+                    ${seg.comingSoon ? `<button type="button" onclick="toggleMobileMenu(false); openSegment('${seg.id}', '${seg.id}-${seg.comingSoon.id}')" class="text-left">${seg.comingSoon.label} <span class="soon-tag">Coming soon</span></button>` : ''}
                 </div>
             </details>`;
         }).join('');
@@ -3377,8 +3391,9 @@ function togglePromoCover(open, quiet) {
 // segment pages keep theirs (HOME_USES)
 const HOME_USE_TILES = [
     // New photo 2026-11-19: a privately owned, customized Tempo at a home (the user's choice; it was a cart on a fairway).
-    // whole: a tall photo shown complete in the landscape tile, on a blurred copy of itself (the user's choice)
-    { route: 'segment', slug: 'private', image: 'image/Banners/private-golf-carts-tempo.jpg', alt: 'A white Tempo with caramel seats, a brush guard and alloy wheels in a home driveway under bougainvillea', width: 1200, height: 1600, whole: true },
+    // (A wider photo of the same cart, 2026-11-19, so it fills the tile; `whole: true` shows a tall photo complete on a
+    // blurred copy of itself)
+    { route: 'segment', slug: 'private', image: 'image/Banners/private-golf-carts-tempo.jpg', alt: 'A white Tempo with caramel seats, a brush guard and alloy wheels in a home driveway under bougainvillea', width: 1600, height: 1200 },
     { route: 'segment', slug: 'golfer', image: 'image/Banners/b2c golf.JPG', alt: 'Two Tempo carts on a golf course cart path', width: 5328, height: 4000 },
     { route: 'solutions', label: 'Fleet Solutions', tagline: 'Fleets for golf courses, resorts and sites.', image: 'image/Banners/Fleet Solutions1.JPG', alt: 'Five numbered fleet carts lined up under a clubhouse', width: 5328, height: 4000 },
     { route: 'segment', slug: 'remanufactured', tagline: 'Rebuilt Tempo carts, each quoted with its rebuild scope, battery condition and warranty terms.', image: 'image/Banners/Rebuilt and Pre Owned.png', alt: 'A red lifted rebuilt cart on a village street', width: 2390, height: 1792 },
@@ -7354,6 +7369,21 @@ function renderSegmentPage() {
                 ${sub.enquiry ? `<div class="mt-14">${renderEnquiryPrompt(sub.enquiry)}</div>` : ''}
             </section>
         `).join('')}
+
+        ${segment.comingSoon ? `
+            <section id="${segment.id}-${segment.comingSoon.id}" class="home-section pt-0 scroll-mt-20 max-w-site mx-auto px-5 sm:px-8 lg:px-12" aria-labelledby="${segment.id}-${segment.comingSoon.id}-title">
+                <div class="soon-panel grid lg:grid-cols-12 gap-6 lg:gap-12 items-end">
+                    <div class="lg:col-span-7 space-y-4">
+                        <p><span class="soon-tag">Coming soon</span></p>
+                        <h2 id="${segment.id}-${segment.comingSoon.id}-title" class="type-lg text-ink">${segment.comingSoon.title}</h2>
+                        <p class="measure">${segment.comingSoon.text}</p>
+                    </div>
+                    <div class="lg:col-span-5 flex flex-wrap gap-4 lg:justify-end">
+                        <button type="button" onclick="golferHeaderClick()" class="btn btn-primary">Be a Golfer</button>
+                        <button type="button" onclick="openQuoteModal('', 'I would like to sell my cart.')" class="btn btn-outline">Ask about selling</button>
+                    </div>
+                </div>
+            </section>` : ''}
 
         ${buildSet ? `
             <section id="${segment.id}-compare" class="home-section pt-0 scroll-mt-20 max-w-site mx-auto px-5 sm:px-8 lg:px-12">

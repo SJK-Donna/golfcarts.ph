@@ -2721,6 +2721,29 @@
         .cc-strip-copy { display: none; }
     }
 
+    /* ---- Coming soon (NAV_SEGMENTS comingSoon in app.js): a small tag, and the page's panel for it ---- */
+    .soon-tag {
+        display: inline-block;
+        margin-left: 0.25rem;
+        padding: 0.0625rem 0.5rem;
+        border-radius: 999px;
+        background: var(--stone);
+        border: 1px solid var(--line);
+        color: var(--ink-2);
+        font-size: 0.75rem;
+        font-weight: 600;
+        vertical-align: 0.1em;
+        white-space: nowrap;
+    }
+    .soon-panel {
+        padding: 2rem;
+        border: 1px dashed var(--field-border);
+        background: var(--stone);
+    }
+    @media (min-width: 1024px) {
+        .soon-panel { padding: 3rem; }
+    }
+
     /* ---- Site intro (showSiteIntro in app.js): the season's video over the page, once per visit ---- */
     .site-intro {
         position: fixed;
