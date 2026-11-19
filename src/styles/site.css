@@ -2721,6 +2721,40 @@
         .cc-strip-copy { display: none; }
     }
 
+    /* ---- Photo trio (renderPhotoTrio in app.js): three cards, the middle one larger and in front; the cards slide to
+       their new places when one is brought forward ---- */
+    .photo-trio {
+        position: relative;
+        height: clamp(280px, 52vw, 640px);
+    }
+    .photo-trio-card {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 40%;
+        aspect-ratio: 1;
+        padding: 0;
+        border: 6px solid var(--paper);
+        background: var(--paper);
+        box-shadow: 0 24px 50px -24px rgba(21, 23, 20, 0.55);
+        cursor: pointer;
+        transition: transform 0.7s var(--ease), opacity 0.7s var(--ease), filter 0.7s var(--ease);
+    }
+    .photo-trio-card img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+    .photo-trio-card.is-left { z-index: 1; transform: translate(-125%, -50%) scale(0.78); filter: brightness(0.85); }
+    .photo-trio-card.is-right { z-index: 1; transform: translate(25%, -50%) scale(0.78); filter: brightness(0.85); }
+    .photo-trio-card.is-front { z-index: 2; transform: translate(-50%, -50%); cursor: default; }
+    .photo-trio-card.is-left:hover, .photo-trio-card.is-right:hover { filter: none; }
+    @media (max-width: 639px) {
+        .photo-trio { height: 92vw; }
+        .photo-trio-card { width: 62%; }
+        .photo-trio-card.is-left { transform: translate(-108%, -50%) scale(0.72); }
+        .photo-trio-card.is-right { transform: translate(8%, -50%) scale(0.72); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .photo-trio-card { transition: none; }
+    }
+
     /* ---- Coming soon (NAV_SEGMENTS comingSoon in app.js): a small tag, and the page's panel for it ---- */
     .soon-tag {
         display: inline-block;

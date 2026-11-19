@@ -1491,6 +1491,12 @@ const NAV_SEGMENTS = [
         tagline: 'A clear value offering.',
         description: 'Rebuilt golf and lifestyle carts, with utility where available. Each unit is quoted with its seating layout, rebuild scope, battery type and condition, included equipment, warranty terms and available upgrades.',
         image: 'image/Products/reman 4.png',
+        // The page's hero (2026-11-19): three rebuilt carts, the middle one in front (renderPhotoTrio)
+        heroTrio: [
+            { src: 'image/reman/reman-red.jpg', alt: 'A rebuilt red Tempo, lifted, with off-road tires, alloy wheels and a chrome grille' },
+            { src: 'image/reman/reman-silver.jpg', alt: 'A rebuilt silver Precedent four-seater with striped seats, and its dashboard' },
+            { src: 'image/reman/reman-blue.jpg', alt: 'A rebuilt blue Precedent with a rear flip seat and black roof, and its dashboard' }
+        ],
         subcategories: [
             {
                 id: 'available-units',
@@ -7321,6 +7327,30 @@ function renderEnquiryPrompt(text) {
         </div>`;
 }
 
+// Three photos side by side, the middle one larger and in front; a click on a side photo swaps it into the middle
+// (photoTrioFront). Each card is a button, so it works by keyboard too
+function renderPhotoTrio(photos) {
+    const pos = ['is-left', 'is-front', 'is-right'];
+    return `
+        <div class="photo-trio" role="group" aria-label="Rebuilt carts">
+            ${photos.slice(0, 3).map((ph, i) => `
+                <button type="button" class="photo-trio-card ${pos[i]}" onclick="photoTrioFront(this)" aria-pressed="${i === 1}" aria-label="Show in front: ${attrText(ph.alt)}">
+                    <img src="${ph.src}" alt="${attrText(ph.alt)}" ${i === 1 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" draggable="false">
+                </button>`).join('')}
+        </div>`;
+}
+
+function photoTrioFront(card) {
+    const trio = card.closest('.photo-trio');
+    const front = trio.querySelector('.is-front');
+    if (!front || front === card) return;
+    const side = card.classList.contains('is-left') ? 'is-left' : 'is-right';
+    card.classList.replace(side, 'is-front');
+    front.classList.replace('is-front', side);
+    card.setAttribute('aria-pressed', 'true');
+    front.setAttribute('aria-pressed', 'false');
+}
+
 function renderSegmentPage() {
     const segment = NAV_SEGMENTS.find(s => s.id === currentSlug) || NAV_SEGMENTS[0];
     const buildSet = segment.version ? tempoBuildSet(segment.version) : null;
@@ -7331,7 +7361,10 @@ function renderSegmentPage() {
     ];
 
     return `
-        <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-16 lg:pt-24">
+        <!-- A page whose hero is the photo trio opens on the photos (2026-11-19): its heading and intro stay for screen
+             readers and search only -->
+        <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 ${segment.heroTrio ? 'pt-4 lg:pt-8' : 'pt-16 lg:pt-24'}">
+            <div class="${segment.heroTrio ? 'sr-only' : ''}">
             <p class="text-sm text-mute">${segment.label}</p>
             <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mt-4">
                 <h1 class="type-xl text-ink lg:col-span-7">${segment.tagline}</h1>
@@ -7340,9 +7373,10 @@ function renderSegmentPage() {
                     ${jumpLinks.length ? `<ul class="flex flex-wrap gap-x-6 gap-y-2">${jumpLinks.map(l => `<li><button type="button" onclick="openSegment('${segment.id}', '${segment.id}-${l.anchor}')" class="link text-sm">${l.label}</button></li>`).join('')}</ul>` : ''}
                 </div>
             </div>
-            <div class="mt-12 ${photo ? 'aspect-[16/9] md:aspect-[21/9] overflow-hidden' : 'bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8'}">
-                <img src="${photo ? photo.image : segment.image}" alt="${photo ? photo.alt : segment.label}" fetchpriority="high" class="${photo ? 'w-full h-full object-cover' : 'max-h-full w-auto object-contain mix-blend-multiply'}">
             </div>
+            ${segment.heroTrio ? renderPhotoTrio(segment.heroTrio) : `<div class="mt-12 ${photo ? 'aspect-[16/9] md:aspect-[21/9] overflow-hidden' : 'bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8'}">
+                <img src="${photo ? photo.image : segment.image}" alt="${photo ? photo.alt : segment.label}" fetchpriority="high" class="${photo ? 'w-full h-full object-cover' : 'max-h-full w-auto object-contain mix-blend-multiply'}">
+            </div>`}
         </section>
 
         ${segment.subcategories.map(sub => `
