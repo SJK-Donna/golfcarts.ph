@@ -1274,7 +1274,35 @@ function tempoBundleSpec(line, layout, i) {
 // `included` marks a single group whose pick comes with the build. `section` groups them on the page. A group's
 // title is the quote row the admin prices it from (account.js BUNDLE_PART_ROWS), so titles and ids stay put.
 function getTempoOptionGroups(product, i) {
-    return bundleTempoGroups(product, i, codeTempoOptionGroups(product, i));
+    const groups = bundleTempoGroups(product, i, codeTempoOptionGroups(product, i));
+    // The lift kit comes right before the wheels, in their section (2026-11-19): turning it on opens the 14" wheels
+    const li = groups.findIndex(g => g.id === 'lift'), wi = groups.findIndex(g => g.id === 'wheels');
+    if (li >= 0 && wi >= 0) {
+        const wheels = groups[wi];
+        const lift = { ...groups.splice(li, 1)[0], section: wheels.section, unlocks: 'wheels' };
+        groups.splice(groups.indexOf(wheels), 0, lift);
+        groups[groups.indexOf(wheels)] = { ...wheels, liftUnlocks: !!wheels.upgradeFrom, labels: Object.fromEntries(wheels.options.map(n => [n, wheelLabel(n)])) };
+    }
+    return groups;
+}
+
+// A wheel choice as the visitor reads it: the rims and the tires (2026-11-19). The Bundles name most wheels by the
+// rim alone ("12in Triton"); the quotation keeps the Bundles' own name
+function wheelLabel(name) {
+    const n = String(name || '').trim();
+    const known = {
+        '8in': '8" steel rims with wheel cover, standard tires',
+        '10in': '10" Club Car premium rims, standard tires',
+        '12in Triton': '12" Triton Machined Black rims, 215/35-12 tires',
+        '12in Hela': '12" Hela Bright Chrome rims, 215/35-12 tires'
+    };
+    if (known[n]) return known[n];
+    const kraken = n.match(/^(.*?)\s+with\s+Kr?aken\s+Tires?$/i);
+    if (kraken) {
+        const rim = kraken[1].replace(/\bChome\b/i, 'Chrome').replace(/^(\S+) with (.+)$/, '$1 rims with $2');
+        return `14" ${/rims/.test(rim) ? rim : rim + ' rims'}, Kraken 23x10-14 tires`;
+    }
+    return n;
 }
 
 function codeTempoOptionGroups(product, i) {
@@ -1458,7 +1486,7 @@ const NAV_SEGMENTS = [
     },
     {
         id: 'resort',
-        label: 'Resort and Hospitality',
+        label: 'Resort & Hospitality',
         category: 'Resort & Hospitality',
         tagline: 'Guest transport and daily property operations.',
         description: 'Match the vehicle to passenger flow, luggage and daily operating conditions, then add utility and fit-to-task builds for the jobs behind the scenes.',
@@ -1486,7 +1514,7 @@ const NAV_SEGMENTS = [
     },
     {
         id: 'remanufactured',
-        label: 'Rebuilt and Pre Owned',
+        label: 'Certified Pre-owned',
         category: null,
         tagline: 'A clear value offering.',
         description: 'Rebuilt golf and lifestyle carts, with utility where available. Each unit is quoted with its seating layout, rebuild scope, battery type and condition, included equipment, warranty terms and available upgrades.',
@@ -1526,8 +1554,8 @@ const MAIN_NAV = [
     { label: 'Custom Carts', href: 'custom-carts/', page: 'custom-carts' },
     { segment: 'resort' },
     { segment: 'remanufactured' },
-    { label: 'Service and Support', href: 'service/', page: 'service' },
-    { label: 'Stories and Guides', href: 'blog/', page: 'blogs' }
+    { label: 'Service & Support', href: 'service/', page: 'service' },
+    { label: "Stories & FAQ's", href: 'blog/', page: 'blogs' }
 ];
 
 // Primary action for individual buyers: start on the hero product's build selector
@@ -1546,12 +1574,15 @@ function buildYourCart() {
 // overlaps the next slightly, and later carts sit in front, so every cart's front stays visible.
 // Five families since 2026-11-17 (the Transporter, cut out by scripts/cut-lineup.mjs): all at 80% of their former
 // size so the five fit, on a lower 4.46 : 1 strip (.lineup-range); width = height x the photo's aspect / 4.46
+// One row since 2026-11-19 (after a two-row formation the same day): side by side on one ground line, no overlap,
+// each sized by its real height, on a 5.17 : 1 stage (.lineup-range). left, width and height are percentages of the
+// stage; the photos keep their shape and stand on their slot's bottom edge
 const HOME_LINEUP = [
-    { name: 'Minibus', seats: '14 and 21 seats', image: 'image/lineup/minibus.png', slug: 'minibus-14', left: 0.5, width: 27.8, height: 82 },
-    { name: 'Villager', seats: '6 to 8 seats', image: 'image/lineup/villager.png', slug: 'villager-8', left: 26.3, width: 23.2, height: 68 },
-    { name: 'Transporter', seats: '4 seats with cargo bed and 6 seats ', image: 'image/lineup/transporter-roof.png', slug: 'transporter-400', left: 47, width: 20.9, height: 65 },
-    { name: 'Carryall', seats: '2 seats and a cargo bed', image: 'image/lineup/carryall.png', slug: 'carryall-500', left: 65.4, width: 20.1, height: 65 },
-    { name: 'Tempo', seats: '2 to 6 seats', image: 'image/lineup/tempo.png', slug: 'golfer-tempo-2', left: 83.5, width: 13.8, height: 61 }
+    { name: 'Minibus', seats: '14 and 21 seats', image: 'image/lineup/minibus.png', slug: 'minibus-14', left: 0.5, width: 25.3, height: 85 },
+    { name: 'Villager', seats: '6 to 8 seats', image: 'image/lineup/villager.png', slug: 'villager-8', left: 26.8, width: 20.8, height: 71 },
+    { name: 'Transporter', seats: '4 seats with cargo bed and 6 seats ', image: 'image/lineup/transporter-roof.png', slug: 'transporter-400', left: 48.6, width: 18.6, height: 67 },
+    { name: 'Carryall', seats: '2 seats and a cargo bed', image: 'image/lineup/carryall.png', slug: 'carryall-500', left: 68.2, width: 17.9, height: 67 },
+    { name: 'Tempo', seats: '2 to 6 seats', image: 'image/lineup/tempo.png', slug: 'golfer-tempo-2', left: 87.1, width: 12.4, height: 64 }
 ];
 
 // Shop by use, in the review's order. Private Golf Carts leads with the largest photo; Rebuilt is a text-led strip (see renderHomeUses)
@@ -3222,7 +3253,7 @@ function renderHomeRange() {
                 </div>
                 <ul class="lineup lineup-range" aria-label="Model families">
                     ${HOME_LINEUP.map((c, i) => `
-                        <li class="lineup-item" style="--left:${c.left}%; --width:${c.width}%; --height:${c.height}%; z-index:${i + 1}">
+                        <li class="lineup-item" style="--left:${c.left}%; --width:${c.width}%; --height:${c.height}%;${c.bottom != null ? ` --bottom:${c.bottom}%;` : ''} z-index:${i + 1}">
                             <a href="${routeHref('product-details', c.slug)}" data-route="product-details" data-slug="${c.slug}" class="lineup-cart">
                                 <img src="${c.image}" alt="">
                                 <span class="lineup-label">
@@ -3747,9 +3778,10 @@ const HOME_STAGE_FEATURE = {
     speaker: { image: 'image/Banners/golfer-features/gc-bluetooth-speaker.jpg', alt: 'GC Bluetooth speaker' }
 };
 const HOME_STAGE_FEATURES = {
-    golf: ['dashboard', 'charger', 'ballHolder', 'cups'],
-    scratch: ['dashboard', 'charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'speaker'],
-    pro: ['dashboard', 'charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'steering', 'carplay']
+    // The dashboard circle left out (2026-11-19, the user's choice)
+    golf: ['charger', 'ballHolder', 'cups'],
+    scratch: ['charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'speaker'],
+    pro: ['charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'steering', 'carplay']
 };
 const homeStageFeats = level => (HOME_STAGE_FEATURES[level.id] || []).map(k => HOME_STAGE_FEATURE[k])
     .map(f => `<li><img src="${f.image}" alt="${f.alt}" title="${f.alt}" width="320" height="320" loading="lazy"></li>`).join('');
@@ -5964,7 +5996,7 @@ function describeTempoChoice(product, i, group, o) {
     const v = o[group.id];
     let text = null;
     if (group.type === 'fixed') text = group.value;
-    else if (group.type === 'single' || group.type === 'optional') text = v || null;
+    else if (group.type === 'single' || group.type === 'optional') text = v ? ((group.labels && group.labels[v]) || v) : null; // wheels: rims and tires (wheelLabel)
     else if (group.type === 'multi') text = v && v.length ? v.join(', ') : null;
     else if (group.type === 'qty') text = v ? String(v) : null;
     else if (group.type === 'flag') text = v ? group.label : null;
@@ -6100,7 +6132,16 @@ function fixTempoSubChoices(product, i, o) {
     if (!o.enclosure) o.cooling = false;
 }
 
+// Confirm (2026-11-19): the build is chosen and locked in, and the page moves on to its colors
+function confirmBuildLevel(id) {
+    if (detailBuild.level !== id) selectBuildLevel(id);
+    detailBuild.confirmed = true;
+    redrawBuildSection();
+    scrollToDetailSection('colors');
+}
+
 function selectBuildLevel(id) {
+    if (detailBuild.level !== id) detailBuild.confirmed = false;
     detailBuild.level = id;
     // Another build is another photo: show the whole cart
     focusColorPart(null);
@@ -6132,8 +6173,8 @@ function selectBuildLevel(id) {
     }
     if (product) updateDetailBuildText(product);
     updateBuildSummaryLine();
-    // The chosen build is drawn large: redraw so the new choice takes its place
-    if (detailBuildFocus) redrawBuildSection();
+    // The cards show which is chosen (raised, its Confirm button filled): redraw them
+    redrawBuildSection();
 }
 
 // The colors of the current build's photo, so the color preview starts out looking like that build. Once the
@@ -6182,6 +6223,7 @@ function toggleTempoOption(id, index) {
     if (group.type === 'flag') {
         if (group.requires && !o[group.requires]) return;
         o[id] = !o[id];
+        if (group.unlocks === 'wheels') syncLiftWheels(product, i, o);
     } else {
         const value = group.options[index];
         o[id] = o[id].includes(value) ? o[id].filter(x => x !== value) : [...o[id], value];
@@ -6243,13 +6285,23 @@ function toggleTempoPackage(levelId, on) {
     refreshTempoOptions();
 }
 
-// The 14" wheel upgrade: on, the 14" wheels can be picked; off, they lock again and a 14" choice goes back to
+// With a lift kit on the build, the 14" wheels follow it: lifted, they can be picked; not, a 14" choice goes back to
 // the standard wheel
+function syncLiftWheels(product, i, o) {
+    const wheels = findTempoGroup(product, i, 'wheels');
+    if (!wheels || !wheels.liftUnlocks) return;
+    o.wheelUpgrade = !!o.lift;
+    if (!o.lift && wheels.options.indexOf(o.wheels) >= wheels.upgradeFrom) o.wheels = wheels.options[0];
+}
+
+// The 14" wheel upgrade: on, the 14" wheels can be picked; off, they lock again and a 14" choice goes back to
+// the standard wheel. Where a lift kit opens them, this turns the lift kit on or off
 function setWheelUpgrade(on) {
     const product = currentDetailProduct();
     const group = findTempoGroup(product, detailLevelIndex(product), 'wheels');
     if (!group || !group.upgradeFrom) return;
     const o = detailBuild.options;
+    if (group.liftUnlocks) o.lift = on;
     o.wheelUpgrade = on;
     if (!on && group.options.indexOf(o.wheels) >= group.upgradeFrom) o.wheels = group.options[0];
     refreshTempoOptions();
@@ -6272,18 +6324,19 @@ function openWheelUpgrade(index) {
         modal.onclick = e => { if (e.target === modal) closeWheelUpgrade(); };
         document.body.appendChild(modal);
     }
-    const [name, detail] = splitOptionName(group.options[index]);
+    const [name, detail] = splitOptionName((group.labels && group.labels[group.options[index]]) || group.options[index]);
     const photo = optionPhoto(group.options[index]);
+    const viaLift = !!group.liftUnlocks;
     modal.innerHTML = `
         <div role="dialog" aria-modal="true" aria-labelledby="wheel-upgrade-title" class="w-full max-w-md bg-paper border border-line">
             ${photo ? `<div class="bg-stone aspect-[4/3] flex items-center justify-center p-6"><img src="${photo}" alt="" class="max-h-full object-contain mix-blend-multiply"></div>` : ''}
             <div class="p-6 space-y-3">
-                <p class="text-sm text-mute">Rims upgrade</p>
+                <p class="text-sm text-mute">${viaLift ? '14" wheels' : 'Rims upgrade'}</p>
                 <h2 id="wheel-upgrade-title" class="type-md text-ink">${name}</h2>
                 ${detail ? `<p class="text-sm text-ink-2">${detail}</p>` : ''}
-                <p class="text-ink-2">These rims are an upgrade over the build's standard rims, priced on top of the build. Add the rims upgrade to choose this wheel.</p>
+                <p class="text-ink-2">${viaLift ? 'The 14" wheels and tires come with the lift kit, priced on top of the build. Add the lift kit to choose this wheel.' : 'These rims are an upgrade over the build\'s standard rims, priced on top of the build. Add the rims upgrade to choose this wheel.'}</p>
                 <div class="flex flex-wrap gap-3 pt-3">
-                    <button type="button" onclick="confirmWheelUpgrade()" class="btn btn-primary">Add rims upgrade</button>
+                    <button type="button" onclick="confirmWheelUpgrade()" class="btn btn-primary">${viaLift ? 'Add the lift kit' : 'Add rims upgrade'}</button>
                     <button type="button" onclick="closeWheelUpgrade()" class="btn btn-outline">Not now</button>
                 </div>
             </div>
@@ -6307,6 +6360,9 @@ function confirmWheelUpgrade() {
     const index = wheelUpgradePick;
     closeWheelUpgrade();
     detailBuild.options.wheelUpgrade = true;
+    const product = currentDetailProduct();
+    const group = product && findTempoGroup(product, detailLevelIndex(product), 'wheels');
+    if (group && group.liftUnlocks) detailBuild.options.lift = true;
     pickTempoOption('wheels', index);
 }
 
@@ -6550,15 +6606,17 @@ function renderTempoGroup(g, o, nested, cell = false) {
             if (g.upgradeFrom && k === g.upgradeFrom) {
                 cards.push(`
                     <div class="opt-grid-label opt-upgrade-head">
-                        <span>Rims upgrade</span>
-                        ${optionSegments([false, true].map(on => ({ key: `wheelUpgrade:${on}`, label: on ? 'On' : 'Off', active: !!o.wheelUpgrade === on, onclick: `setWheelUpgrade(${on})` })))}
+                        ${g.liftUnlocks
+                            ? `<span>14" wheels and tires: ${o.wheelUpgrade ? 'open with the lift kit' : 'turn on the lift kit to choose these'}</span>`
+                            : `<span>Rims upgrade</span>
+                        ${optionSegments([false, true].map(on => ({ key: `wheelUpgrade:${on}`, label: on ? 'On' : 'Off', active: !!o.wheelUpgrade === on, onclick: `setWheelUpgrade(${on})` })))}`}
                     </div>`);
             }
             const multi = g.type === 'multi';
             const active = multi ? (o[g.id] || []).includes(opt) : o[g.id] === opt;
             const locked = g.upgradeFrom && k >= g.upgradeFrom && !o.wheelUpgrade;
             cards.push(optionCard({
-                key: `${g.id}:${k}`, label: opt, photo: optionPhoto(opt) || (g.options.length === 1 ? optionPhoto(g.id) : null), active,
+                key: `${g.id}:${k}`, label: (g.labels && g.labels[opt]) || opt, photo: optionPhoto(opt) || (g.options.length === 1 ? optionPhoto(g.id) : null), active,
                 onclick: multi ? `toggleTempoOption('${g.id}', ${k})` : `pickTempoOption('${g.id}', ${k})`,
                 kind: multi ? 'check' : 'radio',
                 note: locked ? 'Upgrade' : '',
@@ -6745,10 +6803,13 @@ function renderBuildCard(product, b, k, focus) {
                         ${b.proposed ? '<span class="block text-sm text-green-text font-medium">Proposed package, confirmed in your quote</span>' : ''}
                     </button>
                     ${pkg ? `
-                        <label class="flex items-start gap-3 px-5 lg:px-6 pb-5 lg:pb-6 text-sm text-ink-2 cursor-pointer">
+                        <label class="flex items-start gap-3 px-5 lg:px-6 pb-4 text-sm text-ink-2 cursor-pointer">
                             <input type="checkbox" data-build="${b.id}" ${pkgOn ? 'checked' : ''} onchange="toggleTempoPackage('${b.id}', this.checked)" class="build-package-check w-4 h-4 mt-0.5 accent-[#151714] flex-shrink-0">
                             <span>${b.note}</span>
                         </label>` : ''}
+                    ${isTempoVersion(product) ? `<div class="build-card-confirm px-5 lg:px-6 pb-5 lg:pb-6">
+                        <button type="button" onclick="confirmBuildLevel('${b.id}')" class="btn ${b.id === detailBuild.level ? 'btn-primary' : 'btn-outline'} w-full">${b.id === detailBuild.level && detailBuild.confirmed ? 'Confirmed: choose colors' : 'Confirm ' + buildLabelHtml(b)}</button>
+                    </div>` : ''}
                     </div>`;
 }
 
@@ -6791,6 +6852,9 @@ function redrawBuildSection() {
     section.outerHTML = renderBuildSection(product, buildSet);
     // Already faded in (see .rise): the new copy shows at once
     document.getElementById('build').classList.add('is-visible');
+    // Phones show the cards as a swipe row: keep the chosen one in view (sideways only)
+    const row = document.querySelector('#build .build-cards'), card = row && row.querySelector('.build-card-active');
+    if (card && row.scrollWidth > row.clientWidth) row.scrollLeft = card.offsetLeft - row.offsetLeft - parseFloat(getComputedStyle(row).paddingLeft);
 }
 
 function setBuildFocus(on) {
@@ -6812,16 +6876,15 @@ function renderBuildSection(product, buildSet) {
                 ${buildSet.note ? `<p class="measure lg:col-span-5">${buildSet.note}</p>` : ''}
             </div>
 
-            ${detailBuildFocus ? renderFocusedBuilds(product, buildSet) : `
-            <div class="build-cards md:grid ${{ 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }[buildSet.builds.length] || 'md:grid-cols-3'} gap-4" role="radiogroup" aria-label="Build level">
+            ${`
+            <div class="build-cards build-tiers md:grid ${{ 2: 'md:grid-cols-2', 3: 'md:grid-cols-3', 4: 'md:grid-cols-4' }[buildSet.builds.length] || 'md:grid-cols-3'} gap-4" role="radiogroup" aria-label="Build level">
                 ${buildSet.builds.map((b, k) => renderBuildCard(product, b, k, false)).join('')}
             </div>`}
 
             ${isTempoVersion(product) ? `
                 <!-- Tempo builds: the running summary is the side panel beside Equipment and upgrades -->
                 <div class="mt-10 flex flex-wrap items-center justify-between gap-4">
-                    <p class="text-sm text-ink-2 measure">Next, choose colors, then equipment and upgrades. Your build stays beside you as you go.</p>
-                    <button type="button" onclick="scrollToDetailSection('colors')" class="btn btn-primary">Choose colors</button>
+                    <p class="text-sm text-ink-2 measure">Confirm a build to lock it in and go on to its colors, then equipment and upgrades. Your build stays beside you as you go.</p>
                 </div>
             ` : `
                 <div class="mt-16 bg-band text-on-band p-6 sm:p-10 flex flex-col md:flex-row md:items-end justify-between gap-6">

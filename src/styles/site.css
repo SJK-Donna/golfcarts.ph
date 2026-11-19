@@ -621,7 +621,14 @@
         .home-stage-ui > .home-stage-feats img { width: 3.75rem; height: 3.75rem; }
     }
     .home-stage-feats img { display: block; width: 4.5rem; height: 4.5rem; border-radius: 50%; object-fit: cover; border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--line), 0 6px 16px -8px rgba(21, 23, 20, 0.45); transition: transform 0.25s var(--ease); }
-    .home-stage-feats img:hover { transform: scale(1.08); }
+    /* Hover: the circle grows well past its neighbours (2026-11-19), above them */
+    .home-stage-feats li { position: relative; }
+    .home-stage-feats li:hover { z-index: 3; }
+    .home-stage-feats img:hover { transform: scale(1.6); }
+    /* Under the circles, a caption (a flex item that takes a line of its own, so the page editor's texts keep their places) */
+    .home-stage-ui > .home-stage-feats { flex-wrap: wrap; justify-content: center; }
+    .home-stage-feats::after { content: 'Included Accessories'; flex-basis: 100%; margin-top: 0.25rem; text-align: center; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-2); }
+    .home-stage-feats:empty::after { content: none; }
     .home-stage-swap { transition: opacity 0.35s var(--ease), translate 0.35s var(--ease); }
     .home-stage-swap.is-out { opacity: 0; translate: 0 10px; }
 
@@ -1766,6 +1773,15 @@
         border-color: var(--ink);
         box-shadow: inset 0 0 0 1px var(--ink);
     }
+    /* Three columns like a pricing table (2026-11-19): the chosen build raised above the other two, with a shadow;
+       each card's Confirm button sits at its foot, level across the row */
+    .build-tiers { align-items: center; padding: 1.5rem 0; }
+    .build-tiers > .build-card { transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), border-color 0.25s var(--ease); }
+    @media (min-width: 768px) {
+        .build-tiers > .build-card { transform: scale(0.95); opacity: 0.92; }
+        .build-tiers > .build-card-active { z-index: 1; transform: scale(1.04); opacity: 1; box-shadow: inset 0 0 0 1px var(--ink), 0 28px 50px -24px rgba(21, 23, 20, 0.45); }
+    }
+    .build-card-confirm { margin-top: auto; }
     /* The chosen build, large (renderFocusedBuilds in app.js): its photo beside the list from tablet width up */
     .build-card-focus .build-card-photo { aspect-ratio: 3 / 2; }
     @media (min-width: 768px) { .build-card-focus .build-card-photo { margin: 0 0 0 -0.5rem; align-self: center; aspect-ratio: 4 / 3; } }
@@ -2068,10 +2084,10 @@
     .warranty-table tbody th { font-weight: 600; color: var(--ink); width: 11rem; }
     .warranty-table td { color: var(--ink-2); }
     .warranty-table td:last-child { white-space: nowrap; color: var(--ink); font-weight: 600; }
-    /* The range strip with five families (2026-11-17): lower, so the carts (smaller to fit five) fill it */
-    .lineup-range { aspect-ratio: 4.46 / 1; }
+    /* The range in one row (2026-11-19): five carts side by side on the floor strip, none overlapping */
+    .lineup-range { aspect-ratio: 5.17 / 1; }
     .lineup-range::before { height: 30%; }
-    .lineup-range .lineup-item { bottom: 5%; }
+    .lineup-range .lineup-item { bottom: var(--bottom, 5%); }
     @media (max-width: 639px) {
         .lineup-range .lineup-item:last-child { grid-column: 1 / -1; justify-self: center; width: 50%; }
     }
