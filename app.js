@@ -1492,6 +1492,8 @@ const NAV_SEGMENTS = [
         description: 'Rebuilt golf and lifestyle carts, with utility where available. Each unit is quoted with its seating layout, rebuild scope, battery type and condition, included equipment, warranty terms and available upgrades.',
         image: 'image/Products/reman 4.png',
         // The page's hero (2026-11-19): three rebuilt carts, the middle one in front (renderPhotoTrio)
+        // Under the photos, after a line (2026-11-19): the cart market banner, coming soon
+        heroBanner: { src: 'image/reman/cart-market-coming-soon.jpg', alt: 'Cart Market, a marketplace for your cart: coming soon' },
         heroTrio: [
             { src: 'image/reman/reman-red.jpg', alt: 'A rebuilt red Tempo, lifted, with off-road tires, alloy wheels and a chrome grille' },
             { src: 'image/reman/reman-silver.jpg', alt: 'A rebuilt silver Precedent four-seater with striped seats, and its dashboard' },
@@ -7332,7 +7334,7 @@ function renderEnquiryPrompt(text) {
 function renderPhotoTrio(photos) {
     const pos = ['is-left', 'is-front', 'is-right'];
     return `
-        <div class="photo-trio" role="group" aria-label="Rebuilt carts">
+        <div class="photo-trio mt-8 lg:mt-10" role="group" aria-label="Rebuilt carts">
             ${photos.slice(0, 3).map((ph, i) => `
                 <button type="button" class="photo-trio-card ${pos[i]}" onclick="photoTrioFront(this)" aria-pressed="${i === 1}" aria-label="Show in front: ${attrText(ph.alt)}">
                     <img src="${ph.src}" alt="${attrText(ph.alt)}" ${i === 1 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async" draggable="false">
@@ -7361,20 +7363,21 @@ function renderSegmentPage() {
     ];
 
     return `
-        <!-- A page whose hero is the photo trio opens on the photos (2026-11-19): its heading and intro stay for screen
-             readers and search only -->
-        <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 ${segment.heroTrio ? 'pt-4 lg:pt-8' : 'pt-16 lg:pt-24'}">
-            <div class="${segment.heroTrio ? 'sr-only' : ''}">
+        <!-- A page with the photo trio (2026-11-19): a smaller heading above the photos, then a line and its banner -->
+        <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 ${segment.heroTrio ? 'pt-10 lg:pt-14' : 'pt-16 lg:pt-24'}">
+            <div>
             <p class="text-sm text-mute">${segment.label}</p>
             <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mt-4">
-                <h1 class="type-xl text-ink lg:col-span-7">${segment.tagline}</h1>
+                <h1 class="${segment.heroTrio ? 'type-lg' : 'type-xl'} text-ink lg:col-span-7">${segment.tagline}</h1>
                 <div class="lg:col-span-5 space-y-6">
                     <p class="measure">${segment.description}</p>
                     ${jumpLinks.length ? `<ul class="flex flex-wrap gap-x-6 gap-y-2">${jumpLinks.map(l => `<li><button type="button" onclick="openSegment('${segment.id}', '${segment.id}-${l.anchor}')" class="link text-sm">${l.label}</button></li>`).join('')}</ul>` : ''}
                 </div>
             </div>
             </div>
-            ${segment.heroTrio ? renderPhotoTrio(segment.heroTrio) : `<div class="mt-12 ${photo ? 'aspect-[16/9] md:aspect-[21/9] overflow-hidden' : 'bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8'}">
+            ${segment.heroTrio ? renderPhotoTrio(segment.heroTrio) + (segment.heroBanner ? `
+                <hr class="border-line my-10 lg:my-14">
+                <img src="${segment.heroBanner.src}" alt="${attrText(segment.heroBanner.alt)}" width="2400" height="720" loading="lazy" decoding="async" class="block w-full h-auto">` : '') : `<div class="mt-12 ${photo ? 'aspect-[16/9] md:aspect-[21/9] overflow-hidden' : 'bg-stone overflow-hidden aspect-[16/9] md:aspect-[21/9] flex items-center justify-center p-8'}">
                 <img src="${photo ? photo.image : segment.image}" alt="${photo ? photo.alt : segment.label}" fetchpriority="high" class="${photo ? 'w-full h-full object-cover' : 'max-h-full w-auto object-contain mix-blend-multiply'}">
             </div>`}
         </section>
