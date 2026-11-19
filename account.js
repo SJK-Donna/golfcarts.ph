@@ -121,15 +121,15 @@ function refreshGolferUI() {
     const golfer = currentGolfer(), admin = currentAdmin();
     // The header's link is an icon on laptops, with its label from 1600px; the mobile menu's is text only
     document.querySelectorAll('.golfer-link').forEach(link => {
-        (link.querySelector('.golfer-link-label') || link).textContent = admin ? 'Admin' : golfer ? `Hi, ${firstName(golfer)}` : 'Be a Golfer';
-        link.setAttribute('aria-label', admin ? `Admin (${admin.email})` : golfer ? `Your Golfer account (${golfer.name})` : 'Be a Golfer: sign up or log in');
-        link.title = admin ? 'Admin' : golfer ? 'Your Golfer account' : 'Be a Golfer';
+        (link.querySelector('.golfer-link-label') || link).textContent = admin ? 'Admin' : golfer ? `Hi, ${firstName(golfer)}` : 'Be a Member';
+        link.setAttribute('aria-label', admin ? `Admin (${admin.email})` : golfer ? `Your Member account (${golfer.name})` : 'Be a Member: sign up or log in');
+        link.title = admin ? 'Admin' : golfer ? 'Your Member account' : 'Be a Member';
     });
     const hint = document.getElementById('quote-golfer-hint');
     if (hint) hint.innerHTML = golfer
-        ? `This quote will be kept in your <a href="golfer/" data-route="golfer" class="link" onclick="closeQuoteModal()">Golfer account</a>.`
+        ? `This quote will be kept in your <a href="golfer/" data-route="golfer" class="link" onclick="closeQuoteModal()">Member account</a>.`
         : admin ? ''
-        : `Optional: <button type="button" class="link" onclick="openGolferModal('signup', 'Keep this quote and your builds in one place.')">Be a Golfer</button> to keep your quotes and builds.`;
+        : `Optional: <button type="button" class="link" onclick="openGolferModal('signup', 'Keep this quote and your builds in one place.')">Be a Member</button> to keep your quotes and builds.`;
 }
 
 function golferHeaderClick() {
@@ -209,7 +209,7 @@ function renderGolferModal() {
     const reason = golferModalReason ? `<p class="auth-reason">${escapeHtml(golferModalReason)}</p>` : '';
     const steps = {
         signup: {
-            title: 'Create your Golfer account',
+            title: 'Create your Member account',
             sub: 'Free and optional: you can build a cart and get a quote without one.',
             form: `${reason}
                 <div class="auth-row">
@@ -414,7 +414,7 @@ async function logOutGolfer() {
 async function saveCurrentBuild() {
     const golfer = currentGolfer();
     if (!golfer) {
-        if (currentAdmin()) { showToast('Saved builds are for Golfer accounts; you are signed in as staff.'); return; }
+        if (currentAdmin()) { showToast('Saved builds are for Member accounts; you are signed in as staff.'); return; }
         openGolferModal('signup', 'Sign up to save this build. It takes a minute.', saveCurrentBuild);
         return;
     }
@@ -426,7 +426,7 @@ async function saveCurrentBuild() {
     const { error } = await sb.from('saved_builds').insert({ slug: product.slug, title: level ? `${product.name} ${level}` : product.name, photo, rows: details.rows });
     if (error) { showToast(`The build could not be saved: ${error.message}`); return; }
     pageData = null;
-    showToast('Build saved to your Golfer account.');
+    showToast('Build saved to your Member account.');
 }
 
 async function removeSavedBuild(id) {
@@ -470,15 +470,15 @@ function renderGolferPage() {
     if (currentAdmin()) return `
         <section class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12 min-h-[60vh] space-y-6">
             <h1 class="type-xl text-ink">You're signed in as staff.</h1>
-            <p class="measure">${escapeHtml(currentAdmin().email)} uses the admin, not a Golfer account.</p>
+            <p class="measure">${escapeHtml(currentAdmin().email)} uses the admin, not a Member account.</p>
             <a href="admin/" data-route="admin" class="btn btn-primary">Go to the admin</a>
         </section>`;
     if (!golfer) return `
         <section class="home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-12 min-h-[60vh]">
             <div class="lg:col-span-6 space-y-6">
                 <p class="text-sm text-mute">Optional membership</p>
-                <h1 class="type-xl text-ink">Be a Golfer.</h1>
-                <p class="measure">You don't need an account to build a cart or get a quote. A free Golfer account keeps everything in one place.</p>
+                <h1 class="type-xl text-ink">Be a Member.</h1>
+                <p class="measure">You don't need an account to build a cart or get a quote. A free Member account keeps everything in one place.</p>
                 <div class="flex flex-wrap gap-4">
                     <button type="button" onclick="openGolferModal('signup')" class="btn btn-primary">Sign up</button>
                     <button type="button" onclick="openGolferModal('login')" class="btn btn-outline">Log in</button>
@@ -500,7 +500,7 @@ function renderGolferPage() {
     const pending = '<p class="text-mute mt-6" role="status">Loading…</p>';
     return `
         <section class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-16 lg:pt-24">
-            <p class="text-sm text-mute">Golfer account</p>
+            <p class="text-sm text-mute">Member account</p>
             <div class="flex flex-wrap items-end justify-between gap-6 mt-4">
                 <h1 class="type-xl text-ink">Hi, ${escapeHtml(firstName(golfer))}.</h1>
                 <button type="button" onclick="logOutGolfer()" class="btn btn-outline">Log out</button>
@@ -2546,7 +2546,7 @@ function renderAdminQuotes({ quotes: allQuotes, golfers, quotations }) {
             : '<span class="text-xs text-mute">Not priced yet</span>';
     };
     return `<div class="admin-table-wrap"><table class="admin-table">
-        <thead><tr><th>Reference</th><th>Date</th><th>Customer</th><th>Model</th><th>Source</th><th>Golfer</th><th>Status</th>${pricing ? '<th>Quotation</th>' : ''}${canDelete ? '<th><span class="sr-only">Delete</span></th>' : ''}</tr></thead>
+        <thead><tr><th>Reference</th><th>Date</th><th>Customer</th><th>Model</th><th>Source</th><th>Member</th><th>Status</th>${pricing ? '<th>Quotation</th>' : ''}${canDelete ? '<th><span class="sr-only">Delete</span></th>' : ''}</tr></thead>
         <tbody>${quotes.map(q => `
             <tr>
                 <td><details><summary>${escapeHtml(q.reference)}</summary>
@@ -6126,7 +6126,7 @@ function renderAdminUsers({ staff }) {
             <div class="field"><label for="au-email">Add someone</label><input id="au-email" name="email" required type="email" placeholder="name@sjkguahan.com"></div>
             <div class="field"><label for="au-role">Role</label><select id="au-role" name="role">${roleOptions('sales')}</select></div>
             <button type="submit" class="btn btn-primary px-5 text-sm">Add</button>
-            <p class="text-xs text-mute sm:col-span-3">They then sign up on the site with that email (Be a Golfer → Sign up), confirm it from their inbox, and log in.</p>
+            <p class="text-xs text-mute sm:col-span-3">They then sign up on the site with that email (Be a Member → Sign up), confirm it from their inbox, and log in.</p>
         </form>
         <div class="mt-12 max-w-3xl">
             <h2 class="type-md text-ink">What each role can do</h2>

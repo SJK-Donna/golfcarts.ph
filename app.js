@@ -994,8 +994,9 @@ const TEMPO_MATRIX_LEGACY = {
         lifestyle: [[], [], ['GC Premium Bag Attachment']]
     },
     // Pro / Elite upgrades: audio, then charging add-ons
-    audioUpgrades: [[], [], ['Club Car Premium Sound Bar', 'Apple CarPlay', 'GC Sound Bar 27" RGB']],
-    electronicsAddOns: [[], [], ['Wireless Charging', 'Premium USB-C Charging Port', 'GC USB-C Charging Port QC3.0 with Volt Meter']],
+    // Scratch / Signature: the Versions sheet's electronics (2026-11-19)
+    audioUpgrades: [[], ['Club Car Premium Sound Bar', 'GC Sound Bar 27" RGB'], ['Club Car Premium Sound Bar', 'Apple CarPlay', 'GC Sound Bar 27" RGB']],
+    electronicsAddOns: [[], ['Wireless Charging'], ['Wireless Charging', 'Premium USB-C Charging Port', 'GC USB-C Charging Port QC3.0 with Volt Meter']],
     steering: [[], [], ['Premium Steering Wheel with Scorecard (Club Car)']], // an upgrade on Pro / Elite
     // Mirrors, as upgrades on Scratch / Signature and Pro / Elite
     mirrors: { golfer: [[], TEMPO_MIRRORS_LEGACY, TEMPO_MIRRORS_LEGACY], lifestyle: [[], TEMPO_MIRRORS_LEGACY, TEMPO_MIRRORS_LEGACY] },
@@ -1025,15 +1026,14 @@ function tempoLevelIncludesLegacy(line, i, layout = '2') {
         text('mirrors'),
         text('floorMat'),
         text('electronics'),
-        find('steering') && 'Premium steering wheel',
-        find('speedCode') && 'Speed code, no fee'
+        find('steering') && 'Premium steering wheel'
     ].filter(Boolean);
 }
 
 // The line under each build card: its upgrades (the card's checkbox switches them on), or its options
 function tempoLevelNoteLegacy(line, i) {
     return [
-        'Options: lithium battery, lift kit, floor mat and speed code (with fee).',
+        'Options: lithium battery, lift kit and floor mat.',
         'Upgrades: lithium battery, lift kit, 14" wheels, mirrors, storage, rain enclosure, cooling and floor mat.',
         'Upgrades: lift kit, 14" wheels, mirrors, audio, charging, scorecard steering wheel, storage, rain enclosure, cooling and floor mat.'
     ][i];
@@ -1109,7 +1109,7 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (m.electronicsAddOns[i].length) add({ id: 'charging', section: 'Upgrades', title: 'Charging', type: 'multi', options: m.electronicsAddOns[i] });
     if (m.steering[i].length) add({ id: 'steering', section: 'Upgrades', title: 'Steering wheel', type: 'flag', label: m.steering[i][0] });
     if (!m.floorMat[line][i]) add({ id: 'floorMat', section: 'Upgrades', title: 'Floor mat', type: 'flag', label: 'GC floor mat' });
-    if (m.mirrors[line][i].length) add({ id: 'mirrors', section: 'Upgrades', title: 'Mirrors', type: 'multi', options: m.mirrors[line][i] });
+    if (m.mirrors[line][i].length) add({ id: 'mirrors', section: 'Upgrades', title: 'Mirrors', type: 'optional', options: m.mirrors[line][i] }); // one mirror package: each already includes the side mirrors (2026-11-19)
     if (m.storage[i].length) add({ id: 'storage', section: 'Upgrades', title: 'Storage', type: 'multi', options: m.storage[i] });
     const enclosures = (layout === '2' ? m.enclosureTwoSeat : m.enclosureFourSeat)[i];
     if (enclosures.length) add({ id: 'enclosure', section: 'Upgrades', title: 'Rain enclosure', type: 'optional', options: enclosures });
@@ -1121,9 +1121,10 @@ function getTempoOptionGroupsLegacy(product, i) {
 function getTempoSubGroupsLegacy(product, i, o) {
     const m = TEMPO_MATRIX_LEGACY;
     const subs = [];
-    if (o.lift) {
-        subs.push({ id: 'liftFender', parent: 'lift', title: 'Fenders', type: 'single', options: m.liftFenders });
-        subs.push({ id: 'liftAddOns', parent: 'lift', title: 'Lift add-ons', type: 'multi', options: m.liftAddOns });
+    // Shown wherever a lift is offered; locked until the cart is lifted (2026-11-19)
+    if (m.lift[i]) {
+        subs.push({ id: 'liftFender', parent: 'lift', title: 'Fenders', type: 'single', options: m.liftFenders, locked: !o.lift });
+        subs.push({ id: 'liftAddOns', parent: 'lift', title: 'Lift add-ons', type: 'multi', options: m.liftAddOns, locked: !o.lift });
     }
     if (o.flipSeat) {
         subs.push({ id: 'flipSeatColor', parent: 'flipSeat', title: 'Flip seat color', type: 'single',
@@ -1273,17 +1274,113 @@ function tempoBundleSpec(line, layout, i) {
 // flag (on / off). Optional and qty groups have no "None" choice: tapping the chosen one again clears it.
 // `included` marks a single group whose pick comes with the build. `section` groups them on the page. A group's
 // title is the quote row the admin prices it from (account.js BUNDLE_PART_ROWS), so titles and ids stay put.
+// The speed code is no longer offered or shown (2026-11-19, the user's choice), whatever the Bundles list
+const TEMPO_HIDDEN_GROUPS = ['speedCode'];
+
 function getTempoOptionGroups(product, i) {
-    const groups = bundleTempoGroups(product, i, codeTempoOptionGroups(product, i));
+    const groups = bundleTempoGroups(product, i, codeTempoOptionGroups(product, i)).filter(g => !TEMPO_HIDDEN_GROUPS.includes(g.id));
     // The lift kit comes right before the wheels, in their section (2026-11-19): turning it on opens the 14" wheels
     const li = groups.findIndex(g => g.id === 'lift'), wi = groups.findIndex(g => g.id === 'wheels');
     if (li >= 0 && wi >= 0) {
         const wheels = groups[wi];
         const lift = { ...groups.splice(li, 1)[0], section: wheels.section, unlocks: 'wheels' };
         groups.splice(groups.indexOf(wheels), 0, lift);
-        groups[groups.indexOf(wheels)] = { ...wheels, liftUnlocks: !!wheels.upgradeFrom, labels: Object.fromEntries(wheels.options.map(n => [n, wheelLabel(n)])) };
+        groups[groups.indexOf(wheels)] = { ...versionsWheelsGroup(wheels), liftUnlocks: true };
     }
+    // Mirrors (2026-11-19): packages ("Side Mirror + 5 pannel") are choose-one; single mirrors are one side pair and one
+    // inner mirror at most (choosing another of the same kind replaces it)
+    const mirrors = groups.find(g => g.id === 'mirrors');
+    if (mirrors) {
+        const packages = mirrors.options.every(n => /^side mirror/i.test(n));
+        groups[groups.indexOf(mirrors)] = packages ? { ...mirrors, type: 'optional' } : { ...mirrors, type: 'multi',
+            exclusive: [mirrors.options.filter(n => /side mirror/i.test(n)), mirrors.options.filter(n => !/side mirror/i.test(n))],
+            hint: 'Optional: one pair of side mirrors and one inner mirror' };
+    }
+    // Audio and charging are one group, "Electronics and audio" (2026-11-19, the user's choice)
+    const audio = groups.find(g => g.id === 'audio'), charging = groups.find(g => g.id === 'charging');
+    // The Versions sheet's electronics the Bundles don't list are kept too (2026-11-19): a code option no Bundles
+    // option stands for is added to its group (quoted unpriced until the Bundles have it)
+    const code = codeTempoOptionGroups(product, i);
+    [audio, charging].filter(g => g && g.bundleIds).forEach(g => {
+        const own = (code.find(x => x.id === g.id) || {}).options || [];
+        const covered = new Set(g.options.map(n => BUNDLE_VISUAL.option[n] || n));
+        const add = own.filter(n => !covered.has(n) && !g.options.includes(n));
+        if (add.length) g.options = [...g.options, ...add];
+    });
+    if (charging) {
+        if (audio) {
+            groups[groups.indexOf(audio)] = { ...audio, title: 'Electronics and audio', options: [...audio.options, ...charging.options],
+                bundleIds: audio.bundleIds || charging.bundleIds ? { ...(audio.bundleIds || {}), ...(charging.bundleIds || {}) } : undefined };
+            groups.splice(groups.indexOf(charging), 1);
+        } else groups[groups.indexOf(charging)] = { ...charging, title: 'Electronics and audio' };
+    } else if (audio) groups[groups.indexOf(audio)] = { ...audio, title: 'Electronics and audio' };
     return groups;
+}
+
+// The Versions sheet's rims and tires ("tire & wheel combo" tab, 2026-11-19): every rim comes with any of its size's
+// four tires. The tires are listed street first (12") and Kraken first (14"), the ones the Bundles price
+const VERSIONS_WHEELS = {
+    12: { rims: ['Hela Bright Chrome', 'Triton Machined Black', 'Athena Gloss Machined Black', 'Athena Gloss Black', 'Athena Bright Chrome',
+            'Mercury Gloss Black', 'Gridlock Machined Black', 'Gridlock Gloss Black', 'Talon Machined Black'],
+        tires: ['215/35-12', 'Kruizer 205/40-R12', 'Kraken 23X10-12', '23x10.5-12'] },
+    14: { rims: ['Aerion Gloss Black', 'Aerion Black Chrome', 'Athena Solid Gloss Black', 'Athena Solid Bright Chrome', 'Atlas Solid Gloss Black',
+            'Atlas Gunmetal', 'Zeus Gloss Black and Machined', 'Mercury', 'Nokken Gloss Black', 'Nokken Carbon Fiber Inserts',
+            'Triton Machined Black', 'Gridlock Machined Black', 'Gridlock Gloss Black', 'Talon Machined Black'],
+        tires: ['Kraken 23x10-14', 'Morpheus 215/50-R14', '225/30-14', '23x10.50-14'] }
+};
+// With the lift kit (2026-11-19): the one 12" wheel, and the six 14" Kraken wheels (the Nokken is the Bundles' chrome
+// inserts one, its only Nokken on Kraken)
+const LIFT_WHEEL_12 = '12" Athena Gloss Machined Black with 12" Kraken 23X10-12';
+const LIFT_KRAKEN_RIMS = ['Aerion Gloss Black', 'Athena Solid Gloss Black', 'Atlas Solid Gloss Black', 'Zeus Gloss Black and Machined', 'Nokken with Chrome inserts', 'Gridlock Machined Black'];
+const LIFT_KRAKEN_TIRE = 'Kraken 23x10-14';
+const isKrakenTire = t => /kraken/i.test(t);
+const WHEEL_STEEL_8 = '8" steel rims with cover';
+const WHEEL_ALLOY_10 = '10" 5 Spoke Alloy Wheel In Gunmetal';
+const wheelCombo = (size, rim, tire) => `${size}" ${rim} with ${size}" ${tire}`;
+function parseWheel(name) {
+    const m = String(name || '').match(/^(1[24])" (.+?) with \1" (.+)$/);
+    return m ? { size: +m[1], rim: m[2], tire: m[3] } : null;
+}
+
+// A Bundles wheel name as the sheet's combination, or null when the sheet has no such rim (never the nearest one)
+function bundleWheelCombo(name) {
+    const n = String(name || '').trim();
+    if (n === '8in') return WHEEL_STEEL_8;
+    if (n === '10in') return WHEEL_ALLOY_10;
+    if (n === '12in Triton') return wheelCombo(12, 'Triton Machined Black', '215/35-12');
+    if (n === '12in Hela') return wheelCombo(12, 'Hela Bright Chrome', '215/35-12');
+    const k = n.match(/^(.*?)\s+with\s+Kr?aken\s+Tires?$/i);
+    if (!k) return null;
+    const words = k[1].toLowerCase().replace(/\bchome\b/, 'chrome').split(/\s+/).filter(w => !['with', 'inserts'].includes(w));
+    const hits = VERSIONS_WHEELS[14].rims.filter(r => words.every(w => r.toLowerCase().split(/\s+/).includes(w)));
+    return hits.length === 1 ? wheelCombo(14, hits[0], 'Kraken 23x10-14') : null;
+}
+
+// The wheels group as rims and tires: the build's standard wheels, then every 12" and 14" rim with its tires. A
+// Bundles wheel the sheet doesn't have stays, as its own rim with its one tire. Bundle ids follow the combinations
+function versionsWheelsGroup(g) {
+    const ids = g.bundleIds || {};
+    const std = [], byId = {}, extra = { 12: [], 14: [] };
+    let def;
+    const stdCode = g.options.slice(0, g.upgradeFrom || g.options.length);
+    (g.bundleIds ? g.options : stdCode).forEach(n => {
+        const combo = bundleWheelCombo(n) || (/^8/.test(n) ? WHEEL_STEEL_8 : /^10/.test(n) ? WHEEL_ALLOY_10 : null);
+        if (combo) { if (ids[n]) byId[combo] = ids[n]; if (n === g.bundleDefault) def = combo; if (!parseWheel(combo) && !std.includes(combo)) std.push(combo); return; }
+        const k = String(n).match(/^(.*?)\s+with\s+Kr?aken\s+Tires?$/i);
+        if (k && g.bundleIds) { const rim = k[1].replace(/\bChome\b/i, 'Chrome'); extra[14].push(rim); byId[wheelCombo(14, rim, 'Kraken 23x10-14')] = ids[n]; }
+    });
+    if (!std.length) std.push(WHEEL_STEEL_8);
+    const rims = { 12: [], 14: [] };
+    [12, 14].forEach(size => {
+        VERSIONS_WHEELS[size].rims.forEach(rim => rims[size].push({ rim, tires: VERSIONS_WHEELS[size].tires }));
+        extra[size].forEach(rim => rims[size].push({ rim, tires: [size === 14 ? 'Kraken 23x10-14' : VERSIONS_WHEELS[size].tires[0]] }));
+    });
+    if (!rims[14].some(r => r.rim === 'Nokken with Chrome inserts')) rims[14].push({ rim: 'Nokken with Chrome inserts', tires: [LIFT_KRAKEN_TIRE] });
+    const combos = size => rims[size].flatMap(r => r.tires.map(t => wheelCombo(size, r.rim, t)));
+    const options = [...std, ...combos(12), ...combos(14)];
+    const labels = Object.fromEntries(options.map(n => { const p = parseWheel(n); return [n, p ? `${p.size}" ${p.rim} rims, ${p.tire} tires` : n === WHEEL_STEEL_8 ? '8" steel rims with cover, standard tires' : '10" 5-spoke gunmetal alloy rims, standard tires']; }));
+    return { ...g, options, labels, rims, upgradeFrom: std.length + combos(12).length, bundleIds: g.bundleIds ? byId : undefined,
+        bundleDefault: def || std[0], hint: 'Choose a rim, then its tire. 14" rims come with the lift kit' };
 }
 
 // A wheel choice as the visitor reads it: the rims and the tires (2026-11-19). The Bundles name most wheels by the
@@ -1540,8 +1637,8 @@ const NAV_SEGMENTS = [
         comingSoon: {
             id: 'sell',
             label: 'Sell your cart',
-            title: 'Sell your cart here, as a Golfer.',
-            text: 'Soon, Golfers will be able to post their own carts on this page, with photos and details, for other buyers to see. Sign up as a Golfer now and you\'ll be ready when it opens.'
+            title: 'Sell your cart here, as a Member.',
+            text: 'Soon, Members will be able to post their own carts on this page, with photos and details, for other buyers to see. Sign up as a Member now and you\'ll be ready when it opens.'
         }
     }
 ];
@@ -2049,7 +2146,7 @@ function getPageMeta(page, slug = null) {
         blogs: { title: `Stories and Guides | ${site}`, description: 'Company stories, buying guides and maintenance tips for low-speed electric vehicles.' },
         about: { title: `About | ${site}`, description: 'Golfcarts.ph, run by SJK Guahan Inc., sells, customizes and services low-speed electric vehicles for private roads.' },
         contact: { title: `Contact | ${site}`, description: 'Visit or call our branches in Manila, Cebu, Laguna and Clark, or send us a message.' },
-        golfer: { title: `Be a Golfer | ${site}`, description: 'An optional Golfer account: save your cart builds, see your quotes and get member news.' },
+        golfer: { title: `Be a Member | ${site}`, description: 'An optional Member account: save your cart builds, see your quotes and get member news.' },
         admin: { title: `Admin | ${site}`, description: defaultDescription },
         'not-found': { title: `Page not found | ${site}`, description: defaultDescription }
     };
@@ -2492,8 +2589,14 @@ function closeFinder() {
 
 function finderChoose(value) {
     if (finder.step === 1) finder = { step: 2, use: value, model: null };
-    else if (finder.step === 2) finder = { ...finder, step: 3, model: value };
-    else {
+    else if (finder.step === 2) {
+        // Seats chosen (2026-11-19): straight to the model page's builds (Step 3 there), the three side by side
+        const model = VEHICLE_MODELS[value];
+        closeFinder();
+        navigateTo('product-details', model.slug);
+        setTimeout(() => { if (typeof detailBuildFocus !== 'undefined') detailBuildFocus = false; scrollToDetailSection('build'); }, 350);
+        return;
+    } else {
         // The build: open its model page on it, at the build section
         const model = VEHICLE_MODELS[finder.model];
         closeFinder();
@@ -2542,8 +2645,8 @@ function renderFinder() {
     const trail = [use && use.label, model && model.label].filter(Boolean);
     dialog.innerHTML = `
         <div class="finder-head">
-            <ol class="finder-steps" aria-label="Step ${finder.step} of 3">
-                ${['Use', 'Seats', 'Build'].map((s, i) => `<li${i + 1 === finder.step ? ' aria-current="step"' : ''}${i + 1 < finder.step ? ' class="is-done"' : ''}><span class="finder-step-num" aria-hidden="true">${i + 1 < finder.step ? '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M3.5 8.5l3 3 6-7"/></svg>' : i + 1}</span>${s}</li>`).join('')}
+            <ol class="finder-steps" aria-label="Step ${finder.step} of 2">
+                ${['Use', 'Seats'].map((s, i) => `<li${i + 1 === finder.step ? ' aria-current="step"' : ''}${i + 1 < finder.step ? ' class="is-done"' : ''}><span class="finder-step-num" aria-hidden="true">${i + 1 < finder.step ? '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.25"><path d="M3.5 8.5l3 3 6-7"/></svg>' : i + 1}</span>${s}</li>`).join('')}
             </ol>
             <button type="button" onclick="closeFinder()" aria-label="Close" class="auth-close">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -2694,6 +2797,46 @@ function findProductRef(ref) {
     return PRODUCTS_DATA.find(p => p.slug === ref) || PRODUCTS_DATA.find(p => p.name.toLowerCase() === lower) || null;
 }
 
+// The quote form's location (2026-11-19): regions, then the chosen region's cities and municipalities as type-ahead
+// suggestions. The list loads once, when the form first opens; the last location used is filled in next time
+let PH_LOCATIONS = null;
+const QUOTE_LOCATION_KEY = 'gcph-quote-location';
+
+async function loadQuoteLocations() {
+    const region = document.getElementById('modal-region');
+    if (!region) return;
+    if (!PH_LOCATIONS) {
+        try { PH_LOCATIONS = await (await fetch('data/ph-locations.json')).json(); } catch (e) { PH_LOCATIONS = null; }
+        if (PH_LOCATIONS && region.options.length <= 1) region.insertAdjacentHTML('beforeend', PH_LOCATIONS.map(([r]) => `<option>${attrText(r)}</option>`).join(''));
+    }
+    // Filled in from last time, when the form is empty
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(QUOTE_LOCATION_KEY) || 'null'); } catch (e) { /* private mode */ }
+    if (saved && !region.value && PH_LOCATIONS && PH_LOCATIONS.some(([r]) => r === saved.region)) {
+        region.value = saved.region;
+        onQuoteRegionChange();
+        document.getElementById('modal-city').value = saved.city || '';
+    }
+}
+
+function onQuoteRegionChange() {
+    const region = document.getElementById('modal-region'), city = document.getElementById('modal-city');
+    const list = document.getElementById('modal-city-list');
+    const cities = ((PH_LOCATIONS || []).find(([r]) => r === region.value) || [, []])[1];
+    list.innerHTML = cities.map(c => `<option value="${attrText(c)}"></option>`).join('');
+    city.disabled = !region.value;
+    city.placeholder = region.value ? 'Start typing, then pick from the list' : 'Choose a region first';
+    if (city.value && !cities.includes(city.value)) city.value = '';
+}
+
+// "Makati City, NCR – National Capital Region" for the request; also kept for next time
+function quoteLocationText() {
+    const region = document.getElementById('modal-region'), city = document.getElementById('modal-city');
+    if (!region || !region.value) return '';
+    try { localStorage.setItem(QUOTE_LOCATION_KEY, JSON.stringify({ region: region.value, city: city.value.trim() })); } catch (e) { /* private mode */ }
+    return [city.value.trim(), region.value].filter(Boolean).join(', ');
+}
+
 // A custom cart's quote (2026-11-18): the form shows the cart's photo and name in place of the model list and the
 // accessories, and the request says which cart (its name, its photo number and a link to the photo)
 let quoteCustomCart = null;
@@ -2735,6 +2878,7 @@ function openQuoteModal(productName = '', notes = '') {
         quoteBuild = currentPage === 'product-details' ? getBuildDetails() : null;
         renderQuoteSummary();
         prefillGolferForms(modal);
+        loadQuoteLocations();
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
         quoteModalReturnFocus = document.activeElement;
@@ -2761,6 +2905,9 @@ async function handleModalQuoteSubmit(e) {
     const ids = [...(quoteBuild && select && select.value === quoteBuild.slug ? quoteBuild.bundleOptions || [] : [])];
     const custom = quoteCustomCart;
     if (!custom && !await offerLiftKit(select && select.value, rows, ids)) return;
+    // The location, a row of its own (2026-11-19)
+    const location = quoteLocationText();
+    if (location) rows.push(['Location', location]);
     // Everything the visitor chose goes into the request alongside their own notes
     const details = document.getElementById('quote-details');
     if (details) details.value = `Reference: ${refCode}\n${rows.map(([k, v]) => `${k}: ${v}`).join('\n')}`;
@@ -5818,6 +5965,10 @@ function selectDetailTrim(type, value, fromVisitor) {
     const label = document.getElementById(`detail-${type}-name`);
     if (label) label.textContent = value;
     if (type === 'seat') updateSeatPhoto(value);
+    if (type === 'seat' && detailBuild.options && detailBuild.options.flipSeat) {
+        const product = currentDetailProduct();
+        if (product && isTempoVersion(product)) { fixTempoSubChoices(product, detailLevelIndex(product), detailBuild.options); refreshTempoOptions(); }
+    }
     updateDetailBuildSummary();
 }
 
@@ -5827,10 +5978,12 @@ function updateSeatPhoto(value) {
     if (!panel) return;
     const product = PRODUCTS_DATA.find(p => p.slug === currentSlug);
     const family = product && COLOR_FAMILIES[product.colorFamily];
-    const photos = getSeatPhotos(family && family.seatGroups, value);
+    // A 2-seater has only the front seat (2026-11-19): the rear seat's photo is left out
+    const twoSeat = product && String(product.layout || '') === '2';
+    const photos = getSeatPhotos(family && family.seatGroups, value).slice(0, twoSeat ? 1 : undefined);
     panel.classList.toggle('hidden', !photos.length);
     if (!photos.length) return;
-    const labels = photos.length > 1 ? ['Front seat', 'Rear seat'] : [''];
+    const labels = photos.length > 1 ? ['Front seat', 'Rear seat'] : twoSeat ? ['Front seat'] : [''];
     panel.querySelector('.seat-photo-grid').innerHTML = photos.map((src, i) => `
         <figure class="seat-photo">
             <img src="${src}" alt="${value}${labels[i] ? ' ' + labels[i].toLowerCase() : ''}" loading="lazy">
@@ -6055,6 +6208,51 @@ function updateBuildSummaryLine() {
 
 // The "Your build" side panel beside Equipment and upgrades (Tempo builds): the build, its colors and every
 // choice made so far, with the quote button always in reach
+// The build's included items as [title, value]: what it comes with as it is (an upgrade chosen in its place shows
+// instead), its included items with alternatives (as chosen), and its standard wheel while that's the one chosen
+function buildIncludedItems(product, i, o) {
+    const all = getTempoOptionGroups(product, i);
+    return all.filter(g => isIncludedNow(g, o)).map(g => {
+        if (g.type === 'fixed') { const up = all.find(u => u.replaces === g.id), v = up && describeTempoChoice(product, i, up, o); return [g.title, v || g.value]; }
+        return [g.title, describeTempoChoice(product, i, g, o)];
+    }).filter(([, v]) => v);
+}
+
+// Included as the build stands: fixed items, included choices, and the wheels while on a standard (not upgrade) wheel
+function isIncludedNow(g, o) {
+    if (g.type === 'fixed') return true;
+    if (g.id === 'wheels') return !o.lift && g.upgradeFrom != null && g.options.indexOf(o.wheels) > -1 && !parseWheel(o.wheels);
+    return !!g.included;
+}
+
+// "Included with your build": its own box under the Your build panel
+function renderBuildIncluded(product) {
+    const i = detailLevelIndex(product), o = detailBuild.options || {};
+    const items = buildIncludedItems(product, i, o);
+    if (!items.length) return '';
+    return `
+        <p class="build-included-title">Included with your build</p>
+        <ul class="build-included-list">${items.map(([t, v]) => `<li><span class="build-included-check" aria-hidden="true">✓</span><span><span class="build-included-label">${t}</span>${v}</span></li>`).join('')}</ul>`;
+}
+
+// An included item with alternatives, closed: what the cart already has, and a way to change it (openIncludedGroup)
+function renderIncludedClosed(g, value) {
+    return `
+        <div class="opt-group" role="group" aria-label="${g.title}">
+            <div class="opt-group-head"><p class="opt-group-title">${g.title}</p><p class="opt-group-hint">Included</p></div>
+            <div class="opt-included-note">
+                <span class="build-included-check" aria-hidden="true">✓</span>
+                <div><p class="text-ink font-medium">${value}</p><p class="text-sm text-ink-2">Your cart already has this. Want to change it?</p></div>
+                <button type="button" onclick="openIncludedGroup('${g.id}')" class="btn btn-outline btn-sm">Change</button>
+            </div>
+        </div>`;
+}
+
+function openIncludedGroup(id) {
+    detailBuild.openIncluded = [...(detailBuild.openIncluded || []), id];
+    refreshTempoOptions();
+}
+
 function renderBuildPanel(product) {
     const buildSet = getProductBuildSet(product);
     const level = buildSet.builds.find(b => b.id === detailBuild.level) || buildSet.builds[0];
@@ -6067,7 +6265,7 @@ function renderBuildPanel(product) {
         ['Canopy', detailBuild.canopy || 'Standard', getTrimHex('canopy', detailBuild.canopy)]
     ].filter(([, v]) => v);
     const choices = getTempoOptionGroups(product, i)
-        .filter(g => g.type !== 'fixed')
+        .filter(g => !isIncludedNow(g, o))
         .map(g => [g.title, describeTempoChoice(product, i, g, o)])
         .filter(([, v]) => v);
     const row = (label, value, hex) => `
@@ -6103,6 +6301,8 @@ function updateBuildPanel() {
     const panel = document.getElementById('detail-build-panel');
     const product = currentDetailProduct();
     if (panel && product && isTempoVersion(product)) panel.innerHTML = renderBuildPanel(product);
+    const box = document.getElementById('detail-included');
+    if (box && product && isTempoVersion(product)) box.innerHTML = renderBuildIncluded(product);
 }
 
 // Choices for a new build level: keeps each earlier choice the new level still offers
@@ -6127,9 +6327,16 @@ function carryTempoOptions(product, i, prev) {
 
 // Keeps sub-choices valid (Lifestyle 2 and 4): a flip seat always has one of its colors, cooling needs an enclosure
 function fixTempoSubChoices(product, i, o) {
+    // The flip seat is upholstered like the front seat (2026-11-19): its colour is the seat chosen
     const flipColor = getTempoSubGroups(product, i, o).find(x => x.id === 'flipSeatColor');
-    o.flipSeatColor = flipColor ? (flipColor.options.includes(o.flipSeatColor) ? o.flipSeatColor : flipColor.options[0]) : '';
+    o.flipSeatColor = flipColor ? chosenSeatName(product, i) : '';
     if (!o.enclosure) o.cooling = false;
+    if (!o.lift) o.liftAddOns = []; // the lift's parts go with it (2026-11-19)
+}
+
+// The seat chosen on the page, else the build's own (the bundles' Included), else its first
+function chosenSeatName(product, i) {
+    return detailBuild.seat || catalogDefault(product, i, 'seat') || (tempoSeatNames(product, i) || [])[0] || '';
 }
 
 // Confirm (2026-11-19): the build is chosen and locked in, and the page moves on to its colors
@@ -6141,7 +6348,7 @@ function confirmBuildLevel(id) {
 }
 
 function selectBuildLevel(id) {
-    if (detailBuild.level !== id) detailBuild.confirmed = false;
+    if (detailBuild.level !== id) { detailBuild.confirmed = false; detailBuild.openIncluded = []; }
     detailBuild.level = id;
     // Another build is another photo: show the whole cart
     focusColorPart(null);
@@ -6203,6 +6410,7 @@ function pickTempoOption(id, index) {
     const i = detailLevelIndex(product);
     const group = findTempoGroup(product, i, id);
     if (!group) return;
+    if (group.locked) { showToast('Upgrade to lift first: these parts only fit a lifted cart.'); return; }
     if (group.upgradeFrom && index >= group.upgradeFrom && !detailBuild.options.wheelUpgrade) {
         openWheelUpgrade(index);
         return;
@@ -6220,13 +6428,15 @@ function toggleTempoOption(id, index) {
     const group = findTempoGroup(product, i, id);
     if (!group) return;
     const o = detailBuild.options;
+    if (group.locked) { showToast('Upgrade to lift first: these parts only fit a lifted cart.'); return; }
     if (group.type === 'flag') {
         if (group.requires && !o[group.requires]) return;
         o[id] = !o[id];
         if (group.unlocks === 'wheels') syncLiftWheels(product, i, o);
     } else {
         const value = group.options[index];
-        o[id] = o[id].includes(value) ? o[id].filter(x => x !== value) : [...o[id], value];
+        const same = (group.exclusive || []).find(set => set.includes(value)) || [];
+        o[id] = o[id].includes(value) ? o[id].filter(x => x !== value) : [...o[id].filter(x => !same.includes(x)), value];
     }
     fixTempoSubChoices(product, i, o);
     refreshTempoOptions();
@@ -6292,6 +6502,8 @@ function syncLiftWheels(product, i, o) {
     if (!wheels || !wheels.liftUnlocks) return;
     o.wheelUpgrade = !!o.lift;
     if (!o.lift && wheels.options.indexOf(o.wheels) >= wheels.upgradeFrom) o.wheels = wheels.options[0];
+    const cur = parseWheel(o.wheels);
+    if (o.lift && o.wheels !== LIFT_WHEEL_12 && !(cur && cur.size === 14)) o.wheels = wheelCombo(14, LIFT_KRAKEN_RIMS[0], LIFT_KRAKEN_TIRE);
 }
 
 // The 14" wheel upgrade: on, the 14" wheels can be picked; off, they lock again and a 14" choice goes back to
@@ -6587,6 +6799,8 @@ function optionSegments(items) {
 
 // What the visitor can do in a group, shown under its title
 function optionGroupHint(g) {
+    if (g.id === 'flipSeatColor') return 'Same as your seat';
+    if (g.locked) return 'Available with the lift kit';
     if (g.hint) return g.hint;
     if (g.included) return g.options.length > 1 ? 'Included, choose one' : 'Included';
     if (g.type === 'single') return g.upgradeFrom ? 'Choose one; upgrade rims are priced on top' : 'Choose one';
@@ -6598,7 +6812,104 @@ function optionGroupHint(g) {
 }
 
 // `cell`: a one-card group in a row of four (renderTempoSection): its title above the card, no hint
+// Wheels as rims and tires (VERSIONS_WHEELS): the standard wheels, then 12" and 14" rims; under the chosen rim, its
+// tires. 14" rims need the lift kit
+const WHEEL_PHOTO_BY_RIM = [
+    [/^8"/, 'wheel-8-steel'], [/^10"/, 'wheel-10-5spoke-gunmetal'],
+    [/^12" Triton/, 'wheel-12-triton-23105'], [/^12" Hela/, 'wheel-12-hela-215'],
+    [/^14" Aerion Gloss/, 'wheel-14-aerion-gloss-kraken'], [/^14" Aerion Black Chrome/, 'wheel-14-aerion-chrome-kraken'],
+    [/^14" Athena/, 'wheel-14-athena-gloss-kraken'], [/^14" Atlas/, 'wheel-14-atlas-gunmetal-kraken'], [/^14" Zeus/, 'wheel-14-zeus-kraken'],
+    [/^14" Mercury/, 'wheel-14-mercury-kraken'], [/^14" Nokken/, 'wheel-14-nokken-chrome'], [/^14" Gridlock Machined/, 'wheel-14-gridlock-machined-225'],
+    [/^14" Gridlock Gloss/, 'wheel-14-gridlock-gloss-225'], [/^14" Talon/, 'wheel-14-talon-225']
+];
+function wheelPhoto(text) {
+    const hit = WHEEL_PHOTO_BY_RIM.find(([re]) => re.test(text));
+    return hit ? `image/Options/${hit[1]}.jpg` : null;
+}
+
+function renderWheelPicker(g, o) {
+    const cur = parseWheel(o.wheels);
+    const card = (n, label, photoText) => optionCard({ key: `wheels:${g.options.indexOf(n)}`, label, photo: wheelPhoto(photoText || n), active: o.wheels === n,
+        onclick: `pickTempoOption('wheels', ${g.options.indexOf(n)})`, kind: 'radio', inline: true });
+    // Rims of one size as cards, and the chosen rim's tires underneath (only the tires `allow` lets through)
+    const rimCards = (size, allow, mode) => {
+        const rims = g.rims[size].filter(r => r.tires.some(allow));
+        const cards = rims.map(r => optionCard({ key: `wheels:${size}:${r.rim}`, label: `${size}" ${r.rim}`, photo: wheelPhoto(`${size}" ${r.rim}`),
+            active: !!cur && cur.size === size && cur.rim === r.rim && allow(cur.tire), onclick: `pickWheelRim(${size}, '${attrText(r.rim).replace(/'/g, "\\'")}', '${mode}')`, kind: 'radio', inline: true }));
+        const chosen = cur && cur.size === size && allow(cur.tire) && rims.find(r => r.rim === cur.rim);
+        const tires = chosen ? chosen.tires.filter(allow) : [];
+        return `<div class="opt-grid">${cards.join('')}</div>${tires.length > 1 ? `<div class="wheel-tires"><p class="opt-group-title">Tire for the ${size}" ${chosen.rim}</p>${optionSegments(tires.map(t => ({ key: `wheels:tire:${t}`, label: t, active: cur.tire === t, onclick: `pickWheelTire('${t}', '${mode}')` })))}</div>` : ''}`;
+    };
+    let body;
+    if (!o.lift) {
+        const std = g.options.slice(0, g.options.findIndex(n => parseWheel(n)));
+        body = `<div class="opt-grid">${std.map(n => card(n, g.labels[n])).join('')}</div>
+            <p class="opt-grid-label opt-upgrade-head"><span>12" rims</span></p>${rimCards(12, () => true, 'any')}
+            <p class="opt-grid-label opt-upgrade-head"><span>14" wheels come with the lift kit: upgrade to lift to choose them</span></p>`;
+    } else {
+        const size = cur ? cur.size : 14;
+        const kraken = size === 14 && cur && isKrakenTire(cur.tire);
+        body = `<p class="opt-group-title">Wheel size</p>${optionSegments([12, 14].map(s => ({ key: `wheels:size:${s}`, label: `${s}"`, active: size === s, onclick: `pickLiftedWheelSize(${s})` })))}`;
+        if (size === 12) {
+            body += `<div class="opt-grid mt-3">${card(LIFT_WHEEL_12, g.labels[LIFT_WHEEL_12] || LIFT_WHEEL_12)}</div>`;
+        } else {
+            body += `<p class="opt-group-title mt-4">Tire type</p>${optionSegments([['kraken', 'Kraken'], ['standard', 'Standard']].map(([k, label]) => ({ key: `wheels:type:${k}`, label, active: (k === 'kraken') === kraken, onclick: `pickLiftedTireType('${k}')` })))}`;
+            body += kraken
+                ? `<div class="opt-grid mt-3">${LIFT_KRAKEN_RIMS.map(r => { const n = wheelCombo(14, r, LIFT_KRAKEN_TIRE); return card(n, `14" ${r.replace('Nokken with Chrome inserts', 'Nokken Chrome')} rims, ${LIFT_KRAKEN_TIRE} tires`); }).join('')}</div>`
+                : `<div class="mt-3">${rimCards(14, t => !isKrakenTire(t), 'standard')}</div>`;
+        }
+    }
+    return `
+        <div class="opt-group" role="group" aria-label="${g.title}">
+            <div class="opt-group-head"><p class="opt-group-title">${g.title}</p><p class="opt-group-hint">${o.lift ? 'Lifted: choose 12" or 14"' : 'Choose a wheel, or a 12" rim and its tire'}</p></div>
+            ${body}
+        </div>`;
+}
+
+// A rim, keeping the tire when it fits; `mode` 'standard' (lifted 14") keeps to the non-Kraken tires
+function pickWheelRim(size, rim, mode) {
+    const product = currentDetailProduct(), i = detailLevelIndex(product);
+    const g = findTempoGroup(product, i, 'wheels'), o = detailBuild.options;
+    const r = g && g.rims[size].find(x => x.rim === rim);
+    if (!r) return;
+    const allow = mode === 'standard' ? t => !isKrakenTire(t) : () => true;
+    const tires = r.tires.filter(allow), cur = parseWheel(o.wheels);
+    o.wheels = wheelCombo(size, rim, cur && cur.size === size && tires.includes(cur.tire) ? cur.tire : tires[0]);
+    refreshTempoOptions();
+}
+
+function pickWheelTire(tire) {
+    const o = detailBuild.options, cur = parseWheel(o.wheels);
+    if (!cur) return;
+    o.wheels = wheelCombo(cur.size, cur.rim, tire);
+    refreshTempoOptions();
+}
+
+// Lifted: 12" is the one Athena on Kraken; 14" starts on the first Kraken wheel
+function pickLiftedWheelSize(size) {
+    const o = detailBuild.options, cur = parseWheel(o.wheels);
+    if (cur && cur.size === size) return;
+    o.wheels = size === 12 ? LIFT_WHEEL_12 : wheelCombo(14, LIFT_KRAKEN_RIMS[0], LIFT_KRAKEN_TIRE);
+    refreshTempoOptions();
+}
+
+function pickLiftedTireType(type) {
+    const o = detailBuild.options, cur = parseWheel(o.wheels);
+    if (type === 'kraken') o.wheels = cur && cur.size === 14 && LIFT_KRAKEN_RIMS.includes(cur.rim) ? wheelCombo(14, cur.rim, LIFT_KRAKEN_TIRE) : wheelCombo(14, LIFT_KRAKEN_RIMS[0], LIFT_KRAKEN_TIRE);
+    else o.wheels = wheelCombo(14, cur && cur.size === 14 && VERSIONS_WHEELS[14].rims.includes(cur.rim) ? cur.rim : VERSIONS_WHEELS[14].rims[0], VERSIONS_WHEELS[14].tires.find(t => !isKrakenTire(t)));
+    refreshTempoOptions();
+}
+
 function renderTempoGroup(g, o, nested, cell = false) {
+    const open = (detailBuild.openIncluded || []).includes(g.id);
+    if (!open && g.included && g.type === 'single' && g.options && g.options.length > 1) {
+        const product = currentDetailProduct();
+        return renderIncludedClosed(g, describeTempoChoice(product, detailLevelIndex(product), g, o) || g.options[0]);
+    }
+    if (g.id === 'wheels' && g.rims) {
+        if (!open && isIncludedNow(g, o)) return renderIncludedClosed(g, g.labels[o.wheels] || o.wheels);
+        return renderWheelPicker(g, o);
+    }
     let body = '';
     if (g.type === 'single' || g.type === 'optional' || g.type === 'multi') {
         const cards = [];
@@ -6613,23 +6924,20 @@ function renderTempoGroup(g, o, nested, cell = false) {
                     </div>`);
             }
             const multi = g.type === 'multi';
-            const active = multi ? (o[g.id] || []).includes(opt) : o[g.id] === opt;
-            const locked = g.upgradeFrom && k >= g.upgradeFrom && !o.wheelUpgrade;
+            const active = !g.locked && (multi ? (o[g.id] || []).includes(opt) : o[g.id] === opt);
+            const locked = g.locked || (g.upgradeFrom && k >= g.upgradeFrom && !o.wheelUpgrade);
             cards.push(optionCard({
                 key: `${g.id}:${k}`, label: (g.labels && g.labels[opt]) || opt, photo: optionPhoto(opt) || (g.options.length === 1 ? optionPhoto(g.id) : null), active,
                 onclick: multi ? `toggleTempoOption('${g.id}', ${k})` : `pickTempoOption('${g.id}', ${k})`,
                 kind: multi ? 'check' : 'radio',
-                note: locked ? 'Upgrade' : '',
-                extra: locked ? 'data-locked="true"' : '',
+                note: g.locked ? 'Needs the lift kit' : locked ? 'Upgrade' : '',
+                extra: g.locked ? 'data-locked="true" aria-disabled="true"' : locked ? 'data-locked="true"' : '',
                 inline: g.id === 'wheels'
             }));
         });
-        // Seat colors read better as swatches than as photo cards
+        // The flip seat's colour follows the seat chosen: shown, not chosen
         if (g.id === 'flipSeatColor') {
-            body = `<div class="flex flex-wrap gap-2">${g.options.map((opt, k) => `
-                <button type="button" onclick="pickTempoOption('${g.id}', ${k})" data-opt-key="${g.id}:${k}" aria-pressed="${o[g.id] === opt}" class="detail-trim ${o[g.id] === opt ? 'detail-trim-active' : ''}">
-                    <span class="detail-trim-dot" style="background:${getTrimHex('seat', opt) || '#D6D6CE'}"></span>${opt}
-                </button>`).join('')}</div>`;
+            body = `<p class="flex items-center gap-2 text-sm text-ink-2"><span class="detail-trim-dot" style="background:${getTrimHex('seat', o[g.id]) || '#D6D6CE'}"></span>Matches your seat: <span class="text-ink font-medium">${o[g.id] || 'Standard'}</span> <button type="button" onclick="scrollToDetailSection('colors')" class="link">Change seat color</button></p>`;
         } else {
             body = `<div class="opt-grid">${cards.join('')}</div>`;
         }
@@ -6710,21 +7018,46 @@ function renderTempoOptions(product) {
     const level = TEMPO_LINES[product.version].levels[i];
     const groups = getTempoOptionGroups(product, i);
     const subs = getTempoSubGroups(product, i, o);
-    const sections = [...new Set(groups.map(g => g.section))];
+    // A section with only fixed items (Included) has nothing to choose: left out
+    const sections = [...new Set(groups.filter(g => g.type !== 'fixed').map(g => g.section))];
     return `
         <p class="text-sm text-ink-2">Showing the <span class="text-ink font-medium">${buildTitleHtml(product, level)}</span> build. <button type="button" onclick="scrollToDetailSection('build')" class="link">Change build</button></p>
+        ${renderLiftUpgrade(groups, subs, o)}
         ${sections.map(section => {
             const inSection = groups.filter(g => g.section === section);
             return `
                 <div class="opt-section">
                     <h3 class="opt-section-title">${section}</h3>
                     ${section === 'Included'
-                        // What comes as it is, then what comes with a choice (battery, mirrors, windshield)
-                        // An included item whose upgrade is chosen shows the upgrade
-                        ? renderTempoIncluded(inSection.filter(g => g.type === 'fixed').map(g => { const up = groups.find(u => u.replaces === g.id); const v = up && describeTempoChoice(product, i, up, o); return v ? { ...g, value: v } : g; })) + inSection.filter(g => g.type !== 'fixed').map(g => renderTempoGroup(g, o, false)).join('')
+                        // The fixed items are in the box under Your build (2026-11-19); included choices stay here
+                        ? inSection.filter(g => g.type !== 'fixed').map(g => renderTempoGroup(g, o, false)).join('')
                         : renderTempoSection(inSection, subs, o)}
                 </div>`;
         }).join('')}`;
+}
+
+// The lift upgrade (2026-11-19), before the equipment: what lifting opens, and the button that does it. The same
+// switch as the Lift kit card further down
+function renderLiftUpgrade(groups, subs, o) {
+    const lift = groups.find(g => g.id === 'lift');
+    if (!lift) return '';
+    const wheels = groups.find(g => g.id === 'wheels' && g.liftUnlocks);
+    const opens = [
+        ...subs.filter(s => s.parent === 'lift').flatMap(s => s.id === 'liftFender' ? ['fenders'] : s.options.map(x => x.replace(/^GC /, ''))),
+        ...(wheels ? ['14" wheels and tires'] : [])
+    ];
+    const on = !!o.lift;
+    const photo = optionPhoto('lift') || optionPhoto(lift.label);
+    return `
+        <div class="lift-cta ${on ? 'is-on' : ''}">
+            ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async">` : ''}
+            <div class="lift-cta-body">
+                <p class="lift-cta-kicker">${on ? 'Lifted' : 'Upgrade to lift'}</p>
+                <p class="lift-cta-title">${lift.label}</p>
+                <p class="lift-cta-text">${on ? 'Now open: ' : 'Opens '}${opens.join(', ')}. These parts only fit a lifted cart.</p>
+            </div>
+            <button type="button" onclick="toggleTempoOption('lift')" class="btn ${on ? 'btn-outline' : 'btn-primary'}" aria-pressed="${on}">${on ? 'Remove the lift' : 'Upgrade to lift'}</button>
+        </div>`;
 }
 
 // Splits a spec like "100 km per charge" into a big number, a unit, and a small trailing note
@@ -6872,7 +7205,10 @@ function renderBuildSection(product, buildSet) {
     return `
         <section id="build" class="detail-section rise scroll-mt-32 home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12">
             <div class="grid lg:grid-cols-12 gap-8 lg:gap-12 items-end mb-8">
-                <h2 class="type-lg text-ink lg:col-span-7">${buildSet.title}</h2>
+                <div class="lg:col-span-7">
+                    ${isTempoVersion(product) ? '<p class="detail-step" data-step="3"><span class="sr-only">Step 3: </span>Choose your build</p>' : ''}
+                    <h2 class="type-lg text-ink">${buildSet.title}</h2>
+                </div>
                 ${buildSet.note ? `<p class="measure lg:col-span-5">${buildSet.note}</p>` : ''}
             </div>
 
@@ -7162,6 +7498,15 @@ function renderProductDetailsPage() {
             </div>
         </nav>
 
+        <!-- Tempo models (Golfer, Lifestyle) open on the specs, then Step 3 (2026-11-19): no hero; the name stays for
+             screen readers and search -->
+        ${isTempoVersion(product) ? `
+        <section id="overview" class="detail-section scroll-mt-32 pt-6 lg:pt-10">
+            <div class="sr-only">
+                <h1 id="detail-title">${product.name}</h1>
+                <p id="detail-tagline">${product.tagline}</p>
+            </div>
+        </section>` : `
         <!-- Hero: the model name set large beside a big studio shot -->
         <section id="overview" class="detail-section scroll-mt-32 bg-stone">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 pt-8 pb-12 lg:pb-16 grid lg:grid-cols-12 gap-8 lg:gap-12 items-end">
@@ -7181,7 +7526,8 @@ function renderProductDetailsPage() {
                     <div class="aspect-[4/3] overflow-hidden flex items-center justify-center">
                         <img id="detail-main-img" src="${product.image}" alt="${product.name}" fetchpriority="high" class="max-h-full w-auto object-contain mix-blend-multiply">
                     </div>
-                    ${product.gallery.length > 1 ? `
+                    <!-- The build thumbnails (Golfer / Scratch / Pro) were removed from Tempo pages 2026-11-19: Step 3 chooses the build -->
+                    ${product.gallery.length > 1 && !isTempoVersion(product) ? `
                         <div class="flex gap-2 justify-end" role="group" aria-label="Views">
                             ${product.gallery.map((img, i) => {
                                 const level = product.galleryLevels && buildSet && buildSet.builds.find(b => b.id === product.galleryLevels[i]);
@@ -7198,6 +7544,7 @@ function renderProductDetailsPage() {
             </div>
         </section>
 
+        `}
         <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
             ${stats.length ? `
                 <dl class="stat-strip" style="--stat-cols:${stats.length}">
@@ -7228,6 +7575,7 @@ function renderProductDetailsPage() {
         <!-- Colors: the preview stays pinned on desktop while the pickers scroll past it -->
         <section id="colors" class="detail-section colors-fit rise scroll-mt-32 home-section border-t border-line">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12">
+                ${isTempoVersion(product) ? '<p class="detail-step" data-step="4"><span class="sr-only">Step 4: </span>Choose your color</p>' : ''}
                 <h2 class="colors-fit-title text-ink">${bodyColors.length ? 'Your color. Your seat.' : 'Make it yours.'}</h2>
                 <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
                     <div class="lg:col-span-6 lg:sticky lg:top-36">
@@ -7274,7 +7622,10 @@ function renderProductDetailsPage() {
                         <h2 class="colors-fit-title text-ink">Equipment and upgrades.</h2>
                         <p class="text-sm text-ink-2 measure">What your build includes, and what you can add to it. The choices change with the build level.</p>
                     </div>
-                    <div id="detail-build-panel" class="build-panel lg:sticky lg:top-36" aria-live="polite">${renderBuildPanel(product)}</div>
+                    <div class="build-side lg:sticky lg:top-36">
+                        <div id="detail-build-panel" class="build-panel" aria-live="polite">${renderBuildPanel(product)}</div>
+                        <div id="detail-included" class="build-included">${renderBuildIncluded(product)}</div>
+                    </div>
                 </aside>
                 <div class="lg:col-span-8">
                     <div id="detail-options">${renderTempoOptions(product)}</div>
@@ -7420,7 +7771,9 @@ function photoTrioFront(card) {
 function renderSegmentPage() {
     const segment = NAV_SEGMENTS.find(s => s.id === currentSlug) || NAV_SEGMENTS[0];
     const buildSet = segment.version ? tempoBuildSet(segment.version) : null;
-    const photo = HOME_USES[segment.id];
+    // The page's photo is its homepage tile's (2026-11-19, the user's choice), else its own (HOME_USES)
+    const tile = HOME_USE_TILES.find(t => t.route === 'segment' && t.slug === segment.id);
+    const photo = tile ? { image: tile.image, alt: tile.alt } : HOME_USES[segment.id];
     const jumpLinks = [
         ...(segment.subcategories.length > 1 ? segment.subcategories.map(sub => ({ label: sub.label, anchor: sub.id })) : []),
         ...(segment.links || []).map(l => ({ label: l.label, anchor: l.anchor }))
@@ -7480,7 +7833,7 @@ function renderSegmentPage() {
                         <p class="measure">${segment.comingSoon.text}</p>
                     </div>
                     <div class="lg:col-span-5 flex flex-wrap gap-4 lg:justify-end">
-                        <button type="button" onclick="golferHeaderClick()" class="btn btn-primary">Be a Golfer</button>
+                        <button type="button" onclick="golferHeaderClick()" class="btn btn-primary">Be a Member</button>
                         <button type="button" onclick="openQuoteModal('', 'I would like to sell my cart.')" class="btn btn-outline">Ask about selling</button>
                     </div>
                 </div>
@@ -7540,7 +7893,7 @@ function renderSolutionsPage() {
                 <p class="measure lg:col-span-5">Tell us how your operation runs. We'll recommend the vehicles, the service plan and the replacement schedule.</p>
             </div>
             <div class="mt-12 aspect-[16/9] md:aspect-[21/9] overflow-hidden">
-                <img src="image/4.png" alt="A fleet of Tempo carts lined up for delivery under palm trees" width="1920" height="1080" fetchpriority="high" class="w-full h-full object-cover object-[50%_80%]">
+                <img src="${HOME_USE_TILES.find(t => t.route === 'solutions').image}" alt="${HOME_USE_TILES.find(t => t.route === 'solutions').alt}" width="5328" height="4000" fetchpriority="high" class="w-full h-full object-cover">
             </div>
         </section>
 
