@@ -3412,8 +3412,9 @@ function renderHomeUses() {
     const tile = (t, aspect) => {
         const seg = t.slug ? NAV_SEGMENTS.find(s => s.id === t.slug) : null;
         return `
-            <a href="${routeHref(t.route, t.slug)}" data-route="${t.route}"${t.slug ? ` data-slug="${t.slug}"` : ''} class="group block">
-                <div class="media-zoom edge-light ${aspect}${t.whole ? ' media-whole' : ''}">
+            <!-- Not a link for now (2026-11-19, the user's choice): the tiles show the uses without opening their pages -->
+            <div class="block">
+                <div class="overflow-hidden ${aspect}${t.whole ? ' media-whole' : ''}">
                     ${t.whole ? `<span class="media-whole-bg" style="background-image: url('${t.image}')" aria-hidden="true"></span>` : ''}
                     <img src="${t.image}" alt="${t.alt}" width="${t.width}" height="${t.height}" loading="lazy" decoding="async" class="w-full h-full ${t.whole ? 'object-contain' : 'object-cover'}">
                 </div>
@@ -3421,7 +3422,7 @@ function renderHomeUses() {
                     <h3 class="type-lg text-ink">${t.label || seg.label}</h3>
                     <p class="measure">${t.tagline || seg.tagline}</p>
                 </div>
-            </a>`;
+            </div>`;
     };
     return `
         <section class="rise home-section bg-paper" aria-labelledby="home-uses-title">
