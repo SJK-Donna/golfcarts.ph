@@ -3043,6 +3043,7 @@ function renderApp() {
     } else if (currentPage === 'product-details') {
         viewport.innerHTML = renderProductDetailsPage();
         initDetailDepth();
+        updateConfirmGate();
         // Name a Tempo's page after the build it opens on
         const opened = currentDetailProduct();
         if (opened && detailBuild.level) updateDetailBuildText(opened);
@@ -3232,7 +3233,7 @@ const HOME_BANNERS = [
     { image: 'image/Hero/hero3.jpg', alt: 'Meet our GC Red Series!', cta: 'See the Red Series', route: 'product-details', slug: 'golfer-tempo-2' },
     // A video banner (2026-11-18): "video" plays while the slide shows; "image" is its first frame, shown while it
     // loads and when motion is turned down. The slide lasts as long as the video
-    { image: 'image/Hero/hero-rebuilds.jpg', video: 'image/Hero/hero-rebuilds.mp4', alt: 'Shop now: reman or your cart? Browse our reman golf carts and find the one that fits your game.', cta: 'Shop Our Rebuilds', route: 'segment', slug: 'remanufactured' }
+    { image: 'image/Hero/hero-rebuilds.jpg', video: 'image/Hero/hero-rebuilds.mp4', alt: 'Certified pre-owned Club Car carts: dealer-certified rebuilt cart deals, every model built to order with either battery setup.', cta: 'Shop Our Rebuilds', route: 'segment', slug: 'remanufactured' }
 ];
 const HOME_BANNER_MS = 3000;
 const HOME_BANNER_VIDEO_MS = 4300; // until the video says how long it is
@@ -6364,11 +6365,41 @@ function confirmBuildLevel(id) {
     if (detailBuild.level !== id) selectBuildLevel(id);
     detailBuild.confirmed = true;
     redrawBuildSection();
+    updateConfirmGate();
     scrollToDetailSection('colors');
 }
 
+// Until a build is confirmed (2026-11-25, the user's rule), the sections after it (colors, equipment) are locked:
+// shown faded under a notice, and a click in them says to confirm first
+const CONFIRM_GATED = ['colors', 'options'];
+const CONFIRM_NOTE = 'You need to confirm your build first to proceed to the next section.';
+
+function updateConfirmGate() {
+    const product = currentDetailProduct();
+    const locked = !!product && isTempoVersion(product) && !detailBuild.confirmed;
+    CONFIRM_GATED.forEach(id => {
+        const section = document.getElementById(id);
+        if (!section) return;
+        section.classList.toggle('needs-confirm', locked);
+        let note = section.querySelector(':scope > .confirm-gate');
+        if (locked && !note) {
+            section.insertAdjacentHTML('afterbegin', `<div class="confirm-gate" role="note"><p>${CONFIRM_NOTE}</p><button type="button" onclick="scrollToDetailSection('build')" class="btn btn-primary btn-sm">Go to Step 3: Choose your build</button></div>`);
+        } else if (!locked && note) note.remove();
+    });
+}
+
+// A click inside a locked section (not on its notice): the message, and back to the builds
+document.addEventListener('click', e => {
+    const section = e.target.closest && e.target.closest('.needs-confirm');
+    if (!section || e.target.closest('.confirm-gate')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    showToast(CONFIRM_NOTE);
+    scrollToDetailSection('build');
+}, true);
+
 function selectBuildLevel(id) {
-    if (detailBuild.level !== id) { detailBuild.confirmed = false; detailBuild.openIncluded = []; }
+    if (detailBuild.level !== id) { detailBuild.confirmed = false; detailBuild.openIncluded = []; setTimeout(updateConfirmGate, 0); }
     detailBuild.level = id;
     // Another build is another photo: show the whole cart
     focusColorPart(null);
