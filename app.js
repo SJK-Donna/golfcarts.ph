@@ -8833,6 +8833,7 @@ function renderBlogsPage() {
             ${lead && guides.length ? `<nav class="story-jump" aria-label="On this page">
                 <a href="blog/#stories-news">News and events</a>
                 <a href="blog/#guides">Guides</a>
+                <a href="blog/#faq">FAQ's</a>
             </nav>` : ''}
         </section>
 
@@ -8895,6 +8896,9 @@ function renderBlogsPage() {
                 </div>
             </section>
         ` : ''}
+
+        <!-- FAQ's (2026-11-25): the homepage's questions and answers, on the menu's Stories & FAQ's page too -->
+        <div id="faq" class="scroll-mt-24 pt-16 lg:pt-24">${renderHomeFaq()}</div>
     `;
 }
 

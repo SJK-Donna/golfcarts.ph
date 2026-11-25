@@ -1044,8 +1044,13 @@ function renderPageTextBar() {
         <button type="button" onclick="savePageText(this)" class="page-text-save"${changed ? '' : ' disabled'}>Save</button>`, 'page-text-bar');
 }
 
+// What the page's edits were when editing began: on Save, only what changed since then is written, on top of the
+// latest saved copy, so two people editing the same page don't erase each other's changes (2026-11-25)
+let pageTextBase = null;
+
 function startPageTextEditing() {
     pageTextDraft = clone(pageTextSaved());
+    pageTextBase = clone(pageTextDraft);
     pageTextDraftKey = pageTextKey();
     document.body.classList.add('page-editing');
     // The banners stop turning, so the one being edited stays (the lines under them still change banner)
@@ -1077,15 +1082,31 @@ function removeStalePageText() {
 
 async function savePageText(button) {
     button.disabled = true;
-    const items = pageTextDraft, key = pageTextDraftKey;
+    const items = pageTextDraft, key = pageTextDraftKey, base = pageTextBase || {};
     endPageTextEditing();
-    const own = Object.fromEntries(Object.entries(items).filter(([k]) => !k.startsWith('~')));
-    const site = Object.fromEntries(Object.entries(items).filter(([k]) => k.startsWith('~')));
-    const siteBefore = ((siteEdits[SITE_TEXT_KEY] || {}).value || {}).items || {};
-    let ok = true;
-    if (JSON.stringify(site) !== JSON.stringify(siteBefore)) ok = await saveSiteEdit(SITE_TEXT_KEY, Object.keys(site).length ? { items: site } : null, 'Header and footer saved.');
-    if (ok) ok = await saveSiteEdit(key, Object.keys(own).length ? { items: own } : null, key === 'home-text' ? 'Homepage text saved.' : 'Page text saved.');
-    if (!ok) { pageTextDraft = items; pageTextDraftKey = key; document.body.classList.add('page-editing'); applyPageText(); }
+    // Only the items this person changed since they began (added, edited or removed)
+    const changed = [...new Set([...Object.keys(items), ...Object.keys(base)])]
+        .filter(k => JSON.stringify(items[k]) !== JSON.stringify(base[k]));
+    let ok = true, clashes = 0;
+    // Each record (this page's, and the header and footer's) is re-read just before saving; the changed items go on
+    // top of it, so what someone else saved meanwhile stays. An item both changed: this save's version, with a notice
+    for (const [rowKey, mine] of [[SITE_TEXT_KEY, k => k.startsWith('~')], [key, k => !k.startsWith('~')]]) {
+        const keys = changed.filter(mine);
+        if (!keys.length) continue;
+        const { data, error } = await sb.from('site_edits').select('value').eq('key', rowKey).maybeSingle();
+        if (error) { showToast(`Not saved: ${error.message}`); ok = false; break; }
+        const latest = { ...((data && data.value && data.value.items) || {}) };
+        keys.forEach(k => {
+            if (JSON.stringify(latest[k]) !== JSON.stringify(base[k])) clashes++;
+            if (items[k] === undefined) delete latest[k]; else latest[k] = items[k];
+        });
+        ok = await saveSiteEdit(rowKey, Object.keys(latest).length ? { items: latest } : null,
+            rowKey === SITE_TEXT_KEY ? 'Header and footer saved.' : key === 'home-text' ? 'Homepage text saved.' : 'Page text saved.');
+        if (!ok) break;
+    }
+    if (ok && !changed.length) showToast('Nothing changed.');
+    if (ok && clashes) showToast(`Saved. ${clashes} of your changes replaced someone else's change to the same text, saved while you were editing.`);
+    if (!ok) { pageTextDraft = items; pageTextDraftKey = key; pageTextBase = base; document.body.classList.add('page-editing'); applyPageText(); }
 }
 
 // While editing, a click on the page picks a text instead of following links or buttons
