@@ -1245,7 +1245,23 @@ function tempoBuildSet(line, layout) {
 
 function getProductBuildSet(product) {
     if (!product) return null;
-    return isTempoVersion(product) ? tempoBuildSet(product.version, product.layout) : BUILD_SETS[product.buildSet] || null;
+    if (!isTempoVersion(product)) return BUILD_SETS[product.buildSet] || null;
+    // The cards' colour counts and lights are this model's own, as the builder offers them (2026-11-20): the counts
+    // and the lights in the shared text could say "3 seat colors" where the model's build has 2
+    const set = tempoBuildSet(product.version, product.layout);
+    return { ...set, builds: set.builds.map((b, i) => {
+        let groups = [];
+        try { groups = getTempoOptionGroups(product, i); } catch (e) { return b; }
+        const lights = groups.find(g => g.id === 'lighting');
+        const lightText = !lights ? null : lights.type === 'fixed' ? lights.value
+            : `${lights.bundleDefault || lights.options[0]}${lights.options.length > 1 ? `, or ${lights.options.length - 1} other light kit${lights.options.length > 2 ? 's' : ''}` : ''}`;
+        const includes = b.includes.map(line => {
+            if (/body colors?, \d+ seat colors?/.test(line)) return `${getProductBodyColors(product, i).length} body colors, ${tempoSeatNames(product, i).length} seat colors`;
+            if (lightText && /light/i.test(line) && !/^No headlights$/.test(line)) return lightText;
+            return line;
+        });
+        return { ...b, includes };
+    }) };
 }
 
 // What a Tempo build carries and offers, from its bundle (see TEMPO_MATRIX). `big`: the 4 and 4+2 layouts
@@ -3181,8 +3197,10 @@ function renderHomeClubCar() {
     return `
         <section id="home-clubcar" class="rise home-section max-w-site mx-auto px-5 sm:px-8 lg:px-12" aria-labelledby="home-clubcar-title">
             <div class="clubcar-band grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
-                <div class="lg:col-span-5">
+                <!-- With the PGA logo under it (2026-11-25; its light grey ground made transparent) -->
+                <div class="lg:col-span-5 flex flex-col gap-8">
                     <img src="image/Brand/club-car-logo.png" alt="Club Car" width="800" height="271" loading="lazy" class="w-full max-w-[15rem] sm:max-w-[22rem] lg:max-w-[26rem] h-auto">
+                    <img src="image/Brand/pga-logo.png" alt="PGA of America" width="1116" height="325" loading="lazy" class="w-full max-w-[15rem] sm:max-w-[22rem] lg:max-w-[26rem] h-auto">
                 </div>
                 <div class="lg:col-span-7 space-y-6">
                     <h2 id="home-clubcar-title" class="type-lg text-ink">Why Club Car Stood Out</h2>
@@ -4314,9 +4332,11 @@ function renderHomeTrust() {
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-12">
                 <div class="lg:col-span-4 space-y-10">
                     <h2 id="home-trust-title" class="type-lg text-ink">Running on courses, resorts and sites across the Philippines.</h2>
-                    <dl class="grid grid-cols-2 gap-8 border-t border-line pt-8">
-                        <div><dt class="text-sm text-mute">Clients</dt><dd class="type-xl text-ink mt-2">${CLIENT_LOGOS.length}+</dd></div>
-                        <div><dt class="text-sm text-mute">Branches</dt><dd class="mt-2"><a href="./#home-branches" onclick="event.preventDefault(); goToHomeSection('home-branches')" class="group inline-flex items-baseline gap-3"><span class="type-xl text-ink">${BRANCHES.length}</span><span class="link text-sm">See the map</span></a></dd></div>
+                    <!-- Branches, clients and carts sold (2026-11-25, the user's figures) -->
+                    <dl class="home-trust-stats grid grid-cols-3 gap-6 border-t border-line pt-8">
+                        <div><dt class="text-sm text-mute">Branches</dt><dd class="mt-2"><a href="./#home-branches" onclick="event.preventDefault(); goToHomeSection('home-branches')" class="group block"><span class="type-lg text-ink block">${BRANCHES.length}</span><span class="link text-sm">See the map</span></a></dd></div>
+                        <div><dt class="text-sm text-mute">Clients</dt><dd class="type-lg text-ink mt-2">1k+</dd></div>
+                        <div><dt class="text-sm text-mute">Carts sold</dt><dd class="type-lg text-ink mt-2">2,000+</dd></div>
                     </dl>
                 </div>
                 <div class="lg:col-span-8">
@@ -5355,9 +5375,9 @@ const ACCESSORY_CATALOG = [
     ] },
     { group: 'Rain Enclosures', items: [
         { id: 'enc-onward-black', slot: 'enclosure', builder: 'enclosure', name: 'Two-Sided Rain Enclosure (Black)', fits: ['onward'] },
-        { id: 'enc-2-beige', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Beige)', sku: 'SJK-1855', fits: ['tempo-2'], product: 'acc-golf-cover' },
-        { id: 'enc-2-white', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (White)', sku: 'SJK-1856', fits: ['tempo-2'], product: 'acc-golf-cover' },
-        { id: 'enc-2-black', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Black)', sku: 'SJK-1509', fits: ['tempo-2'], product: 'acc-golf-cover' },
+        { id: 'enc-2-beige', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Beige)', sku: 'SJK-1855', fits: ['tempo-2'], product: 'acc-golf-cover', image: 'image/Options/enclosure-3-beige.jpg' },
+        { id: 'enc-2-white', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (White)', sku: 'SJK-1856', fits: ['tempo-2'], product: 'acc-golf-cover', image: 'image/Options/enclosure-3-white.jpg' },
+        { id: 'enc-2-black', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Black)', sku: 'SJK-1509', fits: ['tempo-2'], product: 'acc-golf-cover', image: 'image/Options/enclosure-3-black.jpg' },
         { id: 'enc-22-black', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Black)', sku: 'SJK-0467', fits: ['tempo-2+2'] },
         { id: 'enc-22-beige', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Beige)', fits: ['tempo-2+2'] },
         { id: 'enc-22-white', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (White)', sku: 'SJK-1905', fits: ['tempo-2+2'] },
@@ -7001,6 +7021,8 @@ function renderTempoSection(groups, subs, o) {
     const flush = () => { if (cells.length) html.push(`<div class="opt-cells">${cells.join('')}</div>`); cells = []; };
     groups.forEach(g => {
         const children = subs.filter(s => s.parent === g.id);
+        // The lift kit's own card is the panel at the top (renderLiftUpgrade, 2026-11-20): only its parts show here
+        if (g.id === 'lift') { flush(); if (children.length) html.push(`<div class="opt-subpanel">${children.map(s => renderTempoGroup(s, o, true)).join('')}</div>`); return; }
         if (g.type === 'flag' && !children.length) { cells.push(renderTempoGroup(g, o, false, true)); return; }
         flush();
         html.push(renderTempoGroup(g, o, false)
@@ -7053,8 +7075,6 @@ function renderLiftUpgrade(groups, subs, o) {
             ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async">` : ''}
             <div class="lift-cta-body">
                 <p class="lift-cta-kicker">${on ? 'Lifted' : 'Upgrade to lift'}</p>
-                <p class="lift-cta-title">${lift.label}</p>
-                <p class="lift-cta-text">${on ? 'Now open: ' : 'Opens '}${opens.join(', ')}. These parts only fit a lifted cart.</p>
             </div>
             <button type="button" onclick="toggleTempoOption('lift')" class="btn ${on ? 'btn-outline' : 'btn-primary'}" aria-pressed="${on}">${on ? 'Remove the lift' : 'Upgrade to lift'}</button>
         </div>`;
