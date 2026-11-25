@@ -45,6 +45,11 @@ jobs:
         with:
           path: dist
 
+      # The upload is large (about 490 MB of photos and video): GitHub can take a little while to list it, and the
+      # deploy step failed finding none ("No artifacts named github-pages", 2026-11-25). A short wait first
+      - name: Wait for the upload to register
+        run: sleep 45
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
