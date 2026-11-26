@@ -925,6 +925,14 @@ const TEMPO_MATRIX = {
 
 // ---- Lifestyle 2 and Lifestyle 4: the builder as it was before the builds followed the bundles (they have no
 // bundle yet; the user asked to keep them as they were, 2026-11-06). Used only for those two models, see isLegacyTempo
+// What a side of the cart can hold (2026-11-26): the included Caddy Master cooler, the Premium Caddie Cooler
+// (SJK-1363, an upgrade), a ball washer, or nothing. Every [left, right] pair but two washers and two empty sides,
+// two Caddy Master coolers first (the default)
+const GOLF_SIDE_NAMES = { cooler: 'Caddy Master cooler', premium: 'Premium Caddie Cooler', washer: 'Ball washer' };
+const GOLF_SIDE_PAIRS = (() => {
+    const kinds = ['cooler', 'premium', 'washer', null];
+    return kinds.flatMap(l => kinds.map(r => [l, r])).filter(([l, r]) => !(l === 'washer' && r === 'washer') && (l || r));
+})();
 const TEMPO_MIRRORS_LEGACY = ['Side Mirrors', 'Side Mirrors with Turn Signal', '5 Panel Mirror', 'Convex Inner Mirror (short)', 'Convex Inner Mirror (long)'];
 const TEMPO_THREE_SIDED_LEGACY = ['Three-sided rain enclosure, Beige', 'Three-sided rain enclosure, White', 'Three-sided rain enclosure, Black'];
 const WHEEL_STEEL_LEGACY = '8" steel rims with cover';
@@ -944,7 +952,8 @@ const TEMPO_MATRIX_LEGACY = {
     // The document has no included floor mat, mirrors or audio: the floor mat is an upgrade on every build, and
     // mirrors and audio are upgrades (below). The speed code is included on Pro / Elite, a paid option below
     floorMat: { golfer: [false, false, false], lifestyle: [false, false, false] },
-    mirrorPackage: { golfer: [false, false, false], lifestyle: [false, false, false] },
+    // Included mirrors, by name: Lifestyle Essential comes with side mirrors (2026-11-26, the user's choice)
+    mirrorPackage: { golfer: [false, 'Side Mirrors', false], lifestyle: ['Side Mirrors', 'Side Mirrors', false] }, // Scratch and Signature too (2026-11-26)
     audio: { golfer: [null, null, null], lifestyle: [null, null, null] },
     speedCodeIncluded: [false, false, true],
     wheels: [[WHEEL_STEEL_LEGACY], [WHEEL_STEEL_LEGACY, WHEEL_TRITON, WHEEL_HELA], [WHEEL_ALLOY, WHEEL_TRITON, WHEEL_HELA]],
@@ -963,6 +972,8 @@ const TEMPO_MATRIX_LEGACY = {
         // Golf has none (Versions.docx); Scratch and Pro may drop theirs, but don't start without (2026-11-26)
         golfer: [[],
             ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights', 'No headlight'], ['Club Car Tempo Deluxe Light Kit', 'No headlight']],
+        // Signature: the GC Apex or the GC Tempo LED headlights and tail lights (Versions.docx; GC Tempo LED Headlights and
+        // No headlight taken out, 2026-11-26, the user's choice)
         lifestyle: [['GC Tempo LED Headlights & Tail Lights'], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']]
     },
     // Golfer 2 and 4 golf accessories, all included: Golf the black GC bag cover only; Scratch a GC bag cover (black,
@@ -972,15 +983,17 @@ const TEMPO_MATRIX_LEGACY = {
     bagCover: [['GC Bag Cover, Black'],
         ['GC Bag Cover, Black', 'GC Bag Cover, Beige', 'GC Bag Cover, White', 'CC Magnetic Bag Cover, Black', 'CC Magnetic Bag Cover, Beige'],
         ['CC Magnetic Bag Cover, Black', 'CC Magnetic Bag Cover, Beige']],
-    // Side attachment (2026-11-26, the user's rule): a Caddy Master cooler goes on both sides; a ball washer on the left
-    // or the right only; sand bottles none, left, right or both
+    // Side attachment (2026-11-26, the user's rule): each side takes a cooler (the Caddy Master, included, or the
+    // Premium Caddie Cooler SJK-1363), a ball washer, or nothing: a cooler on the left, the right or both, one ball
+    // washer at most; sand bottles none, left, right or both. golfSideItems lists every pair [left, right] (the first
+    // is the default); golfSides names them
     sandBottles: ['Sand bottle with mounting bracket', 'Two sand bottles with mounting brackets'],
-    golfSides: ['Two Caddy Master coolers', 'Ball washer, left side', 'Ball washer, right side'],
-    golfSideItems: [['cooler', 'cooler'], ['washer', null], [null, 'washer']],
+    golfSideItems: GOLF_SIDE_PAIRS,
+    golfSides: GOLF_SIDE_PAIRS.map(([l, r]) => [l && `${GOLF_SIDE_NAMES[l]} left`, r && `${GOLF_SIDE_NAMES[r]} right`].filter(Boolean).join(', ')),
     golfExtras: [false, true, true],
     lifestyleCooler: [false, true, true], // an add-on on the Lifestyle builds
     lift: [true, true, true],            // Lifted 3.5" GC lift kit, an option on every level
-    liftFenders: ['Tempo Fenders 3"', 'Tempo Fenders 1.5"', 'Onward Fender Flare Kit'],
+    liftFenders: ['Tempo Fenders'], // the 3" kit, named without its size; the 1.5" and the Onward Fender Flare Kit taken out (2026-11-26, the user's choice)
     liftAddOns: ['GC Brush Guard', 'Nerf Bar'],
     // +2 layouts: the included rear flip seat, by line and layout (Golfer Pro may take the Club Car premium seat
     // instead), and its colours
@@ -1004,7 +1017,11 @@ const TEMPO_MATRIX_LEGACY = {
     audioUpgrades: [[], [], ['Apple CarPlay']],
     electronicsAddOns: [[], [], ['Wireless Charging']],
     // Pro / Elite: one overhead attachment (2026-11-26)
-    overhead: [[], [], ['Overhead Storage Console', '5 Panel Mirror', 'GC Sound Bar 27" RGB', 'Club Car Premium Sound Bar']],
+    // Scratch has one too (2026-11-26, the user's choice): the GC sound bar, the storage console or the 5 panel mirror
+    overhead: {
+        golfer: [[], ['GC Sound Bar 27" RGB', 'Overhead Storage Console', '5 Panel Mirror'], ['Overhead Storage Console', '5 Panel Mirror', 'GC Sound Bar 27" RGB', 'Club Car Premium Sound Bar']],
+        lifestyle: [[], ['GC Sound Bar 27" RGB', 'Overhead Storage Console', '5 Panel Mirror'], ['Overhead Storage Console', '5 Panel Mirror', 'GC Sound Bar 27" RGB', 'Club Car Premium Sound Bar']]
+    },
     // Included on Pro / Elite, quoted as two items: the wheel and the scorecard holder (2026-11-26)
     steering: [[], [], ['Premium Steering Wheel', 'Scorecard holder']],
     // Mirrors, as upgrades on Scratch / Signature and Pro / Elite
@@ -1067,7 +1084,7 @@ function getTempoOptionGroupsLegacy(product, i) {
 
     // Included. Ids match the quote accessories they make redundant (see getBuildDetails)
     include('battery', 'Battery', m.battery[i]);
-    if (m.mirrorPackage[line][i]) include('mirrors', 'Mirrors', 'Mirror package');
+    if (m.mirrorPackage[line][i]) include('sideMirrors', 'Side mirrors', typeof m.mirrorPackage[line][i] === 'string' ? m.mirrorPackage[line][i] : 'Mirror package');
     if (m.floorMat[line][i]) include('floorMat', 'Floor mat', 'GC floor mat');
     if (m.audio[line][i]) include('electronics', 'Audio', m.audio[line][i]);
     if (m.speedCodeIncluded[i]) include('speedCode', 'Speed code', 'Included, no fee');
@@ -1103,8 +1120,16 @@ function getTempoOptionGroupsLegacy(product, i) {
                 const sides = Object.fromEntries(m.golfSides.map((name, k) => [name, m.golfSideItems[k]]));
                 add({ id: 'ballWasher', covers: ['cooler'], section: 'Accessories', title: 'Ball washer and cooler', type: 'single',
                     hint: 'Included, choose one. One ball washer per cart, on the left or the right', options: m.golfSides, included: true, sides,
-                    quoteRows: Object.fromEntries(Object.entries(sides).map(([name, [left, right]]) =>
-                        [name, [left && ['Golf accessory, left side', sideName[left]], right && ['Golf accessory, right side', sideName[right]]].filter(Boolean)])) });
+                    // The Premium Caddie Cooler has its own row (the bundles' side items are the Caddy Master and the washer),
+                    // one row for both sides
+                    quoteRows: Object.fromEntries(Object.entries(sides).map(([name, [left, right]]) => {
+                        const premium = [left === 'premium' && 'left', right === 'premium' && 'right'].filter(Boolean);
+                        return [name, [
+                            left && left !== 'premium' && ['Golf accessory, left side', sideName[left]],
+                            right && right !== 'premium' && ['Golf accessory, right side', sideName[right]],
+                            premium.length && ['Premium caddie cooler', `Premium Caddie Cooler (SJK-1363), ${premium.length === 2 ? 'x2, left and right' : premium[0] + ' side'}`]
+                        ].filter(Boolean)];
+                    })) });
             }
         }
         if (layout === '2') add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
@@ -1114,7 +1139,8 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (plusTwo) add({ id: 'flipSeat', section: 'Accessories', title: 'Rear flip seat', type: 'single', options: m.flipSeat[line][product.layout][i], included: true });
 
     // Upgrades (lithium is standard on Pro / Elite)
-    if (i < 2) add({ id: 'batteryUpgrade', section: 'Upgrades', title: 'Lithium battery', type: 'flag', label: m.batteryUpgrade, replaces: 'battery' });
+    // Scratch / Signature only: Golf / Essential has no battery upgrade (2026-11-26, the user's choice)
+    if (i === 1) add({ id: 'batteryUpgrade', section: 'Upgrades', title: 'Lithium battery', type: 'flag', label: m.batteryUpgrade, replaces: 'battery' });
     if (!m.speedCodeIncluded[i]) add({ id: 'speedCode', section: 'Upgrades', title: 'Speed code', type: 'flag', label: 'Speed code (with fee)' });
     if (m.lift[i]) add({ id: 'lift', section: 'Upgrades', title: 'Lift kit', type: 'flag', label: 'Lifted 3.5" GC lift kit' });
     if (plusTwo && line === 'lifestyle') {
@@ -1123,9 +1149,13 @@ function getTempoOptionGroupsLegacy(product, i) {
     }
     if (m.audioUpgrades[i].length) add({ id: 'audio', section: 'Upgrades', title: 'Audio', type: 'multi', options: m.audioUpgrades[i] });
     if (m.electronicsAddOns[i].length) add({ id: 'charging', section: 'Upgrades', title: 'Charging', type: 'multi', options: m.electronicsAddOns[i] });
-    if (m.steering[i].length) { include('steering', 'Steering wheel', m.steering[i][0]); include('scorecard', 'Scorecard holder', m.steering[i][1]); }
-    if (m.overhead[i].length) add({ id: 'overhead', covers: ['audio'], section: 'Accessories', title: 'Overhead attachment', type: 'optional', options: m.overhead[i] });
-    add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'flag', label: 'Tinted windshield' });
+    // Driver attachment (2026-11-26, the user's choice): an upgrade, one tick for the premium steering wheel and its
+    // scorecard holder, quoted as two lines
+    if (m.steering[i].length) add({ id: 'steering', section: 'Upgrades', title: 'Driver attachment', type: 'flag', label: 'Premium Steering Wheel with Scorecard Holder',
+        rowsFor: o => (o.steering ? [['Steering wheel', m.steering[i][0]], ['Scorecard holder', m.steering[i][1]]] : []) });
+    if (m.overhead[line][i].length) add({ id: 'overhead', covers: ['audio'], section: 'Accessories', title: 'Overhead attachment', type: 'optional', options: m.overhead[line][i] });
+    // Tinted windshield: not on Golf / Essential (2026-11-26, the user's choice)
+    if (i > 0) add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'flag', label: 'Tinted windshield' });
     if (!m.floorMat[line][i]) add({ id: 'floorMat', section: 'Upgrades', title: 'Floor mat', type: 'flag', label: 'GC floor mat' });
     if (m.mirrors[line][i].length) add({ id: 'mirrors', section: 'Upgrades', title: 'Mirrors', type: 'optional', options: m.mirrors[line][i] }); // one mirror package: each already includes the side mirrors (2026-11-19)
     if (m.storage[i].length) add({ id: 'storage', section: 'Upgrades', title: 'Storage', type: 'multi', options: m.storage[i] });
@@ -1195,12 +1225,15 @@ function buildLabelHtml(level) {
 }
 
 // "Golfer 2 · Scratch Golfer": a model and its build level named together
+// A Lifestyle build is named by its seats (2026-11-26, the user's choice): "2 · Essential", not "Essential 2 · Essential"
+const buildTitleName = product => (product.version === 'lifestyle' && product.layout ? product.layout : product.name);
+
 function buildTitle(product, level) {
-    return `${product.name} · ${buildLabel(level)}`;
+    return `${buildTitleName(product)} · ${buildLabel(level)}`;
 }
 
 function buildTitleHtml(product, level) {
-    return `${product.name} · ${buildLabelHtml(level)}`;
+    return `${buildTitleName(product)} · ${buildLabelHtml(level)}`;
 }
 
 // Build line, level and layout of a Tempo model
@@ -1324,7 +1357,7 @@ function getTempoOptionGroups(product, i) {
     // Mirrors (2026-11-19): packages ("Side Mirror + 5 pannel") are choose-one; single mirrors are one side pair and one
     // inner mirror at most (choosing another of the same kind replaces it)
     const mirrors = groups.find(g => g.id === 'mirrors');
-    if (mirrors) {
+    if (mirrors && mirrors.options) { // (an included mirror, like Essential's side mirrors, has no choices)
         const packages = mirrors.options.every(n => /^side mirror/i.test(n));
         groups[groups.indexOf(mirrors)] = packages ? { ...mirrors, type: 'optional' } : { ...mirrors, type: 'multi',
             exclusive: [mirrors.options.filter(n => /side mirror/i.test(n)), mirrors.options.filter(n => !/side mirror/i.test(n))],
@@ -1356,7 +1389,12 @@ function getTempoOptionGroups(product, i) {
 // rest); and Accessories as Side, Overhead and Driver attachments and Mirrors. `part` says which; `order` sorts
 const OVERHEAD_RE = /overhead|5\s*pann?el|sound\s*bar/i;
 const isOverheadName = n => OVERHEAD_RE.test(n) && !/carplay|entertainment/i.test(n); // the CarPlay unit is electronics
-const UPGRADE_ORDER = ['batteryUpgrade', 'lighting', 'windshield', 'caddyStand'];
+// Upgrades, in this order (2026-11-26, the user's choice): headlight, windshield, caddy stand. Accessories start with
+// the driver attachment, overhead attachment and electronics, then storage, rain enclosure and floor mat (the side
+// attachment and mirrors follow)
+const UPGRADE_ORDER = ['lighting', 'windshield', 'caddyStand', 'mirrors']; // mirrors are upgrades (2026-11-26)
+// (Lifestyle's cooler sits where the Golfer's side attachment does: after storage, 2026-11-26)
+const EXTRA_ORDER = ['steering', 'overhead', 'audio', 'storage', 'cooler', 'enclosure', 'floorMat'];
 function arrangeTempoGroups(product, i, groups) {
     const out = groups.map(g => ({ ...g }));
     const get = id => out.find(g => g.id === id);
@@ -1378,7 +1416,9 @@ function arrangeTempoGroups(product, i, groups) {
     });
     // Convex rear mirrors only on the 2+2, 4 and 4+2 (2026-11-26)
     const mirrors = get('mirrors');
-    if (mirrors && product.layout === '2') {
+    // Side mirrors included (Scratch, Essential): not offered again among the mirrors
+    if (mirrors && mirrors.options && get('sideMirrors')) mirrors.options = mirrors.options.filter(n => !/^side mirrors?$/i.test(n.trim()));
+    if (mirrors && mirrors.options && product.layout === '2') {
         mirrors.options = mirrors.options.filter(n => !/convex/i.test(n));
         if (mirrors.exclusive) mirrors.exclusive = mirrors.exclusive.map(set => set.filter(n => !/convex/i.test(n)));
     }
@@ -1397,10 +1437,14 @@ function arrangeTempoGroups(product, i, groups) {
     }
     const battery = get('batteryUpgrade');
     if (battery) battery.title = 'Battery';
-    if (product.version === 'golfer') {
+    // Electronics (2026-11-26, the user's choice): wireless charging only
+    const audio = get('audio');
+    if (audio && audio.options) Object.assign(audio, { title: 'Electronics', options: audio.options.filter(n => !/carplay|entertainment/i.test(n)) });
+    // (Lifestyle Signature as Golfer Scratch, 2026-11-26)
+    if (product.version === 'golfer' || (product.version === 'lifestyle' && i === 1)) {
         // The document's light kits, not the Bundles' (12V Basic, 12v Deluxe, SRLLK-21): a kit the Bundles don't have
         // comes into the quotation unpriced
-        const docLights = TEMPO_MATRIX_LEGACY.lighting.golfer[i];
+        const docLights = TEMPO_MATRIX_LEGACY.lighting[product.version][i];
         if (lights && docLights.length) {
             const none = docLights.filter(n => /^no headlight/i.test(n)), kits = docLights.filter(n => !/^no headlight/i.test(n));
             Object.assign(lights, { options: [...kits, ...none], bundleDefault: kits[0], bundleIds: undefined });
@@ -1409,6 +1453,10 @@ function arrangeTempoGroups(product, i, groups) {
         const wheels = get('wheels');
         const doc = golferDocWheels()[i];
         if (wheels && doc) wheels.allowed = { std: doc.std.filter(n => wheels.options.includes(n)), up: doc.up.filter(n => wheels.options.includes(n)) };
+    } else if (i === 0) {
+        // Lifestyle Essential, like Golf (2026-11-26, the user's choice): its 8" steel wheels only, lifted or not
+        const wheels = get('wheels');
+        if (wheels) wheels.allowed = { std: golferDocWheels()[0].std.filter(n => wheels.options.includes(n)), up: [] };
     }
     const kept = out.filter(g => !(g.options && !g.options.length && g.type !== 'fixed'));
     kept.forEach(g => {
@@ -1416,15 +1464,15 @@ function arrangeTempoGroups(product, i, groups) {
         else if (g.id === 'lift') g.part = 'lift';
         else if (g.id === 'wheels') g.part = 'included'; // its standard choices behind Customize package; lifted ones under the lift
         else if (['ballWasher', 'sandBottle'].includes(g.id)) g.part = 'side';
-        else if (g.id === 'overhead') g.part = 'overhead';
-        else if (g.id === 'mirrors') g.part = 'mirrors';
-        else if (g.id === 'cooler') g.part = 'accessories';
+        // The lithium battery is changed with the included items, under Customize package (2026-11-26)
+        else if (g.id === 'batteryUpgrade') g.part = 'included';
+        // Accessories start with storage, the rain enclosure and the floor mat, before the attachments (2026-11-26)
+        else if (EXTRA_ORDER.includes(g.id)) g.part = 'extras';
         else if (UPGRADE_ORDER.includes(g.id) || !g.included) g.part = 'upgrades';
         else g.part = 'included';
-        g.order = UPGRADE_ORDER.includes(g.id) ? UPGRADE_ORDER.indexOf(g.id) : 99;
+        g.order = UPGRADE_ORDER.includes(g.id) ? UPGRADE_ORDER.indexOf(g.id) : EXTRA_ORDER.includes(g.id) ? EXTRA_ORDER.indexOf(g.id) : 99;
     });
     // The driver attachment: the steering wheel and its scorecard holder, included on Pro / Elite
-    ['steering', 'scorecard'].forEach(id => { const g = get(id); if (g) g.part = 'driver'; });
     return kept;
 }
 
@@ -3922,7 +3970,7 @@ const HOME_COMPARE_COLORS = [
         'Chameleon (7 colors) Violet Blue', 'Chameleon (7 colors) Green Blue', 'Chameleon (3 colors) White'],
         seat: ['Classic Premium Seat Camello', 'Classic Premium Seat Black and Gray', 'Elite Bright White Seat'] }
 ];
-const LIFT_TEXT = 'Lifted 3.5" GC, with Tempo fenders 3" or 1.5" or the Onward fender flare kit; GC brush guard and nerf bar optional';
+const LIFT_TEXT = 'Lifted 3.5" GC, with Tempo fenders; GC brush guard and nerf bar optional';
 const MIRROR_TEXT = 'Side mirrors, side mirrors with turn signal, 5 panel mirror, convex inner mirror (short or long)';
 // [label, [Golf, Scratch, Pro]]: a cell is [photo, text] (photo may be null), or null where the build has none
 const HOME_COMPARE_ROWS = [
@@ -3944,15 +3992,15 @@ const HOME_COMPARE_ROWS = [
     ['Caddy stand', [[OPT('caddy-stand'), 'Caddy stand'], [OPT('caddy-stand'), 'Caddy stand'], [OPT('caddy-stand'), 'Caddy stand']]],
     ['Lifted upgrade', [[OPT('lift-gc-35'), LIFT_TEXT], [OPT('lift-gc-35'), LIFT_TEXT], [OPT('lift-gc-35'), LIFT_TEXT]]],
     ['Steering & floor mat', [[OPT('floor-mat-gc'), 'GC floor mat'], [OPT('floor-mat-gc'), 'GC floor mat'],
-        [OPT('steering-scorecard'), 'Premium steering wheel with scorecard holder (included); GC floor mat']]],
+        [OPT('steering-scorecard'), 'Premium steering wheel with scorecard holder (upgrade); GC floor mat']]],
     ['Mirrors', [null, [OPT('mirror-side'), MIRROR_TEXT], [OPT('mirror-side'), MIRROR_TEXT]]],
     ['Electronics', [null, null,
-        [OPT('audio-cc-soundbar'), 'Apple CarPlay; wireless charging']]],
+        [OPT('audio-cc-soundbar'), 'Wireless charging']]],
     ['Overhead attachment', [null, null,
         [OPT('overhead-storage-console'), 'One of: overhead storage console, 5 panel mirror, GC Sound Bar 27" RGB, Club Car Premium Sound Bar']]],
     ['Storage', [null, [OPT('overhead-storage-console'), 'Overhead storage console, under seat storage tray'],
         [OPT('overhead-storage-console'), 'Under seat storage tray']]],
-    ['Windshield', [[null, 'Tinted windshield (upgrade)'], [null, 'Tinted windshield (upgrade)'], [null, 'Tinted windshield (upgrade)']]],
+    ['Windshield', [null, [null, 'Tinted windshield (upgrade)'], [null, 'Tinted windshield (upgrade)']]],
     ['Rain enclosure', [null, [OPT('enclosure-3-beige'), 'Three-sided (CCJX): beige, white or black'],
         [OPT('enclosure-3-black'), 'Two-sided black (CC), or three-sided (CCJX): beige, white or black']]],
     ['Cooling', [null, [null, 'Zero Breeze Mark 3 (with an enclosure)'], [null, 'Zero Breeze Mark 3 (with an enclosure)']]]
@@ -5431,7 +5479,8 @@ function bundleTempoGroups(product, i, groups) {
         // A choice made of a left and a right item (the ball washer / cooler sides): both ids, from Accessories 2 (left)
         // and Accessories 3 (right), the washer by "washer" or "cleaner", the cooler by "cooler" (2026-11-18)
         if (g.sides) {
-            const find = (slot, kind) => kind && (catalogOptions(product, i, slot) || []).find(o => kind === 'cooler' ? /cooler/i.test(o.option) : /washer|cleaner/i.test(o.option));
+            // (the Premium Caddie Cooler isn't a bundle side item: no id, its own quote row)
+            const find = (slot, kind) => kind && kind !== 'premium' && (catalogOptions(product, i, slot) || []).find(o => kind === 'cooler' ? /cooler/i.test(o.option) : /washer|cleaner/i.test(o.option));
             const ids = Object.fromEntries(Object.entries(g.sides).map(([name, [left, right]]) =>
                 [name, [find('accessories 2', left), find('accessories 3', right)].filter(Boolean).map(o => o.id)]));
             return Object.values(ids).some(list => list.length) ? { ...g, bundleIds: ids } : g;
@@ -6298,6 +6347,7 @@ let detailOptionsOpen = null;
 
 function showDetailOptions() {
     detailOptionsOpen = currentSlug;
+    saveDetailBuild();
     const section = document.getElementById('options');
     if (!section) return;
     section.hidden = false;
@@ -6410,7 +6460,8 @@ function buildIncludedItems(product, i, o) {
 // Included as the build stands: fixed items, included choices, and the wheels while on a standard (not upgrade) wheel
 function isIncludedNow(g, o) {
     if (g.type === 'fixed') return true;
-    if (g.id === 'wheels') return !o.lift && g.upgradeFrom != null && g.options.indexOf(o.wheels) > -1 && !parseWheel(o.wheels);
+    // (a build with no lifted wheels, like Golf, keeps its standard wheel when lifted)
+    if (g.id === 'wheels') return (!o.lift || (g.allowed && !g.allowed.up.length)) && g.upgradeFrom != null && g.options.indexOf(o.wheels) > -1 && !parseWheel(o.wheels);
     return !!g.included;
 }
 
@@ -6492,6 +6543,44 @@ function updateBuildPanel() {
     if (panel && product && isTempoVersion(product)) panel.innerHTML = renderBuildPanel(product);
     const box = document.getElementById('detail-included');
     if (box && product && isTempoVersion(product)) box.innerHTML = renderBuildIncluded(product);
+    saveDetailBuild();
+}
+
+// The builder's choices survive a reload (2026-11-26, the user's request): kept for the browser tab (sessionStorage),
+// by model page, and put back when the page is drawn again. Saving waits until they're back, so the page's own
+// defaults never overwrite them
+const BUILD_STORE = 'gcph-build:';
+let detailBuildRestoring = null;
+
+function saveDetailBuild() {
+    const product = currentDetailProduct();
+    if (!product || !isTempoVersion(product) || detailBuildRestoring === product.slug) return;
+    const { level, body, seat, canopy, options, confirmed, customize, colorsPicked } = detailBuild;
+    try {
+        sessionStorage.setItem(BUILD_STORE + product.slug, JSON.stringify({ level, body, seat, canopy, options, confirmed, customize, colorsPicked, open: detailOptionsOpen === product.slug }));
+    } catch (err) { /* private window or storage blocked: the page just starts over */ }
+}
+
+function restoreDetailBuild(slug) {
+    let saved = null;
+    try { saved = JSON.parse(sessionStorage.getItem(BUILD_STORE + slug) || 'null'); } catch (err) { saved = null; }
+    detailBuildRestoring = null;
+    const product = currentDetailProduct();
+    if (!saved || !product || product.slug !== slug) return;
+    const buildSet = getProductBuildSet(product);
+    if (!buildSet || !buildSet.builds.some(b => b.id === saved.level)) return;
+    // The colours and options first; switching to the saved build keeps the ones it offers (and checks the rest)
+    Object.assign(detailBuild, { body: saved.body, seat: saved.seat, canopy: saved.canopy, colorsPicked: !!saved.colorsPicked, options: { ...detailBuild.options, ...(saved.options || {}) } });
+    selectBuildLevel(saved.level);
+    detailBuild.confirmed = !!saved.confirmed;
+    detailBuild.customize = !!saved.customize;
+    if (saved.open) detailOptionsOpen = slug;
+    redrawBuildSection();
+    updateConfirmGate();
+    const section = document.getElementById('options');
+    if (section && saved.open) section.hidden = false;
+    refreshTempoOptions();
+    updateBuildSummaryLine();
 }
 
 // Choices for a new build level: keeps each earlier choice the new level still offers
@@ -6512,7 +6601,9 @@ function carryTempoOptions(product, i, prev) {
     next.wheelUpgrade = !!(prev.wheelUpgrade && wheels && wheels.upgradeFrom);
     if (wheels && !next.wheelUpgrade && wheels.options.indexOf(next.wheels) >= (wheels.upgradeFrom || Infinity)) next.wheels = wheels.options[0];
     if (wheels && wheels.allowed && ![...wheels.allowed.std, ...wheels.allowed.up].includes(next.wheels)) next.wheels = wheels.allowed.std[0];
-    if (prev.liftFender) next.liftFender = prev.liftFender;
+    if (TEMPO_MATRIX_LEGACY.liftFenders.includes(prev.liftFender)) next.liftFender = prev.liftFender;
+    // Still lifted on the new build: its wheels follow the lift (a lifted wheel, or its standard one if it has none)
+    if (next.lift) syncLiftWheels(product, i, next);
     if (prev.liftAddOns) next.liftAddOns = prev.liftAddOns.slice();
     fixTempoSubChoices(product, i, next);
     return next;
@@ -6542,6 +6633,7 @@ function confirmBuildLevel(id) {
     detailBuild.confirmed = true;
     redrawBuildSection();
     updateConfirmGate();
+    saveDetailBuild();
     scrollToDetailSection('colors');
 }
 
@@ -6892,6 +6984,7 @@ const OPTION_PHOTOS = {
     'Side mirrors and 5 panel rear mirror': 'mirror-5-panel',
     'Premium steering wheel': 'steering-premium',
     'Premium steering wheel with scorecard': 'steering-scorecard',
+    'Premium Steering Wheel with Scorecard Holder': 'steering-scorecard',
     'GC Bag Cover, Beige': 'bag-cover-beige',
     'GC Bag Cover, White': 'bag-cover-white',
     'Magnetic Bag Cover, Black': 'bag-cover-magnetic-black',
@@ -6922,6 +7015,7 @@ const OPTION_PHOTOS = {
     // Lift
     lift: 'lift-gc-35',
     'Tempo Fenders 3"': 'fender-tempo-3',
+    'Tempo Fenders': 'fender-tempo-3',
     'GC Brush Guard': 'brush-guard',
     'Nerf Bar': 'nerf-bar',
     // Rear flip seats
@@ -7098,6 +7192,8 @@ function renderWheelPicker(g, o) {
     // The Golfer line (2026-11-26): only the document's wheels, the Rims Upgrade ones once lifted
     if (g.allowed) {
         const list = o.lift && g.allowed.up.length ? g.allowed.up : g.allowed.std;
+        // One wheel (Golf's 8" steel rims) isn't a choice: it's in the Included list (2026-11-26)
+        if (list.length < 2) return '';
         return `
         <div class="opt-group" role="group" aria-label="${g.title}">
             <div class="opt-group-head"><p class="opt-group-title">${g.title}</p><p class="opt-group-hint">${o.lift && g.allowed.up.length ? 'Lifted wheels' : list.length > 1 ? 'Choose one' : 'Included'}</p></div>
@@ -7302,22 +7398,26 @@ function renderTempoOptions(product) {
 
     // Lift: its fenders and add-ons, and the lifted wheels, under the button once it's on
     const lift = groups.find(g => g.id === 'lift');
-    const liftParts = lift && o.lift ? `<div class="opt-subpanel opt-lift-parts">${subs.filter(s => s.parent === 'lift').map(s => renderTempoGroup(s, o, true)).join('')}${wheels ? renderTempoGroup(wheels, o, true, false, true) : ''}</div>` : '';
+    // (a single fender isn't a choice: it's named under "Lifted" instead)
+    const liftParts = lift && o.lift ? `<div class="opt-subpanel opt-lift-parts">${subs.filter(s => s.parent === 'lift' && !(s.id === 'liftFender' && s.options.length === 1)).map(s => renderTempoGroup(s, o, true)).join('')}${wheels ? renderTempoGroup(wheels, o, true, false, true) : ''}</div>` : '';
 
     // Included: the list, then the included choices behind "Customize package"
-    const customize = !!detailBuild.customize;
+    // Golf / Essential have no customization (2026-11-26, the user's rule): no "Customize package" there
+    const canCustomize = i > 0;
+    const customize = canCustomize && !!detailBuild.customize;
     // Only what isn't shown again below (2026-11-26, the user's rule): the headlight, side attachments and driver
     // attachment are in their own sections, so they're left out of this list
     const ownSection = new Set(groups.filter(g => g.part && g.part !== 'included' && isIncludedNow(g, o)).map(g => g.title));
     const included = buildIncludedItems(product, i, o).filter(([t]) => !ownSection.has(t));
     const choices = part('included').filter(g => g.type !== 'fixed' && g.id !== 'lighting' && !(g.id === 'wheels' && o.lift));
-    const colors = [['Body', detailBuild.body], ['Seat', detailBuild.seat || catalogDefault(product, i, 'seat')], ['Canopy', detailBuild.canopy || catalogDefault(product, i, 'canopy')]].filter(([, v]) => v);
+    // The battery first (the colours line was taken out, 2026-11-26, the user's choice), then the other included choices
+    const batteryChoice = choices.find(g => g.id === 'batteryUpgrade');
     const includedBody = `
         <ul class="build-included-list opt-included-list">${included.map(([t, v]) => `<li><span class="build-included-check" aria-hidden="true">✓</span><span><span class="build-included-label">${t}</span>${v}</span></li>`).join('')}</ul>
-        <label class="opt-customize"><input type="checkbox" ${customize ? 'checked' : ''} onchange="setCustomizePackage(this.checked)"> <span>Customize package</span></label>
+        ${canCustomize ? `<label class="opt-customize"><input type="checkbox" ${customize ? 'checked' : ''} onchange="setCustomizePackage(this.checked)"> <span>Customize package</span></label>` : ''}
         ${customize ? `<div class="opt-subpanel">
-            ${colors.length ? `<div class="opt-group"><div class="opt-group-head"><p class="opt-group-title">Colors</p></div><p class="text-sm text-ink-2">${colors.map(([k, v]) => `${k}: <span class="text-ink font-medium">${v}</span>`).join(' · ')} <button type="button" onclick="scrollToDetailSection('colors')" class="link">Change colors</button></p></div>` : ''}
-            ${choices.map(g => renderTempoGroup(g, o, true, false, true) + (subs.some(s => s.parent === g.id) ? subs.filter(s => s.parent === g.id).map(s => renderTempoGroup(s, o, true)).join('') : '')).join('')}
+            ${batteryChoice ? renderBatteryChoice(product, i, batteryChoice, o) : ''}
+            ${choices.filter(g => g !== batteryChoice).map(g => renderTempoGroup(g, o, true, false, true) + (subs.some(s => s.parent === g.id) ? subs.filter(s => s.parent === g.id).map(s => renderTempoGroup(s, o, true)).join('') : '')).join('')}
         </div>` : ''}`;
 
     // Upgrades: battery, headlight, tinted windshield, caddy stand, then the rest
@@ -7325,18 +7425,21 @@ function renderTempoOptions(product) {
     // Accessories
     const side = part('side').length ? renderSideAttachment(product, i, o) : '';
     const driver = part('driver');
+    const extras = part('extras').sort((a, b) => a.order - b.order);
     const accessories = [
-        sub('Side attachment', side),
+        // Up to storage, then the side attachment, then the rain enclosure and the rest (2026-11-26, the user's choice)
         sub('Overhead attachment', part('overhead').map(withSubs).join('')),
+        renderTempoSection(extras.filter(g => g.order <= EXTRA_ORDER.indexOf('storage')), subs, o),
+        sub('Side attachment', side),
+        renderTempoSection(extras.filter(g => g.order > EXTRA_ORDER.indexOf('storage')), subs, o),
         sub('Driver attachment', driver.length ? `<p class="opt-group-hint mb-2">Included</p>${renderTempoIncluded(driver)}` : ''),
         sub('Mirrors', part('mirrors').map(withSubs).join('')),
         sub('More for this build', part('accessories').map(withSubs).join(''))
     ].join('');
     return `
         <p class="text-sm text-ink-2">Showing the <span class="text-ink font-medium">${buildTitleHtml(product, level)}</span> build. <button type="button" onclick="scrollToDetailSection('build')" class="link">Change build</button></p>
-        ${renderLiftUpgrade(groups, subs, o)}
-        ${liftParts}
         ${section('Included with your build', includedBody)}
+        <div class="opt-section">${renderLiftUpgrade(groups, subs, o)}${liftParts}</div>
         ${section('Upgrades', renderTempoSection(upgrades, subs, o))}
         ${section('Accessories', accessories)}`;
 }
@@ -7344,6 +7447,25 @@ function renderTempoOptions(product) {
 function setCustomizePackage(on) {
     detailBuild.customize = !!on;
     refreshTempoOptions();
+}
+
+// The battery under Customize package, as text (2026-11-26, the user's choice): the included lead-acid, or the
+// lithium upgrade
+function renderBatteryChoice(product, i, g, o) {
+    const base = (getTempoOptionGroups(product, i).find(x => x.id === 'battery') || {}).value || 'Lead-acid';
+    const items = [[false, base], [true, 'Battlite lithium']].map(([on, label]) => ({
+        key: `batteryUpgrade:${on}`, label, active: !!o.batteryUpgrade === on, onclick: `setBatteryUpgrade(${on})`
+    }));
+    return `
+        <div class="opt-group opt-group-nested" role="group" aria-label="Battery">
+            <div class="opt-group-head"><p class="opt-group-title">Battery</p></div>
+            ${optionSegments(items)}
+        </div>`;
+}
+
+function setBatteryUpgrade(on) {
+    if (!!detailBuild.options.batteryUpgrade === !!on) return;
+    toggleTempoOption('batteryUpgrade');
 }
 
 // Side attachment (2026-11-26, the user's rule): a left and a right column. A Caddy Master cooler ticks both sides;
@@ -7355,11 +7477,12 @@ function renderSideAttachment(product, i, o) {
     const sandOne = sand && sand.options.find(n => !/two|2/i.test(n)), sandTwo = sand && sand.options.find(n => /two|2/i.test(n));
     const sandOn = s => !!o.sandBottle && (o.sandBottle === sandTwo || (o.sandSide || 'left') === s);
     const rows = [
-        sides && ['cooler', 'Caddy Master cooler', s => items[s === 'left' ? 0 : 1] === 'cooler', 'Goes on both sides'],
-        sides && ['washer', 'Ball washer', s => items[s === 'left' ? 0 : 1] === 'washer', 'One side only'],
+        sides && ['cooler', 'Caddy Master cooler', s => items[s === 'left' ? 0 : 1] === 'cooler', 'Included. Left, right or both'],
+        sides && ['premium', 'Premium Caddie Cooler', s => items[s === 'left' ? 0 : 1] === 'premium', 'Upgrade (SJK-1363). Left, right or both'],
+        sides && ['washer', 'Ball washer', s => items[s === 'left' ? 0 : 1] === 'washer', 'Left or right'],
         sand && sandOne && ['sand', 'Sand bottle', sandOn, 'Up to two']
     ].filter(Boolean);
-    const photo = { cooler: optionPhoto('Caddy Master cooler') || optionPhoto('cooler'), washer: optionPhoto('Ball washer') || optionPhoto('ballWasher'), sand: optionPhoto('Sand bottle') || optionPhoto('sandBottle') };
+    const photo = { cooler: 'image/Options/caddy-cooler.jpg', premium: 'image/Options/cooler-premium.jpg', washer: 'image/Options/ball-washer.jpg', sand: 'image/Options/sand-bottle.jpg' };
     return `
         <div class="side-attach" role="group" aria-label="Side attachment">
             <div class="side-attach-head"><span></span><span>Left</span><span>Right</span></div>
@@ -7368,7 +7491,7 @@ function renderSideAttachment(product, i, o) {
                     <span class="side-attach-item">${photo[key] ? `<img src="${photo[key]}" alt="" loading="lazy">` : ''}<span><span class="text-ink font-medium">${label}</span><span class="block text-xs text-ink-2">${note}</span></span></span>
                     ${['left', 'right'].map(s => `<label class="side-attach-check"><input type="checkbox" ${on(s) ? 'checked' : ''} onchange="setSideItem('${key}', '${s}', this.checked)" aria-label="${label}, ${s} side"></label>`).join('')}
                 </div>`).join('')}
-            <p class="text-xs text-ink-2 mt-2">Included with this build. Untick to leave a side empty.</p>
+            <p class="text-xs text-ink-2 mt-2">Each side holds one: a cooler or the ball washer. Untick to leave a side empty.</p>
         </div>`;
 }
 
@@ -7377,8 +7500,15 @@ function setSideItem(key, side, on) {
     const groups = getTempoOptionGroups(product, i);
     const sides = groups.find(g => g.id === 'ballWasher'), sand = groups.find(g => g.id === 'sandBottle');
     const nameFor = (l, r) => Object.keys((sides && sides.sides) || {}).find(n => sides.sides[n][0] === l && sides.sides[n][1] === r) || '';
-    if (key === 'cooler') o.ballWasher = on ? nameFor('cooler', 'cooler') : '';
-    if (key === 'washer') o.ballWasher = on ? (side === 'left' ? nameFor('washer', null) : nameFor(null, 'washer')) : '';
+    // A side holds one item: ticking one puts it there; one ball washer per cart, so ticking it on a side takes it off
+    // the other; unticking leaves the side empty
+    if (sides && ['cooler', 'premium', 'washer'].includes(key)) {
+        const pair = [...((sides.sides && sides.sides[o.ballWasher]) || [null, null])];
+        const k = side === 'left' ? 0 : 1;
+        pair[k] = on ? key : null;
+        if (on && key === 'washer' && pair[1 - k] === 'washer') pair[1 - k] = null;
+        o.ballWasher = nameFor(pair[0], pair[1]);
+    }
     if (key === 'sand' && sand) {
         const one = sand.options.find(n => !/two|2/i.test(n)), two = sand.options.find(n => /two|2/i.test(n));
         const has = s => !!o.sandBottle && (o.sandBottle === two || (o.sandSide || 'left') === s);
@@ -7406,6 +7536,7 @@ function renderLiftUpgrade(groups, subs, o) {
             ${photo ? `<img src="${photo}" alt="" loading="lazy" decoding="async">` : ''}
             <div class="lift-cta-body">
                 <p class="lift-cta-kicker">${on ? 'Lifted' : 'Upgrade to lift'}</p>
+                ${on && o.liftFender ? `<p class="text-sm text-ink mt-1">${o.liftFender}</p>` : ''}
             </div>
             <button type="button" onclick="toggleTempoOption('lift')" class="btn ${on ? 'btn-outline' : 'btn-primary'}" aria-pressed="${on}">${on ? 'Remove the lift' : 'Upgrade to lift'}</button>
         </div>`;
@@ -7801,6 +7932,8 @@ function renderProductDetailsPage() {
     };
     if (tempo) fixTempoSubChoices(product, levelIdx, detailBuild.options);
     if (tempo) applyBuildLook(product);
+    // The choices saved before a reload come back right after the page is drawn
+    if (tempo) { detailBuildRestoring = product.slug; setTimeout(() => restoreDetailBuild(product.slug), 0); }
     const canopyOptions = getDetailCanopyOptions(product);
     setTimeout(updateDetailBuildSummary, 0);
     setTimeout(updateBuildSummaryLine, 0);

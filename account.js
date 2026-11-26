@@ -4705,9 +4705,9 @@ const MATCH_SYNONYMS = { grey: 'gray', cleaner: 'washer', headlight: 'light', ta
 // it (8in rims bring their wheel cover; Side Mirror + 5 pannel doesn't bring Side Mirror too). Choosing Triton wheels must not bring the Hela line too because both say 12in. Multi parts
 // take every option the row names. No row: the part wasn't chosen.
 const BUNDLE_PART_ROWS = {
-    wheel: ['Wheels and tires'], '14in wheel': ['Wheels and tires'], windshield: ['Windshield'], mirror: ['Mirrors', 'Overhead attachment'],
+    wheel: ['Wheels and tires'], '14in wheel': ['Wheels and tires'], windshield: ['Windshield'], mirror: ['Mirrors', 'Side mirrors', 'Overhead attachment'],
     'steeing wheel': ['Steering wheel'], 'steering wheel': ['Steering wheel'], 'scorecard holder': ['Scorecard holder'], light: ['Lighting', 'Headlight'], 'bag cover': ['Bag cover'], 'accessories 1': ['Sand bottle'],
-    'accessories 2': ['Golf accessory, left side'], 'accessories 3': ['Golf accessory, right side'], 'caddy stand': ['Caddy stand'],
+    'accessories 2': ['Golf accessory, left side'], 'accessories 3': ['Golf accessory, right side'], 'premium caddie cooler': ['Premium caddie cooler'], 'caddy stand': ['Caddy stand'],
     'add-on': ['Audio', 'Audio and storage', 'Electronics and audio', 'Overhead attachment'], charger: ['Charging'], 'speed code': ['Speed code'], floormat: ['Floor mat'],
     'lift kit upgrade': ['Lift kit']
 };

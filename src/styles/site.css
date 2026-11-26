@@ -1833,6 +1833,9 @@
     .opt-subsection + .opt-subsection { margin-top: 0.5rem; border-top: 1px solid var(--line); }
     .opt-subsection-title { font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--green-text); }
     .opt-subsection .opt-group:first-of-type { padding-top: 0.75rem; }
+    /* A group right under its sub-section heading (Overhead attachment, Mirrors) doesn't repeat the heading as its title */
+    .opt-subsection > .opt-group > .opt-group-head .opt-group-title { display: none; }
+    .opt-subsection > .opt-group > .opt-group-head { justify-content: flex-end; }
     .side-attach { margin-top: 0.75rem; border: 1px solid var(--line); background: var(--paper); }
     .side-attach-head, .side-attach-row { display: grid; grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem; align-items: center; gap: 0.5rem; padding: 0.625rem 1rem; }
     .side-attach-head { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); text-align: center; border-bottom: 1px solid var(--line); }
