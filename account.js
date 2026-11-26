@@ -4705,10 +4705,10 @@ const MATCH_SYNONYMS = { grey: 'gray', cleaner: 'washer', headlight: 'light', ta
 // it (8in rims bring their wheel cover; Side Mirror + 5 pannel doesn't bring Side Mirror too). Choosing Triton wheels must not bring the Hela line too because both say 12in. Multi parts
 // take every option the row names. No row: the part wasn't chosen.
 const BUNDLE_PART_ROWS = {
-    wheel: ['Wheels and tires'], '14in wheel': ['Wheels and tires'], windshield: ['Windshield'], mirror: ['Mirrors'],
-    'steeing wheel': ['Steering wheel'], light: ['Lighting'], 'bag cover': ['Bag cover'], 'accessories 1': ['Sand bottle'],
+    wheel: ['Wheels and tires'], '14in wheel': ['Wheels and tires'], windshield: ['Windshield'], mirror: ['Mirrors', 'Overhead attachment'],
+    'steeing wheel': ['Steering wheel'], 'steering wheel': ['Steering wheel'], 'scorecard holder': ['Scorecard holder'], light: ['Lighting', 'Headlight'], 'bag cover': ['Bag cover'], 'accessories 1': ['Sand bottle'],
     'accessories 2': ['Golf accessory, left side'], 'accessories 3': ['Golf accessory, right side'], 'caddy stand': ['Caddy stand'],
-    'add-on': ['Audio', 'Audio and storage'], charger: ['Charging'], 'speed code': ['Speed code'], floormat: ['Floor mat'],
+    'add-on': ['Audio', 'Audio and storage', 'Electronics and audio', 'Overhead attachment'], charger: ['Charging'], 'speed code': ['Speed code'], floormat: ['Floor mat'],
     'lift kit upgrade': ['Lift kit']
 };
 const BUNDLE_MULTI_PARTS = new Set(['add-on']);
@@ -5041,6 +5041,7 @@ function openQuotation(id) {
     renderApp();
     window.scrollTo({ top: 0, behavior: scrollBehavior() });
     loadQuotationEmails(id);
+    loadQuotationPss(id);
 }
 
 function closeQuotation() {
@@ -5202,10 +5203,10 @@ function renderQuotationEditor(data) {
             ${qt.status === 'approved' && !prepares ? '<p class="text-sm text-mute">Approved. The sales manager sends it to the customer.</p>' : ''}
             ${(qt.status === 'submitted' || qt.status === 'approved') && prepares ? `<button type="button" onclick="reopenQuotation()" class="link text-sm">Edit (needs approval again)</button>` : ''}
             <button type="button" onclick="previewQuotation()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Preview PDF</button>
-            ${qt.status === 'approved' || qt.status === 'sent' ? '<button type="button" onclick="downloadPss()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">PSS.xlsx</button>' : ''}
             ${canDeleteQuotation(qt) ? `<button type="button" onclick="deleteQuotation()" class="link text-sm">Delete</button>` : ''}
         </div>
         ${dirty && editable ? '<p class="text-xs text-mute mt-3">Unsaved changes. The PDF preview shows the last saved version.</p>' : ''}
+        ${qt.status === 'approved' || qt.status === 'sent' ? renderQuotationPss(qt) : ''}
         ${renderQuotationEmails(qt)}`;
 }
 
@@ -5755,6 +5756,132 @@ function pssSpec(qt) {
     };
 }
 
+// --- The PSS form (2026-11-26): every blank of the sheet, filled from the quotation where it can be, and edited by
+// sales (sales managers and super admins) in the admin, also after the quotation is approved or sent. Saved apart from
+// the quotation (quotation_pss, supabase/add-quotation-pss.sql), so the approval isn't touched. PSS.xlsx takes it ---
+const PSS_YES_NO = ['YES', 'NO'];
+const PSS_FORM = [
+    ['Client and order', [
+        ['office_address', 'Office address'], ['tin', 'TIN'], ['effective_date', 'Effective date', 'date'],
+        ['order_no', 'Order no.'], ['sales_order_no', 'Sales order no.'], ['zoho', 'Inputted in Zoho?', PSS_YES_NO], ['zoho_date', 'Zoho: dated', 'date'],
+        ['po_no', "Customer's P/O no."], ['po_date', 'P/O: dated', 'date'],
+        ['serial_no', 'Serial no.'], ['charger_no', 'Charger no.'], ['controller_no', 'Controller no.']]],
+    ['Local costs (₱)', [
+        ['cost_pdi', 'PDI', 'money'], ['cost_delivery', 'Delivery', 'money'], ['cost_training', "Operator's training", 'money'],
+        ['cost_others', 'Others', 'money'], ['cost_others_note', 'Others: what for']]],
+    ['Payment terms', [
+        ['pay_down_pct', 'Down payment %', 'pct'], ['pay_down_note', 'Down payment remarks'],
+        ['pay_progress_pct', 'Progress payment %', 'pct'], ['pay_progress_note', 'Progress payment remarks'],
+        ['pay_final_pct', 'Final payment %', 'pct'], ['pay_final_note', 'Final payment remarks']]],
+    ['Delivery schedule', [
+        ['delivery_date', 'Delivery date', 'date'], ['delivery_site', 'Delivery to site'], ['delivery_contact', 'Delivery contact'],
+        ['delivery_phone', 'Contact no.'], ['delivery_notes', 'Special instructions', 'long']]],
+    ['Other requirements', [
+        ['pdi', 'Pre-delivery inspection', PSS_YES_NO], ['pdi_date', 'PDI: date required', 'date'],
+        ['training', "Operator's training", PSS_YES_NO], ['training_date', 'Training: date required', 'date'],
+        ['pm_service', 'Free PM service', PSS_YES_NO], ['pm_visits', 'No. of visits'], ['other_req', 'Others']]],
+    ['Remarks', [['remark_1', 'Remark 1', 'long'], ['remark_2', 'Remark 2', 'long'], ['remark_3', 'Remark 3', 'long'], ['remark_4', 'Remark 4', 'long']]],
+    ['Product specification', [
+        ['unit', 'Type of unit'], ['seats', 'How many seater?'], ['body', 'Color of the body'], ['canopy', 'Color of the canopy'], ['seat', 'Color of the seats'],
+        ['local_paint', 'Local painting needed?', PSS_YES_NO], ['ground', 'Ground conditions'], ['side_mirrors', 'Side mirrors needed?', PSS_YES_NO],
+        ['special_tire', 'Specialized tire needed?'], ['rear_mirror', 'Rear view mirror needed?', PSS_YES_NO], ['enclosure', 'Enclosure needed?', PSS_YES_NO],
+        ['enclosure_kind', 'Enclosure: what kind?'], ['bag_cover', 'Bag cover needed?', PSS_YES_NO], ['tire', 'What size tire?'],
+        ['upholstery', 'Custom upholstery needed?', PSS_YES_NO], ['rims', 'Rims needed?', PSS_YES_NO], ['cooler', 'Cooler?', PSS_YES_NO],
+        ['lift', 'Lift kit needed? If yes, how many inches?'], ['spec_other', 'Other requirements'], ['lights', 'Lights included?', PSS_YES_NO],
+        ['washer', 'Ball washer and sand bottle?', PSS_YES_NO], ['stretch', 'Is this a stretch project?', PSS_YES_NO], ['stretch_type', 'M&M or Nivel stretch?']]],
+    ['Battery', [
+        ['battery', 'Battery'], ['charging_time', 'Charging time'], ['hours_per_day', 'Hours of use per day'], ['informed', 'Customer informed about the charging time?'],
+        ['voltage', 'Battery voltage [V]'], ['running_ok', 'Running time suits the application?'], ['capacity', 'Rated capacity [Ah]'],
+        ['power_ok', 'Power supply at the site meets our requirements?'], ['site_voltage', 'Voltage at customer site [V / Hz / phase]']]]
+];
+
+let quotationPss = {};      // quotation id -> its saved PSS row ({ data, updated_by, updated_at }), null when there is none, false when the table is missing
+let quotationPssDraft = null; // the open quotation's PSS while it's edited
+
+async function loadQuotationPss(id) {
+    quotationPssDraft = null;
+    try {
+        const { data, error } = await sb.from('quotation_pss').select('*').eq('quotation_id', id).maybeSingle();
+        if (error) throw error;
+        quotationPss[id] = data || null;
+    } catch (err) {
+        quotationPss[id] = false;
+    }
+    if (quotationOpen === id) renderApp();
+}
+
+// What the form starts with: what the quotation and its build already say
+function pssDefaults(qt) {
+    const c = qt.customer || {};
+    const s = pssSpec(qt);
+    return {
+        serial_no: 'To follow', charger_no: 'To follow', delivery_contact: c.name || '', delivery_phone: c.phone || '', remark_1: qt.notes || '',
+        unit: s.unit, seats: s.seats, body: (s.body || '').toUpperCase(), canopy: (s.canopy || '').toUpperCase(), seat: (s.seat || '').toUpperCase(),
+        local_paint: 'NO', side_mirrors: s.sideMirrors, rear_mirror: s.rearMirror, enclosure: s.enclosure, bag_cover: s.bagCover, tire: s.tire,
+        upholstery: s.upholstery, rims: s.rims, cooler: s.cooler, lift: s.lift, lights: s.lights, washer: s.washer, stretch: 'NO', stretch_type: 'N/A',
+        battery: s.battery
+    };
+}
+
+// The PSS as it stands: the form's edits (or the saved ones) over the defaults
+function pssValues(qt) {
+    const saved = quotationPss[qt.id] && quotationPss[qt.id].data;
+    const edits = quotationOpen === qt.id && quotationPssDraft ? quotationPssDraft : saved || {};
+    return { ...pssDefaults(qt), ...edits };
+}
+
+function setPssField(key, value) {
+    const qt = quotationDraft;
+    if (!quotationPssDraft) quotationPssDraft = { ...((quotationPss[qt.id] && quotationPss[qt.id].data) || {}) };
+    quotationPssDraft[key] = String(value);
+    const note = document.getElementById('pss-unsaved');
+    if (note) note.hidden = false;
+}
+
+async function saveQuotationPss() {
+    const qt = quotationDraft;
+    if (!quotationPssDraft) return;
+    const { data, error } = await sb.from('quotation_pss').upsert({ quotation_id: qt.id, data: quotationPssDraft }).select().single();
+    if (error) { showToast(`The PSS was not saved: ${error.message}`); return; }
+    quotationPss[qt.id] = data;
+    quotationPssDraft = null;
+    renderApp();
+    showToast('PSS saved. PSS.xlsx now has these details.');
+}
+
+function renderQuotationPss(qt) {
+    const saved = quotationPss[qt.id];
+    if (saved === undefined) return '';
+    const head = '<h3 class="type-md text-ink">PSS (Product Specification Sheet)</h3>';
+    if (saved === false) return `<section class="mt-12">${head}<p class="text-sm text-mute mt-2">The PSS form isn't in the database yet: run supabase/add-quotation-pss.sql in the Supabase SQL Editor. PSS.xlsx still downloads, with the blanks to fill in Excel.</p></section>`;
+    const editable = can('quotations.prepare');
+    const v = pssValues(qt);
+    const field = ([key, label, type]) => {
+        const id = `pss-${key}`, value = v[key] == null ? '' : String(v[key]);
+        const on = `onchange="setPssField('${key}', this.value)"${editable ? '' : ' disabled'}`;
+        const input = Array.isArray(type)
+            ? `<select id="${id}" ${on}><option value=""></option>${type.map(o => `<option${o === value ? ' selected' : ''}>${o}</option>`).join('')}</select>`
+            : type === 'long' ? `<textarea id="${id}" rows="2" ${on}>${escapeHtml(value)}</textarea>`
+            : `<input id="${id}" type="${type === 'date' ? 'date' : 'text'}"${type === 'money' || type === 'pct' ? ' inputmode="decimal"' : ''} value="${escapeHtml(value)}" ${on}>`;
+        return `<div class="field${type === 'long' ? ' sm:col-span-2' : ''}"><label for="${id}">${escapeHtml(label)}</label>${input}</div>`;
+    };
+    return `
+        <section class="mt-12" aria-labelledby="pss-title">
+            <h3 id="pss-title" class="type-md text-ink">PSS (Product Specification Sheet)</h3>
+            <p class="text-sm text-mute mt-2">${editable ? 'Filled from the quotation; change or add anything here, save, then download PSS.xlsx. It stays editable after the quotation is sent.' : 'Edited by sales.'}${saved && saved.updated_at ? ` Last saved by ${escapeHtml(adminName(saved.updated_by))}, ${formatShortDate(saved.updated_at)}.` : ''}</p>
+            ${PSS_FORM.map(([title, fields]) => `
+                <details class="admin-card mt-4"${title === 'Local costs (₱)' || title === 'Delivery schedule' ? ' open' : ''}>
+                    <summary class="font-medium cursor-pointer">${escapeHtml(title)}</summary>
+                    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">${fields.map(field).join('')}</div>
+                </details>`).join('')}
+            <div class="quotation-actions mt-6">
+                ${editable ? '<button type="button" onclick="saveQuotationPss()" class="btn btn-primary min-h-[2.75rem] px-5 text-sm">Save PSS</button>' : ''}
+                <button type="button" onclick="downloadPss()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">PSS.xlsx</button>
+                <p id="pss-unsaved" class="text-xs text-mute"${quotationPssDraft ? '' : ' hidden'}>Unsaved PSS changes. PSS.xlsx uses them as they are now.</p>
+            </div>
+        </section>`;
+}
+
 async function downloadPss() {
     const qt = quotationDraft;
     try {
@@ -5765,8 +5892,9 @@ async function downloadPss() {
     }
     const c = qt.customer || {};
     const t = quotationTotals(qt);
-    const spec = pssSpec(qt);
+    const f = pssValues(qt);
     const day = iso => (iso ? new Date(iso) : null);
+    const num = v => { const n = parseAmount(String(v == null ? '' : v)); return n == null || Number.isNaN(n) ? null : n; };
     const person = email => PSS_PEOPLE[email] || adminName(email);
     const selfApproved = !(qt.approvers || []).length && qt.reviewed_by && qt.reviewed_by === qt.submitted_by;
 
@@ -5784,16 +5912,18 @@ async function downloadPss() {
         r.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF151714' } };
         return r;
     };
-    // label, value, label, value across the sheet: labels in bold, values boxed
+    const dateCell = (cell, d) => { if (d && !Number.isNaN(d.getTime())) { cell.value = d; cell.numFmt = 'dd-mmm-yy'; cell.alignment = { horizontal: 'left' }; } else cell.value = ''; };
+    // label, value, label, value across the sheet: labels in bold, values boxed; a value that is a Date shows as a date
     const pair = (l1, v1, l2, v2) => {
-        const r = ws.addRow([l1, v1, '', '', l2 || '', v2 == null ? '' : v2]);
+        const r = ws.addRow([l1, '', '', '', l2 || '', '']);
+        [[2, v1], [6, v2]].forEach(([n, v]) => { if (v instanceof Date) dateCell(r.getCell(n), v); else r.getCell(n).value = v == null ? '' : v; });
         ws.mergeCells(r.number, 2, r.number, 4);
         ws.mergeCells(r.number, 6, r.number, 7);
         [1, 5].forEach(i => { r.getCell(i).font = { bold: true }; });
         [2, 6].forEach(i => box(r.getCell(i)));
         return r;
     };
-    const dateCell = (cell, d) => { if (d) { cell.value = d; cell.numFmt = 'dd-mmm-yy'; cell.alignment = { horizontal: 'left' }; } };
+    const fd = key => (f[key] ? new Date(f[key]) : null);
 
     const head = ws.addRow(['PRODUCT SPECIFICATION SHEET', '', '', '', 'REF#', qt.reference]);
     ws.mergeCells(head.number, 1, head.number, 4);
@@ -5805,34 +5935,38 @@ async function downloadPss() {
     dateCell(sub.getCell(6), day(qt.reviewed_at));
     const eff = ws.addRow(['', '', '', '', 'Effective date', '']);
     eff.getCell(5).font = { bold: true };
+    dateCell(eff.getCell(6), fd('effective_date'));
     ws.addRow([]);
 
     section(`CLIENT'S IDENTIFICATION: ${String(c.name || '').toUpperCase()}`);
     pair('Client / owner', c.name || '', 'Project name', qt.title);
-    pair('Office address', '', 'TIN', '');
+    pair('Office address', f.office_address, 'TIN', f.tin);
     pair('Contact person', c.name || '', 'Phone no.', c.phone || '');
     pair('Email', c.email || '', 'Nearest branch', c.branch || '');
-    const unit = pair('Unit details', [qt.title, spec.body && `${spec.body} body`, spec.canopy && `${spec.canopy} canopy`, spec.seat && `${spec.seat} seats`].filter(Boolean).join(', '), 'Units', qt.units);
+    const unit = pair('Unit details', [qt.title, f.body && `${f.body} body`, f.canopy && `${f.canopy} canopy`, f.seat && `${f.seat} seats`].filter(Boolean).join(', '), 'Units', qt.units);
     unit.getCell(2).alignment = { wrapText: true, vertical: 'top' };
-    pair('Model', qt.title, 'Serial no.', 'To follow');
-    pair('Order no.', '', 'Charger no.', 'To follow');
-    pair('Inputted in Zoho?', '', 'Dated', '');
-    pair("Customer's P/O no.", '', 'Dated', '');
+    pair('Model', qt.title, 'Serial no.', f.serial_no);
+    pair('Order no.', f.order_no, 'Charger no.', f.charger_no);
+    pair('Inputted in Zoho?', f.zoho, 'Dated', fd('zoho_date'));
+    pair("Customer's P/O no.", f.po_no, 'Dated', fd('po_date'));
     ws.addRow([]);
 
     section('COST ALLOCATION (internal use only)');
-    pair('Sales order no.', '', '', '');
+    pair('Sales order no.', f.sales_order_no, '', '');
     const costHead = ws.addRow(['Description', '', 'Part number', 'Qty', 'Landed cost', 'Local cost', 'Amount']);
     costHead.font = { bold: true };
     ws.mergeCells(costHead.number, 1, costHead.number, 2);
-    const locals = ['PDI', 'Delivery', "Operator's training", 'Others'];
+    const locals = [['PDI', f.cost_pdi], ['Delivery', f.cost_delivery], ["Operator's training", f.cost_training],
+        [f.cost_others_note ? `Others: ${f.cost_others_note}` : 'Others', f.cost_others]];
     const lineRows = Math.max(qt.lines.length, locals.length);
     const first = costHead.number + 1;
     for (let i = 0; i < lineRows; i++) {
         const l = qt.lines[i];
         const cost = l ? quotationCostPhp(qt, l) : null;
         const qty = l ? Number(l.qty == null ? 1 : l.qty) * Number(qt.units || 1) : null;
-        const r = ws.addRow([l ? [l.part, l.option, l.description].filter(Boolean).join(' · ') : '', '', l ? l.sku : '', qty, cost == null || !l ? null : Math.round(cost * qty * 100) / 100, locals[i] || '', null]);
+        const local = locals[i];
+        const r = ws.addRow([l ? [l.part, l.option, l.description].filter(Boolean).join(' · ') : '', '', l ? l.sku : '', qty, cost == null || !l ? null : Math.round(cost * qty * 100) / 100,
+            local ? local[0] : '', local ? num(local[1]) : null]);
         ws.mergeCells(r.number, 1, r.number, 2);
         [5, 7].forEach(n => { r.getCell(n).numFmt = money; box(r.getCell(n)); });
     }
@@ -5848,17 +5982,21 @@ async function downloadPss() {
     section('PAYMENT TERMS');
     const payHead = ws.addRow(['', '', '%', '', 'Amount', 'Remarks']);
     payHead.font = { bold: true };
-    ['Down payment', 'Progress payment', 'Final payment'].forEach(label => {
-        const r = ws.addRow([label, '', null, '', null, '']);
+    const payRows = [['Down payment', 'pay_down'], ['Progress payment', 'pay_progress'], ['Final payment', 'pay_final']].map(([label, key]) => {
+        const pct = num(f[`${key}_pct`]);
+        const r = ws.addRow([label, '', pct == null ? null : pct / 100, '', null, f[`${key}_note`] || '']);
         r.getCell(1).font = { bold: true };
         r.getCell(3).numFmt = '0%';
         r.getCell(5).numFmt = money;
         [3, 5].forEach(n => box(r.getCell(n)));
         ws.mergeCells(r.number, 6, r.number, 7);
+        return r;
     });
     const total = ws.addRow(['Total (quotation)', '', '', '', Math.round(t.total * 100) / 100, '']);
     total.font = { bold: true };
     total.getCell(5).numFmt = money;
+    // Each payment: its % of the quotation's total
+    payRows.forEach(r => { if (r.getCell(3).value != null) r.getCell(5).value = { formula: `C${r.number}*E${total.number}` }; });
     const net = ws.addRow(['Total net of VAT', '', '', '', { formula: `E${total.number}/1.12` }, '']);
     net.font = { bold: true };
     net.getCell(5).numFmt = money;
@@ -5868,24 +6006,23 @@ async function downloadPss() {
     ws.addRow([]);
 
     section('DELIVERY SCHEDULE');
-    pair('Delivery date', '', 'Delivery contact', c.name || '');
-    pair('Delivery to site', '', 'Contact no.', c.phone || '');
-    pair('Special instructions', '', '', '');
+    pair('Delivery date', fd('delivery_date'), 'Delivery contact', f.delivery_contact);
+    pair('Delivery to site', f.delivery_site, 'Contact no.', f.delivery_phone);
+    pair('Special instructions', f.delivery_notes, '', '').getCell(2).alignment = { wrapText: true, vertical: 'top' };
     ws.addRow([]);
 
     section('OTHER REQUIREMENTS');
-    pair('Pre-delivery inspection', '', 'Date required', '');
-    pair("Operator's training", '', 'Date required', '');
-    pair('Free PM service', '', 'No. of visits', '');
-    pair('Others', '', '', '');
+    pair('Pre-delivery inspection', f.pdi, 'Date required', fd('pdi_date'));
+    pair("Operator's training", f.training, 'Date required', fd('training_date'));
+    pair('Free PM service', f.pm_service, 'No. of visits', f.pm_visits);
+    pair('Others', f.other_req, '', '');
     ws.addRow([]);
 
     section('REMARKS');
     const remarkHead = ws.addRow(['#', 'Remark', '', '', '', 'Settled on']);
     remarkHead.font = { bold: true };
-    const remarks = [qt.notes].filter(Boolean);
     for (let i = 0; i < 4; i++) {
-        const r = ws.addRow([i + 1, remarks[i] || '', '', '', '', '']);
+        const r = ws.addRow([i + 1, f[`remark_${i + 1}`] || '', '', '', '', '']);
         ws.mergeCells(r.number, 2, r.number, 5);
         r.getCell(2).alignment = { wrapText: true, vertical: 'top' };
         box(r.getCell(2)); box(r.getCell(6));
@@ -5926,29 +6063,29 @@ async function downloadPss() {
         r.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF151714' } };
     };
     psSection('DESCRIPTION OF EQUIPMENT');
-    qa('Type of unit', spec.unit, 'Quantity', qt.units);
-    qa('Model / serial number', 'To follow', 'Charger number', 'To follow');
-    qa('Controller number', '', '', '');
+    qa('Type of unit', f.unit, 'Quantity', qt.units);
+    qa('Model / serial number', f.serial_no, 'Charger number', f.charger_no);
+    qa('Controller number', f.controller_no, '', '');
     psSection('APPLICATION');
-    qa('How many seater?', spec.seats, 'Local painting needed?', 'NO');
-    qa('Color of the body?', spec.body.toUpperCase(), 'Color of the canopy?', spec.canopy.toUpperCase());
-    qa('Color of the seats?', spec.seat.toUpperCase(), 'Ground conditions?', '');
-    qa('Side mirrors needed?', spec.sideMirrors, 'Specialized tire needed?', '');
-    qa('Rear view mirror needed?', spec.rearMirror, 'Enclosure needed?', spec.enclosure);
-    qa('If yes, what kind?', '', 'Bag cover needed?', spec.bagCover);
-    qa('What size tire?', spec.tire, 'Custom upholstery needed?', spec.upholstery);
-    qa('Rims needed?', spec.rims, 'Cooler?', spec.cooler);
-    qa('Lift kit needed? If yes, how many inches?', spec.lift, 'Other requirements?', '');
-    qa('Lights included?', spec.lights, 'Ball washer and sand bottle?', spec.washer);
+    qa('How many seater?', f.seats, 'Local painting needed?', f.local_paint);
+    qa('Color of the body?', f.body, 'Color of the canopy?', f.canopy);
+    qa('Color of the seats?', f.seat, 'Ground conditions?', f.ground);
+    qa('Side mirrors needed?', f.side_mirrors, 'Specialized tire needed?', f.special_tire);
+    qa('Rear view mirror needed?', f.rear_mirror, 'Enclosure needed?', f.enclosure);
+    qa('If yes, what kind?', f.enclosure_kind, 'Bag cover needed?', f.bag_cover);
+    qa('What size tire?', f.tire, 'Custom upholstery needed?', f.upholstery);
+    qa('Rims needed?', f.rims, 'Cooler?', f.cooler);
+    qa('Lift kit needed? If yes, how many inches?', f.lift, 'Other requirements?', f.spec_other);
+    qa('Lights included?', f.lights, 'Ball washer and sand bottle?', f.washer);
     psSection('STRETCH');
-    qa('Is this a stretch project?', 'NO', 'What type of configuration?', spec.seats);
-    qa('M&M or Nivel stretch?', 'N/A', 'Lift kit required?', spec.lift);
+    qa('Is this a stretch project?', f.stretch, 'What type of configuration?', f.seats);
+    qa('M&M or Nivel stretch?', f.stretch_type, 'Lift kit required?', f.lift);
     psSection('BATTERY');
-    qa('Battery', spec.battery, 'Charging time', '');
-    qa('Hours of use per day', '', 'Customer informed about the charging time?', '');
-    qa('Battery voltage [V]', '', 'Running time suits the application?', '');
-    qa('Rated capacity [Ah]', '', 'Power supply at the site meets our requirements?', '');
-    qa('Voltage at customer site [V / Hz / phase]', '', '', '');
+    qa('Battery', f.battery, 'Charging time', f.charging_time);
+    qa('Hours of use per day', f.hours_per_day, 'Customer informed about the charging time?', f.informed);
+    qa('Battery voltage [V]', f.voltage, 'Running time suits the application?', f.running_ok);
+    qa('Rated capacity [Ah]', f.capacity, 'Power supply at the site meets our requirements?', f.power_ok);
+    qa('Voltage at customer site [V / Hz / phase]', f.site_voltage, '', '');
 
     const buffer = await book.xlsx.writeBuffer();
     const name = `PSS_${c.name || 'customer'}_${qt.title || qt.reference}`.replace(/[\\/:*?"<>|·]+/g, ' ').replace(/\s+/g, ' ').trim();

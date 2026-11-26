@@ -1822,6 +1822,26 @@
         .build-side .build-panel { max-height: none; min-height: 0; flex: 1 1 auto; }
         .build-side .build-included { flex: 0 1 auto; overflow-y: auto; }
     }
+    /* The builder's layout (2026-11-26): Included as a two-column list with Customize package under it; the
+       Accessories' sub-sections; and the Side attachment's left and right columns */
+    .opt-included-list { margin-top: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 0.75rem 1.5rem; font-size: 0.9375rem; }
+    .opt-included-list .build-included-label { font-size: 0.75rem; }
+    .opt-customize { display: inline-flex; align-items: center; gap: 0.625rem; margin-top: 1.25rem; padding: 0.625rem 1rem; border: 1px solid var(--line); background: var(--paper); font-weight: 600; cursor: pointer; }
+    .opt-customize input { width: 1.125rem; height: 1.125rem; accent-color: var(--green); }
+    .opt-lift-parts { margin-top: 0; }
+    .opt-subsection { padding-top: 1.75rem; }
+    .opt-subsection + .opt-subsection { margin-top: 0.5rem; border-top: 1px solid var(--line); }
+    .opt-subsection-title { font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--green-text); }
+    .opt-subsection .opt-group:first-of-type { padding-top: 0.75rem; }
+    .side-attach { margin-top: 0.75rem; border: 1px solid var(--line); background: var(--paper); }
+    .side-attach-head, .side-attach-row { display: grid; grid-template-columns: minmax(0, 1fr) 4.5rem 4.5rem; align-items: center; gap: 0.5rem; padding: 0.625rem 1rem; }
+    .side-attach-head { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); text-align: center; border-bottom: 1px solid var(--line); }
+    .side-attach-row + .side-attach-row { border-top: 1px solid var(--line); }
+    .side-attach-item { display: flex; align-items: center; gap: 0.75rem; }
+    .side-attach-item img { width: 3rem; height: 3rem; object-fit: cover; flex: none; background: var(--stone); }
+    .side-attach-check { display: grid; place-items: center; min-height: 2.75rem; cursor: pointer; }
+    .side-attach-check input { width: 1.25rem; height: 1.25rem; accent-color: var(--green); }
+    .side-attach > p { padding: 0 1rem 0.75rem; }
     /* An included item with alternatives, closed (renderIncludedClosed) */
     .opt-included-note { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; border: 1px solid var(--line); background: var(--stone); }
     /* The lift upgrade panel (renderLiftUpgrade) and the lift-only cards it opens */
