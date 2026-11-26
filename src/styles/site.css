@@ -562,10 +562,6 @@
         background: radial-gradient(ellipse 70% 75% at 55% 55%, var(--stage-inner) 0%, var(--stage-mid) 60%, var(--stage-outer) 100%);
         transition: --stage-inner 1.2s var(--ease), --stage-mid 1.2s var(--ease), --stage-outer 1.2s var(--ease);
     }
-    .home-stage-leaves { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
-    .home-stage-leaf { position: absolute; width: var(--size); opacity: 0.35; filter: blur(2px); }
-    .home-stage-leaf > div { will-change: transform; }
-    .home-stage-leaf svg { display: block; width: 100%; }
 
     /* No z-index here, so the cart blends with the section's backdrop rather than an empty layer */
     .home-stage-ui {
@@ -610,25 +606,26 @@
     .home-stage-copy .home-stage-tagline { display: none; }
     .home-stage-tagline { font-family: var(--font-display); font-style: italic; font-size: clamp(1.25rem, 1.8vw, 1.6rem); line-height: 1.2; }
     .home-stage-desc { color: var(--ink-2); line-height: 1.6; max-width: 34ch; }
-    /* The build's features as round photos with a border, in a row centred under the cart (2026-11-17); in the
-       grid's flow on tablets and phones (below) */
-    .home-stage-ui > .home-stage-feats { position: absolute; z-index: 2; left: 57%; bottom: 48px; translate: -50% 0; width: max-content; display: flex; flex-wrap: nowrap; gap: 0.75rem; }
+    /* The build's features as round photos with a border, in a row centred under the cart (2026-11-17); on tablets
+       and phones a carousel of three under the cart, with arrows and each one's name (2026-11-26, below) */
+    .home-stage-ui > .home-stage-feats-box { position: absolute; z-index: 2; left: 57%; bottom: 48px; translate: -50% 0; width: max-content; display: flex; flex-direction: column; align-items: center; }
+    .home-stage-feats { display: flex; flex-wrap: nowrap; gap: 0.75rem; }
     .home-stage-feats li { flex-shrink: 0; }
-    .home-stage-feats:empty { display: none; }
+    .home-stage-feats-box:has(.home-stage-feats:empty) { display: none; }
+    .home-stage-feats-arrow, .home-stage-feats li span { display: none; }
     /* Narrower desktops: the bottom row has no room beside the specs, so the circles sit just above it, a little smaller */
     @media (min-width: 1024px) and (max-width: 1399px) {
-        .home-stage-ui > .home-stage-feats { bottom: 128px; gap: 0.5rem; }
-        .home-stage-ui > .home-stage-feats img { width: 3.75rem; height: 3.75rem; }
+        .home-stage-ui > .home-stage-feats-box { bottom: 128px; }
+        .home-stage-feats-box .home-stage-feats { gap: 0.5rem; }
+        .home-stage-feats-box .home-stage-feats img { width: 3.75rem; height: 3.75rem; }
     }
     .home-stage-feats img { display: block; width: 4.5rem; height: 4.5rem; border-radius: 50%; object-fit: cover; border: 2px solid var(--paper); box-shadow: 0 0 0 1px var(--line), 0 6px 16px -8px rgba(21, 23, 20, 0.45); transition: transform 0.25s var(--ease); }
     /* Hover: the circle grows well past its neighbours (2026-11-19), above them */
     .home-stage-feats li { position: relative; }
     .home-stage-feats li:hover { z-index: 3; }
     .home-stage-feats img:hover { transform: scale(1.6); }
-    /* Under the circles, a caption (a flex item that takes a line of its own, so the page editor's texts keep their places) */
-    .home-stage-ui > .home-stage-feats { flex-wrap: wrap; justify-content: center; }
-    .home-stage-feats::after { content: 'Included Accessories'; flex-basis: 100%; margin-top: 0.25rem; text-align: center; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-2); }
-    .home-stage-feats:empty::after { content: none; }
+    /* Under the circles, a caption (a pseudo-element, so the page editor's texts keep their places) */
+    .home-stage-feats-box::after { content: 'Included Accessories'; margin-top: 1rem; text-align: center; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-2); }
     .home-stage-swap { transition: opacity 0.35s var(--ease), translate 0.35s var(--ease); }
     .home-stage-swap.is-out { opacity: 0; translate: 0 10px; }
 
@@ -709,17 +706,28 @@
     @media (max-width: 1023px) {
         .home-stage { height: auto; }
         .home-stage-ui { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; padding: 32px 20px 32px; }
-        .home-stage-cart { position: relative; left: auto; top: auto; translate: none; grid-column: 1; grid-row: 1; width: min(100%, 600px); margin: 0 auto; }
+        /* Text first (2026-11-26), then the cart, its features, the builds and the figures */
+        .home-stage-cart { position: relative; left: auto; top: auto; translate: none; grid-column: 1; grid-row: 2; width: min(100%, 600px); margin: 1rem auto 0; }
         .home-stage-shown { align-items: center; }
         .home-stage-swatches { justify-content: center; max-width: none; }
-        .home-stage-ui > .home-stage-feats { position: relative; left: auto; bottom: auto; translate: none; grid-column: 1; grid-row: 6; justify-self: start; flex-wrap: wrap; margin-top: 1.5rem; }
-        /* The builds right under the colors, all three in one row, then the text */
-        .home-stage-models { grid-column: 1; grid-row: 3; justify-self: stretch; align-items: stretch; margin-top: 1.25rem; gap: 0.5rem; }
-        .home-stage-copy { grid-column: 1; grid-row: 4; max-width: none; margin-top: 1.5rem; }
+        /* The features three at a time, each with its name under it, and arrows either side for the rest */
+        .home-stage-ui > .home-stage-feats-box { position: relative; left: auto; bottom: auto; translate: none; width: auto; grid-column: 1; grid-row: 3; display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) 2.25rem; align-items: start; column-gap: 0.25rem; margin-top: 0.5rem; }
+        .home-stage-feats-box::after { content: none; }
+        .home-stage-feats-box::before { content: 'Included Accessories'; grid-column: 1 / -1; margin-bottom: 0.75rem; text-align: center; font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.02em; color: var(--ink-2); }
+        .home-stage-feats { gap: 0; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+        .home-stage-feats::-webkit-scrollbar { display: none; }
+        .home-stage-feats li { flex: 0 0 calc(100% / 3); scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 4px 0.25rem 18px; text-align: center; }
+        .home-stage-feats li span { display: block; max-width: 7.5rem; font-size: 0.75rem; line-height: 1.3; color: var(--ink-2); }
+        .home-stage-feats img:hover { transform: none; }
+        .home-stage-feats-arrow { display: flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; margin-top: calc(4px + 1.125rem); border-radius: 50%; color: var(--ink); background: var(--paper); border: 1px solid rgba(21, 23, 20, 0.18); transition: opacity 0.2s var(--ease); }
+        .home-stage-feats-arrow:disabled { opacity: 0.3; }
+        .home-stage-feats-arrow[hidden] { display: flex; visibility: hidden; }
+        /* The builds under the features, all three in one row */
+        .home-stage-models { grid-column: 1; grid-row: 4; justify-self: stretch; align-items: stretch; margin-top: 1.25rem; gap: 0.5rem; }
+        .home-stage-copy { grid-column: 1; grid-row: 1; max-width: none; }
         .home-stage-card { flex: 1 1 0; min-width: 0; width: auto; }
         .home-stage-facts { grid-column: 1; grid-row: 5; margin-top: 1.75rem; gap: 1.5rem; }
         .home-stage-facts dd { font-size: 1.25rem; }
-        .home-stage .is-wide { display: none; }
     }
     /* Phones: smaller build cards (name only) and tighter text, so the section is about one screen shorter */
     @media (max-width: 639px) {
@@ -730,12 +738,23 @@
         .home-stage-card { padding: 0.375rem 0.375rem 0.5rem; text-align: center; }
         .home-stage-card small { display: none; }
         .home-stage-card span { font-size: 0.8125rem; }
-        .home-stage-copy { gap: 0.75rem; margin-top: 1.25rem; }
+        .home-stage-copy { gap: 0.75rem; }
         .home-stage-title { font-size: 2.75rem; }
         .home-stage-tagline { font-size: 1.125rem; }
         .home-stage-desc { font-size: 0.9375rem; line-height: 1.5; }
         .home-stage-facts { margin-top: 1.25rem; gap: 1rem; }
         .home-stage-facts dd { font-size: 1.0625rem; }
+        /* The body colours in a column beside the cart (2026-11-26): the builds' box and the colours' box give up their
+           own boxes (display: contents), so their parts take places in the stage's grid */
+        .home-stage-models, .home-stage-shown { display: contents; }
+        .home-stage-cart { width: calc(100% - 2.75rem); margin: 1rem 2.75rem 0 0; }
+        .home-stage-swatches { position: relative; z-index: 2; grid-column: 1; grid-row: 2; justify-self: end; align-self: center; flex-direction: column; flex-wrap: nowrap; gap: 0.625rem; margin-top: 1rem; }
+        .home-stage-swatch { width: 1.625rem; height: 1.625rem; }
+        #home-stage-models-label { grid-column: 1; grid-row: 4; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+        .home-stage-cards { grid-column: 1; grid-row: 5; }
+        .home-stage-shown > p { grid-column: 1; grid-row: 6; justify-self: center; margin-top: 0.75rem; }
+        .home-stage-compare { grid-column: 1; grid-row: 7; justify-self: center; margin-top: 0.5rem; }
+        .home-stage-facts { grid-row: 8; }
     }
     @media (prefers-reduced-motion: reduce) {
         .home-stage { transition: none; }
@@ -1787,8 +1806,9 @@
     .needs-confirm > :not(.confirm-gate) { opacity: 0.35; filter: grayscale(0.6); pointer-events: none; user-select: none; }
     .confirm-gate { position: sticky; top: 8.5rem; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.75rem 1.25rem; max-width: 46rem; margin: 0 auto 1.5rem; padding: 1rem 1.25rem; border: 1px solid var(--line); border-left: 6px solid var(--green); background: var(--paper); box-shadow: 0 18px 40px -20px rgba(21, 23, 20, 0.45); text-align: center; }
     .confirm-gate p { font-weight: 600; color: var(--ink); }
-    /* The homepage stats (branches, clients, carts sold): three to a narrow column on desktop, so the numbers fit it */
-    @media (min-width: 1024px) { .home-trust-stats .type-lg { font-size: clamp(2rem, 2.6vw, 2.75rem); } }
+    /* The homepage stats (branches, clients, carts sold): centred under the logos, large and in the accent green (2026-11-26) */
+    .home-trust-stats .type-lg { font-size: clamp(2.25rem, 10vw, 3.25rem); line-height: 1; }
+    @media (min-width: 1024px) { .home-trust-stats .type-lg { font-size: clamp(3.5rem, 5vw, 5rem); } }
     /* "Included with your build": a box under the Your build panel; the panel and the box stay in view together */
     .build-included:empty { display: none; }
     .build-included { margin-top: 1rem; padding: 1rem 1.25rem; border: 1px solid var(--line); border-left: 4px solid var(--green); background: var(--paper); }

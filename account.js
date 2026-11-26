@@ -1200,7 +1200,10 @@ function nudgePageText(dx, dy) {
 
 // A move as it shows at this window width: across scales with the window it was made at (an older move, with no ref,
 // as saved)
+// A move made on a desktop-width window is left off below 1024px, where the page is laid out differently and the
+// move would push the text over what's above it (2026-11-26)
 function pageTextShift(e) {
+    if (e.ref >= 1024 && document.documentElement.clientWidth < 1024) return { x: 0, y: 0 };
     const k = e.ref ? document.documentElement.clientWidth / e.ref : 1;
     return { x: (e.x || 0) * k, y: e.y || 0 };
 }
@@ -4720,6 +4723,15 @@ function rowValue(rows, label) {
     return row ? String(row[1]) : '';
 }
 
+// The lithium upgrade as the battery (2026-11-26): requests made before then have it as its own row beside the
+// lead-acid "Battery" row, which the quotation priced and the PSS showed instead
+function lithiumAsBattery(rows) {
+    const up = rowValue(rows, 'Lithium battery');
+    if (!up) return rows || [];
+    const out = rows.filter(([k]) => k !== 'Lithium battery').map(r => (r[0] === 'Battery' ? ['Battery', up] : r));
+    return out.some(([k]) => k === 'Battery') ? out : [...out, ['Battery', up]];
+}
+
 // Words to match on: lower case, inch sizes as "8in", plurals as singulars, filler words dropped
 // Names the builder and the bundles write differently as whole phrases (2026-11-18): "GC floor mat" is the bundle's
 // "GC Premium Floormat", "Apple CarPlay" its "Club Car Overhead Entertainment Carplay"
@@ -4858,6 +4870,11 @@ function suggestBundleLines(quote, group, bundles) {
 // Without them, the old sheet lines as before
 function quotationBundleLines(quote, group) {
     const basis = pageData.basis;
+    // An older request with the lithium upgrade: priced as lithium, without the lead-acid battery it also sent by id
+    if (rowValue(quote.rows, 'Lithium battery')) {
+        const leadIds = new Set(((basis && basis.options) || []).filter(o => String(o.slot).trim().toLowerCase() === 'battery').map(o => o.id));
+        quote = { ...quote, rows: lithiumAsBattery(quote.rows), bundle_options: (quote.bundle_options || []).filter(id => !leadIds.has(Number(id))) };
+    }
     const build = group && basis && basis.builds.find(b => bundleGroupName(b) === group);
     if (!build) return group && pageData.bundles ? suggestBundleLines(quote, group, pageData.bundles) : { lines: [], unmatched: [] };
     // The build's options as lines (the shape the old sheet lines had)
@@ -5719,7 +5736,7 @@ function loadExcelJs() {
 
 // Answers for the product specification, read from the build the customer chose and the quotation's lines
 function pssSpec(qt) {
-    const rows = qt.build_rows || [];
+    const rows = lithiumAsBattery(qt.build_rows || []);
     const value = label => { const r = rows.find(x => String(x[0]).toLowerCase() === label); return r ? String(r[1]) : ''; };
     const text = rows.map(r => r.join(' ')).concat(qt.lines.map(l => [l.part, l.option, l.description].join(' '))).join(' | ').toLowerCase();
     const yes = re => (re.test(text) ? 'YES' : 'NO');
@@ -5756,13 +5773,13 @@ async function downloadPss() {
     const book = new ExcelJS.Workbook();
     book.creator = 'Golfcarts.ph admin';
     const ws = book.addWorksheet('PSS', { pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-    ws.columns = [{ width: 26 }, { width: 34 }, { width: 14 }, { width: 8 }, { width: 18 }, { width: 22 }, { width: 18 }, { width: 34 }];
+    ws.columns = [{ width: 26 }, { width: 34 }, { width: 14 }, { width: 8 }, { width: 18 }, { width: 22 }, { width: 18 }];
     const money = '#,##0.00';
     const thin = { style: 'thin', color: { argb: 'FFBFBFBF' } };
     const box = cell => { cell.border = { top: thin, left: thin, bottom: thin, right: thin }; };
     const section = title => {
         const r = ws.addRow([title]);
-        ws.mergeCells(r.number, 1, r.number, 8);
+        ws.mergeCells(r.number, 1, r.number, 7);
         r.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
         r.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF151714' } };
         return r;
@@ -5805,7 +5822,7 @@ async function downloadPss() {
 
     section('COST ALLOCATION (internal use only)');
     pair('Sales order no.', '', '', '');
-    const costHead = ws.addRow(['Description', '', 'Part number', 'Qty', 'Landed cost', 'Local cost', 'Amount', 'Stock (stock sheet)']);
+    const costHead = ws.addRow(['Description', '', 'Part number', 'Qty', 'Landed cost', 'Local cost', 'Amount']);
     costHead.font = { bold: true };
     ws.mergeCells(costHead.number, 1, costHead.number, 2);
     const locals = ['PDI', 'Delivery', "Operator's training", 'Others'];
@@ -5815,17 +5832,9 @@ async function downloadPss() {
         const l = qt.lines[i];
         const cost = l ? quotationCostPhp(qt, l) : null;
         const qty = l ? Number(l.qty == null ? 1 : l.qty) * Number(qt.units || 1) : null;
-        // the line's stock in Zoho against what the quotation needs, short or out marked in red
-        const stock = l ? stockStatus(l.sku, qty) : null;
-        const r = ws.addRow([l ? [l.part, l.option, l.description].filter(Boolean).join(' · ') : '', '', l ? l.sku : '', qty, cost == null || !l ? null : Math.round(cost * qty * 100) / 100, locals[i] || '', null,
-            stock ? stock.text : '']);
-        r.getCell(8).alignment = { wrapText: true, vertical: 'top' };
+        const r = ws.addRow([l ? [l.part, l.option, l.description].filter(Boolean).join(' · ') : '', '', l ? l.sku : '', qty, cost == null || !l ? null : Math.round(cost * qty * 100) / 100, locals[i] || '', null]);
         ws.mergeCells(r.number, 1, r.number, 2);
         [5, 7].forEach(n => { r.getCell(n).numFmt = money; box(r.getCell(n)); });
-        if (stock && (stock.kind === 'short' || stock.kind === 'out')) {
-            r.getCell(8).font = { bold: true, color: { argb: 'FF8A2A1C' } };
-            r.getCell(8).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF6E0DC' } };
-        }
     }
     const last = first + lineRows - 1;
     const totals = ws.addRow(['Total machine cost', '', '', '', { formula: `SUM(E${first}:E${last})` }, 'Total local cost', { formula: `SUM(G${first}:G${last})` }]);

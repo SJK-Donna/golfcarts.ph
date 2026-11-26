@@ -63,7 +63,10 @@ const COLOR_PREVIEW = {
     // like paint (2026-11-16): the map takes in the dark red inside the rear body, and painted flat it came out as
     // blocks of the new colour with black holes; shaded, those stay the body's shadows. Red measures as dark as a black
     // cart's paint, but its light and shade are the panel's, not reflections, so it isn't softened as a dark photo is
-    'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', mask: 'image/Products/builds/masks/lifestyle-2-2-sangria.png', shade: true, brightPaint: true },
+    'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', mask: 'image/Products/builds/masks/lifestyle-2-2-sangria.png', shade: true, brightPaint: true,
+        // The rear side panel, the rocker below the well under the seat, and the cowl's shaded right flank
+        lit: [[[705, 590], [720, 560], [800, 530], [858, 524], [872, 560], [862, 640], [832, 700], [760, 722], [705, 716]],
+            [[615, 635], [700, 635], [705, 716], [615, 716]], [[480, 565], [545, 540], [556, 600], [546, 652], [488, 652]]] },
     // Paint maps (scripts/build-color-masks.mjs) of body, seats and roof, shaded like paint. The Transporter photo has
     // no roof, so its canopy choice can't be shown; the Villagers' seats aren't offered in other colours
     // Its seats and grab handles are the same black, so pixels of the seat's colour beside a seat are handle, not seat:
@@ -313,7 +316,7 @@ function shadeRegion(out, base, region, target, gradient, top) {
         let deep = 1;
         if (region.brightPaint) {
             Y = form.soft[k] + (Y - form.soft[k]) * 0.15;
-            deep = Math.max(0, Math.min(1, (form.blur[k] / form.ref - 0.25) / 0.25));
+            deep = region.lit && region.lit[k] ? 1 : Math.max(0, Math.min(1, (form.blur[k] / form.ref - 0.25) / 0.25));
         }
         const shade = Math.min(1, Y / refY);
         // Reflections show more strongly on dark paint
@@ -783,6 +786,13 @@ async function loadMaskRegions(slug, cfg, base) {
     const mask = await loadRecolorMask(cfg.mask, base.w, base.h);
     const regions = { body: maskRegion(base, mask, 0), seat: maskRegion(base, mask, 1), canopy: maskRegion(base, mask, 2) };
     if (cfg.brightPaint && regions.body) regions.body.brightPaint = true;
+    // `lit` (2026-11-26): outlines, in the photo's pixels, of body faces that are in shade but not hollows (the Sangria
+    // 2+2's rear side panel measures as dark as the well beside it): there a light colour follows the panel's broad
+    // light, smoothed, instead of the photo's own mottled shading
+    if (cfg.lit && regions.body) {
+        const inPoly = (x, y, poly) => { let hit = false; for (let a = 0, b = poly.length - 1; a < poly.length; b = a++) { const [xa, ya] = poly[a], [xb, yb] = poly[b]; if ((ya > y) !== (yb > y) && x < (xb - xa) * (y - ya) / (yb - ya) + xa) hit = !hit; } return hit; };
+        regions.body.lit = Uint8Array.from(regions.body.idx, i => (cfg.lit.some(p => inPoly(i % base.w, Math.floor(i / base.w), p)) ? 1 : 0));
+    }
     if (cfg.seatFormGain && regions.seat) regions.seat.formGain = cfg.seatFormGain;
     const seat = regions.seat;
     if (seat && cfg.seatTones) {

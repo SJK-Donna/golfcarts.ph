@@ -958,8 +958,9 @@ const TEMPO_MATRIX_LEGACY = {
             '12" Hela Bright Chrome, 23x10.5-12 tires', '12" Triton Machined Black, 23x10.5-12 tires']
     ],
     lighting: {
-        // Golfer: no lights; Scratch: GC lights (a kit is included, the visitor picks which); Pro: Club Car premium lights
-        golfer: [[], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights', 'No headlight'], ['Club Car Tempo Deluxe Light Kit']],
+        // Golfer: no lights; Scratch: GC lights (a kit is included, the visitor picks which); Pro: Club Car premium lights,
+        // or no headlight (Versions.docx, 2026-11-26)
+        golfer: [[], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights', 'No headlight'], ['Club Car Tempo Deluxe Light Kit', 'No headlight']],
         lifestyle: [['GC Tempo LED Headlights & Tail Lights'], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']]
     },
     // Golfer 2 and 4 golf accessories, all included: Golf the black GC bag cover only; Scratch a GC bag cover (black,
@@ -994,9 +995,9 @@ const TEMPO_MATRIX_LEGACY = {
         lifestyle: [[], [], ['GC Premium Bag Attachment']]
     },
     // Pro / Elite upgrades: audio, then charging add-ons
-    // Scratch / Signature: the Versions sheet's electronics (2026-11-19)
-    audioUpgrades: [[], ['Club Car Premium Sound Bar', 'GC Sound Bar 27" RGB'], ['Club Car Premium Sound Bar', 'Apple CarPlay', 'GC Sound Bar 27" RGB']],
-    electronicsAddOns: [[], ['Wireless Charging'], ['Wireless Charging', 'Premium USB-C Charging Port', 'GC USB-C Charging Port QC3.0 with Volt Meter']],
+    // Pro / Elite only (Versions.docx, 2026-11-26: Scratch / Signature have none)
+    audioUpgrades: [[], [], ['Club Car Premium Sound Bar', 'Apple CarPlay', 'GC Sound Bar 27" RGB']],
+    electronicsAddOns: [[], [], ['Wireless Charging', 'Premium USB-C Charging Port', 'GC USB-C Charging Port QC3.0 with Volt Meter']],
     steering: [[], [], ['Premium Steering Wheel with Scorecard (Club Car)']], // an upgrade on Pro / Elite
     // Mirrors, as upgrades on Scratch / Signature and Pro / Elite
     mirrors: { golfer: [[], TEMPO_MIRRORS_LEGACY, TEMPO_MIRRORS_LEGACY], lifestyle: [[], TEMPO_MIRRORS_LEGACY, TEMPO_MIRRORS_LEGACY] },
@@ -1004,6 +1005,13 @@ const TEMPO_MATRIX_LEGACY = {
     enclosureTwoSeat: [[], TEMPO_THREE_SIDED_LEGACY, ['Two-sided rain enclosure, Black (Club Car)', ...TEMPO_THREE_SIDED_LEGACY]],
     enclosureFourSeat: [[], ['Custom enclosure'], ['Custom enclosure']],
     cooling: [[], ['Zero Breeze Mark 3'], ['Zero Breeze Mark 3']] // only with an enclosure
+};
+
+// A lighting choice in a build's list: its one kit (or no headlight), or how many kits there are to choose from
+const lightKitsText = options => {
+    const kits = options.filter(o => !/^no headlight/i.test(o));
+    const none = kits.length < options.length ? ', or no headlight' : '';
+    return kits.length === 1 ? kits[0] + none : `GC LED lights (${kits.length} kits to choose from${none})`;
 };
 
 function tempoLevelIncludesLegacy(line, i, layout = '2') {
@@ -1019,7 +1027,7 @@ function tempoLevelIncludesLegacy(line, i, layout = '2') {
     return [
         `${m.battery[i]} battery`,
         wheels.length > 1 ? `${wheels[0]}, or ${wheels.length - 1} other wheel choices` : wheels[0],
-        !lights ? 'No headlights' : lights.type === 'fixed' ? lights.value : `GC LED lights (${lights.options.length} kits to choose from)`,
+        !lights ? 'No headlights' : lights.type === 'fixed' ? lights.value : lightKitsText(lights.options),
         `${tempoBodyNames({ version: line, layout }, i).length} body colors, ${m.seat[i].length} seat colors`,
         golf,
         text('flipSeat'),
@@ -1098,7 +1106,7 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (plusTwo) add({ id: 'flipSeat', section: 'Accessories', title: 'Rear flip seat', type: 'single', options: m.flipSeat[line][product.layout][i], included: true });
 
     // Upgrades (lithium is standard on Pro / Elite)
-    if (i < 2) add({ id: 'batteryUpgrade', section: 'Upgrades', title: 'Lithium battery', type: 'flag', label: m.batteryUpgrade });
+    if (i < 2) add({ id: 'batteryUpgrade', section: 'Upgrades', title: 'Lithium battery', type: 'flag', label: m.batteryUpgrade, replaces: 'battery' });
     if (!m.speedCodeIncluded[i]) add({ id: 'speedCode', section: 'Upgrades', title: 'Speed code', type: 'flag', label: 'Speed code (with fee)' });
     if (m.lift[i]) add({ id: 'lift', section: 'Upgrades', title: 'Lift kit', type: 'flag', label: 'Lifted 3.5" GC lift kit' });
     if (plusTwo && line === 'lifestyle') {
@@ -1344,9 +1352,10 @@ const VERSIONS_WHEELS = {
             'Triton Machined Black', 'Gridlock Machined Black', 'Gridlock Gloss Black', 'Talon Machined Black'],
         tires: ['Kraken 23x10-14', 'Morpheus 215/50-R14', '225/30-14', '23x10.50-14'] }
 };
-// With the lift kit (2026-11-19): the one 12" wheel, and the six 14" Kraken wheels (the Nokken is the Bundles' chrome
-// inserts one, its only Nokken on Kraken)
-const LIFT_WHEEL_12 = '12" Athena Gloss Machined Black with 12" Kraken 23X10-12';
+// With the lift kit: 12" rims on the off-road tires only (2026-11-26; without the lift, the street tires only), and the
+// six 14" Kraken wheels (the Nokken is the Bundles' chrome inserts one, its only Nokken on Kraken)
+const OFFROAD_12_TIRES = ['Kraken 23X10-12', '23x10.5-12'];
+const isOffroad12 = t => OFFROAD_12_TIRES.includes(t);
 const LIFT_KRAKEN_RIMS = ['Aerion Gloss Black', 'Athena Solid Gloss Black', 'Atlas Solid Gloss Black', 'Zeus Gloss Black and Machined', 'Nokken with Chrome inserts', 'Gridlock Machined Black'];
 const LIFT_KRAKEN_TIRE = 'Kraken 23x10-14';
 const isKrakenTire = t => /kraken/i.test(t);
@@ -1599,7 +1608,7 @@ const NAV_SEGMENTS = [
     },
     {
         id: 'resort',
-        label: 'Resort & Hospitality',
+        label: 'Resorts & Hospitality',
         category: 'Resort & Hospitality',
         tagline: 'Guest transport and daily property operations.',
         description: 'Match the vehicle to passenger flow, luggage and daily operating conditions, then add utility and fit-to-task builds for the jobs behind the scenes.',
@@ -3126,7 +3135,7 @@ function renderBatteryBar(value, side) {
     const isLithium = side === 'lithium';
     return `
         <div class="battery-track ${isLithium ? 'justify-start' : 'justify-end'}" aria-hidden="true">
-            <div class="battery-bar ${isLithium ? 'bg-green' : 'bg-mute'}" style="--bar:${value}%"></div>
+            <div class="battery-bar bg-green" style="--bar:${value}%"></div>
         </div>`;
 }
 
@@ -3141,9 +3150,9 @@ function renderHomeBatteryCompare() {
 
             <div class="max-w-5xl mx-auto">
                 <div class="battery-grid">
-                    <div class="battery-cell-lead px-4 sm:px-6 pt-4 pb-4 md:text-right">
+                    <div class="battery-cell-lead px-4 sm:px-6 pt-4 pb-4 md:text-right bg-stone">
                         <p class="type-md text-ink">Lead-acid</p>
-                        <p class="text-sm text-mute mt-1">Flooded (FLA)</p>
+                        <p class="text-sm text-ink-2 mt-1">Flooded (FLA)</p>
                     </div>
                     <div class="battery-cell-label hidden md:block"></div>
                     <div class="battery-cell-lithium px-4 sm:px-6 pb-4 pt-4 bg-stone">
@@ -3155,8 +3164,8 @@ function renderHomeBatteryCompare() {
                 ${BATTERY_COMPARISON.map(row => `
                     <div class="battery-row battery-grid">
                         <p class="battery-cell-label px-4 pt-4 md:py-4 text-sm font-medium text-ink md:text-center">${row.label}</p>
-                        <div class="battery-cell-lead px-4 sm:px-6 py-3 md:py-4 space-y-2 md:text-right">
-                            <p class="text-sm leading-snug">${row.lead}</p>
+                        <div class="battery-cell-lead px-4 sm:px-6 py-3 md:py-4 space-y-2 md:text-right bg-stone">
+                            <p class="text-sm leading-snug text-ink font-medium">${row.lead}</p>
                             ${renderBatteryBar(row.bars[0], 'lead')}
                         </div>
                         <div class="battery-cell-lithium px-4 sm:px-6 py-3 md:py-4 space-y-2 bg-stone">
@@ -3761,10 +3770,9 @@ function renderHomeInside() {
 // ==========================================
 // HOMEPAGE CART STAGE: the Golfer 2 in its three builds (Golfer, Scratch, Pro), one at a time on a light studio
 // backdrop tinted for each build. The build photos are on white, and the cart is multiplied onto the backdrop, so
-// the white falls away and the photo's own ground shadow stays. With a mouse, the cart leans toward the pointer
-// and leaves drift behind it; picking another build drives the cart off and the next one in. Still for reduced
-// motion; the leaves are only added where the browser can animate them, so pre-rendered pages carry the text,
-// photo and buttons only.
+// the white falls away and the photo's own ground shadow stays. With a mouse, the cart leans toward the pointer;
+// picking another build drives the cart off and the next one in. Still for reduced motion. (The drifting leaves
+// were taken out 2026-11-26.)
 // ==========================================
 const HOME_STAGE_SLUG = 'golfer-tempo-2';
 // Backdrop per build: centre, middle and edge of the radial gradient
@@ -3773,8 +3781,6 @@ const HOME_STAGE_BACKDROPS = {
     scratch: ['#FCFAF6', '#EFE8DA', '#D6C9AE'],
     pro: ['#FAFBFB', '#E6EAEC', '#C3CCD1']
 };
-const HOME_STAGE_LEAVES = [{ x: 12, y: 10, s: 70, r: 20 }, { x: 82, y: 36, s: 120, r: -30, wide: true }, { x: 74, y: 76, s: 80, r: 60 }, { x: 22, y: 84, s: 110, r: -10, wide: true }];
-const HOME_STAGE_LEAF_SVG = '<svg viewBox="0 0 60 120"><path d="M30 2C52 30 56 74 30 118C4 74 8 30 30 2Z" fill="#9CC45A"/><path d="M30 8V116" stroke="#4F6E22" stroke-width="2"/></svg>';
 
 let homeStage = null;
 let homeStageIndex = 0;
@@ -3812,7 +3818,7 @@ const MIRROR_TEXT = 'Side mirrors, side mirrors with turn signal, 5 panel mirror
 const HOME_COMPARE_ROWS = [
     ['Lighting', [null,
         [OPT('light-gc-apex'), 'Choice of: no headlight, GC Apex Tempo LED headlights & tail lights, GC Tempo LED headlights, or GC Tempo LED headlights & tail lights'],
-        [OPT('light-cc-deluxe'), 'Club Car Tempo Deluxe Light Kit']]],
+        [OPT('light-cc-deluxe'), 'Club Car Tempo Deluxe Light Kit, or no headlight']]],
     ['Colors', 'colors'],
     ['Canopy', [[null, '2 Pass Canopy: white or beige'], [null, '2 Pass Canopy: white, beige or black'], [null, '2 Pass Canopy: white, beige or black']]],
     ['Battery', [[OPT('battery-trojan-8v'), 'Trojan FLA 8V'], [OPT('battery-trojan-8v'), 'Trojan FLA 8V'], [OPT('battery-battlite'), 'Battlite lithium']]],
@@ -3932,16 +3938,16 @@ function homeStageFacts(product) {
 // three, the Pro two more (square crops in image/Banners/golfer-features). The CarPlay circle shows the Club Car
 // overhead unit until a photo of the CarPlay unit is added
 const HOME_STAGE_FEATURE = {
-    dashboard: { image: 'image/Banners/golfer-features/dashboard.jpg', alt: 'Dashboard and steering wheel' },
-    charger: { image: 'image/Banners/golfer-features/wired-charger.jpg', alt: 'Wired USB charger' },
-    ballHolder: { image: 'image/Banners/golfer-features/golf-ball-holder.jpg', alt: 'Side storage with golf ball holder' },
-    cups: { image: 'image/Banners/golfer-features/cup-holders.jpg', alt: 'Cup holders' },
-    cooler: { image: 'image/Banners/golfer-features/cooler-ball-washer.jpg', alt: 'Caddy cooler and ball washer' },
-    mirror: { image: 'image/Banners/golfer-features/mirror.jpg', alt: 'Side mirrors' },
-    sand: { image: 'image/Banners/golfer-features/sand-bottle.jpg', alt: 'Sand bottle' },
-    steering: { image: 'image/Banners/golfer-features/steering-premium.jpg', alt: 'Premium steering wheel' },
-    carplay: { image: 'image/Banners/golfer-features/carplay.jpg', alt: 'Overhead entertainment with Apple CarPlay' },
-    speaker: { image: 'image/Banners/golfer-features/gc-bluetooth-speaker.jpg', alt: 'GC Bluetooth speaker' }
+    dashboard: { name: 'Dashboard', image: 'image/Banners/golfer-features/dashboard.jpg', alt: 'Dashboard and steering wheel' },
+    charger: { name: 'USB charger', image: 'image/Banners/golfer-features/wired-charger.jpg', alt: 'Wired USB charger' },
+    ballHolder: { name: 'Golf ball holder', image: 'image/Banners/golfer-features/golf-ball-holder.jpg', alt: 'Side storage with golf ball holder' },
+    cups: { name: 'Cup holders', image: 'image/Banners/golfer-features/cup-holders.jpg', alt: 'Cup holders' },
+    cooler: { name: 'Cooler and ball washer', image: 'image/Banners/golfer-features/cooler-ball-washer.jpg', alt: 'Caddy cooler and ball washer' },
+    mirror: { name: 'Side mirrors', image: 'image/Banners/golfer-features/mirror.jpg', alt: 'Side mirrors' },
+    sand: { name: 'Sand bottle', image: 'image/Banners/golfer-features/sand-bottle.jpg', alt: 'Sand bottle' },
+    steering: { name: 'Premium steering wheel', image: 'image/Banners/golfer-features/steering-premium.jpg', alt: 'Premium steering wheel' },
+    carplay: { name: 'Apple CarPlay', image: 'image/Banners/golfer-features/carplay.jpg', alt: 'Overhead entertainment with Apple CarPlay' },
+    speaker: { name: 'Bluetooth speaker', image: 'image/Banners/golfer-features/gc-bluetooth-speaker.jpg', alt: 'GC Bluetooth speaker' }
 };
 const HOME_STAGE_FEATURES = {
     // The dashboard circle left out (2026-11-19, the user's choice)
@@ -3950,7 +3956,7 @@ const HOME_STAGE_FEATURES = {
     pro: ['charger', 'ballHolder', 'cups', 'cooler', 'mirror', 'sand', 'steering', 'carplay']
 };
 const homeStageFeats = level => (HOME_STAGE_FEATURES[level.id] || []).map(k => HOME_STAGE_FEATURE[k])
-    .map(f => `<li><img src="${f.image}" alt="${f.alt}" title="${f.alt}" width="320" height="320" loading="lazy"></li>`).join('');
+    .map(f => `<li><img src="${f.image}" alt="${f.alt}" title="${f.alt}" width="320" height="320" loading="lazy"><span aria-hidden="true">${f.name}</span></li>`).join('');
 
 function renderHomeStage() {
     const builds = homeStageBuilds();
@@ -3958,7 +3964,6 @@ function renderHomeStage() {
     // The swatches stay hidden until initHomeStage finds the repaint works here (see livePreviewAvailable)
     return `
         <section id="home-stage" class="rise home-stage" style="${homeStageBackdrop(builds[0])}" aria-labelledby="home-stage-title">
-            <div class="home-stage-leaves" aria-hidden="true"></div>
             <div class="home-stage-ui">
                 <div class="home-stage-cart" aria-hidden="true">
                     <div class="home-stage-bob">
@@ -3979,7 +3984,12 @@ function renderHomeStage() {
                     </div>
                 </div>
 
-                <ul class="home-stage-feats" aria-label="Features of this build" data-txt-scope="${level.id}">${homeStageFeats(level)}</ul>
+                <!-- On tablets and phones, three at a time with arrows (2026-11-26) -->
+                <div class="home-stage-feats-box">
+                    <button type="button" class="home-stage-feats-arrow" data-dir="-1" aria-label="Previous accessories"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
+                    <ul class="home-stage-feats" aria-label="Features of this build" data-txt-scope="${level.id}">${homeStageFeats(level)}</ul>
+                    <button type="button" class="home-stage-feats-arrow" data-dir="1" aria-label="Next accessories"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg></button>
+                </div>
 
                 <div class="home-stage-models">
                     <p id="home-stage-models-label" class="home-stage-eyebrow">Choose a build</p>
@@ -4031,9 +4041,17 @@ function initHomeStage() {
     const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const canAnimate = !reduceMotion && !!window.IntersectionObserver && !!Element.prototype.animate;
     let switching = false, stopped = false, running = false, onScreen = false, colorToken = 0;
-    const leaves = [];
     const swatches = find('.home-stage-swatches');
     swatches.hidden = !livePreviewAvailable;
+    // The features' arrows: off at either end, and hidden when all of them fit
+    const feats = find('.home-stage-feats'), featArrows = section.querySelectorAll('.home-stage-feats-arrow');
+    const updateArrows = () => {
+        const max = feats.scrollWidth - feats.clientWidth;
+        featArrows.forEach(b => { b.hidden = max <= 1; b.disabled = +b.dataset.dir < 0 ? feats.scrollLeft <= 1 : feats.scrollLeft >= max - 1; });
+    };
+    feats.addEventListener('scroll', updateArrows, { passive: true });
+    window.addEventListener('resize', updateArrows);
+    updateArrows();
 
     const setBackdrop = stops => ['--stage-inner', '--stage-mid', '--stage-outer'].forEach((v, k) => section.style.setProperty(v, stops[k]));
 
@@ -4050,7 +4068,9 @@ function initHomeStage() {
         find('#home-stage-desc').textContent = build.level.about || build.level.blurb;
         find('#home-stage-build').innerHTML = `Build the ${buildLabelHtml(build.level)}`;
         find('#home-stage-body').textContent = build.body;
-        find('.home-stage-feats').innerHTML = homeStageFeats(build.level);
+        feats.innerHTML = homeStageFeats(build.level);
+        feats.scrollLeft = 0;
+        updateArrows();
         section.querySelectorAll('.home-stage-card').forEach((c, k) => c.setAttribute('aria-pressed', String(k === i)));
         setBackdrop(build.backdrop);
         photo.src = build.photo;
@@ -4111,23 +4131,15 @@ function initHomeStage() {
         if (card && !switching && +card.dataset.build !== homeStageIndex) switchBuild(+card.dataset.build);
         const swatch = e.target.closest('.home-stage-swatch');
         if (swatch && !switching) pickColor(swatch.dataset.color);
+        const arrow = e.target.closest('.home-stage-feats-arrow');
+        if (arrow) feats.scrollBy({ left: +arrow.dataset.dir * (feats.firstElementChild ? feats.firstElementChild.offsetWidth : feats.clientWidth), behavior: reduceMotion ? 'auto' : 'smooth' });
     };
     section.addEventListener('click', onClick);
 
     // Everything below is motion
     let observer = null, onVisibility = null;
     if (canAnimate) {
-        const layer = find('.home-stage-leaves');
-        HOME_STAGE_LEAVES.forEach(l => {
-            const pos = document.createElement('div');
-            pos.className = 'home-stage-leaf' + (l.wide ? ' is-wide' : '');
-            pos.style.cssText = `left:${l.x}%; top:${l.y}%; --size:${l.s}px; rotate:${l.r}deg`;
-            pos.innerHTML = `<div>${HOME_STAGE_LEAF_SVG}</div>`;
-            layer.appendChild(pos);
-            leaves.push(pos.firstChild);
-        });
-
-        // With a mouse: the cart leans toward the pointer and the leaves drift the other way
+        // With a mouse: the cart leans toward the pointer
         const target = { x: 0, y: 0 }, eased = { x: 0, y: 0 };
         if (window.matchMedia('(pointer: fine)').matches) {
             section.addEventListener('pointermove', e => {
@@ -4140,15 +4152,9 @@ function initHomeStage() {
 
         const frame = () => {
             if (!running || !section.isConnected) { running = false; return; }
-            const t = performance.now() / 1000;
             eased.x += (target.x - eased.x) * 0.06;
             eased.y += (target.y - eased.y) * 0.06;
             tilt.style.transform = `perspective(1400px) rotateY(${eased.x * -14}deg) rotateX(${eased.y * 6}deg)`;
-            layer.style.transform = `translate(${eased.x * -15}px, ${eased.y * -15}px)`;
-            leaves.forEach((leaf, i) => {
-                const phase = (t + i * 1.2) * (Math.PI * 2 / (10 + i * 2));
-                leaf.style.transform = `translate(${Math.cos(phase * 0.5) * 15}px, ${Math.sin(phase) * 20}px) rotate(${Math.sin(phase * 0.3) * 15}deg)`;
-            });
             requestAnimationFrame(frame);
         };
 
@@ -4177,6 +4183,7 @@ function initHomeStage() {
             stopped = true;
             running = false;
             section.removeEventListener('click', onClick);
+            window.removeEventListener('resize', updateArrows);
             if (observer) observer.disconnect();
             if (onVisibility) document.removeEventListener('visibilitychange', onVisibility);
         }
@@ -4331,14 +4338,8 @@ function renderHomeTrust() {
     return `
         <section class="rise home-section" aria-labelledby="home-trust-title">
             <div class="max-w-site mx-auto px-5 sm:px-8 lg:px-12 grid lg:grid-cols-12 gap-12">
-                <div class="lg:col-span-4 space-y-10">
+                <div class="lg:col-span-4">
                     <h2 id="home-trust-title" class="type-lg text-ink">Running on courses, resorts and sites across the Philippines.</h2>
-                    <!-- Branches, clients and carts sold (2026-11-25, the user's figures) -->
-                    <dl class="home-trust-stats grid grid-cols-3 gap-6 border-t border-line pt-8">
-                        <div><dt class="text-sm text-mute">Branches</dt><dd class="mt-2"><a href="./#home-branches" onclick="event.preventDefault(); goToHomeSection('home-branches')" class="group block"><span class="type-lg text-ink block">${BRANCHES.length}</span><span class="link text-sm">See the map</span></a></dd></div>
-                        <div><dt class="text-sm text-mute">Clients</dt><dd class="type-lg text-ink mt-2">1k+</dd></div>
-                        <div><dt class="text-sm text-mute">Carts sold</dt><dd class="type-lg text-ink mt-2">2,000+</dd></div>
-                    </dl>
                 </div>
                 <div class="lg:col-span-8">
                     <!-- Logos animate around the grid (initLogoGrid); without JavaScript or with reduced motion it stays static -->
@@ -4350,6 +4351,14 @@ function renderHomeTrust() {
                         </ul>
                     </div>
                     <button type="button" id="home-logos-toggle" class="link text-sm mt-4" aria-pressed="false" hidden>Pause logos</button>
+                </div>
+                <!-- Branches, clients and carts sold (2026-11-25, the user's figures), under the heading and the logos (2026-11-26) -->
+                <div class="lg:col-span-12">
+                    <dl class="home-trust-stats grid grid-cols-3 gap-6 border-t border-line pt-10 max-w-4xl mx-auto text-center">
+                        <div><dt class="text-sm lg:text-base text-mute">Branches</dt><dd class="mt-2"><a href="./#home-branches" onclick="event.preventDefault(); goToHomeSection('home-branches')" class="group block"><span class="type-lg text-green block">${BRANCHES.length}</span><span class="link text-sm">See the map</span></a></dd></div>
+                        <div><dt class="text-sm lg:text-base text-mute">Clients</dt><dd class="type-lg text-green mt-2">1,300+</dd></div>
+                        <div><dt class="text-sm lg:text-base text-mute">Carts sold</dt><dd class="type-lg text-green mt-2">2,000+</dd></div>
+                    </dl>
                 </div>
             </div>
         </section>
@@ -4778,6 +4787,33 @@ function initHomePage() {
     initHomeStage();
     initLogoGrid();
     initBranchMap();
+    initTrustCount();
+}
+
+// The homepage figures (branches, clients, carts sold) count up from 0 the first time they come into view
+// (2026-11-26). Each counts to the number its text shows then, so a page-editor change to a figure is kept; still
+// for reduced motion
+function initTrustCount() {
+    const els = [...document.querySelectorAll('.home-trust-stats .type-lg')];
+    if (!els.length || !window.IntersectionObserver || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const run = el => {
+        const text = el.textContent, m = text.match(/\d[\d,]*/);
+        if (!m) return;
+        const target = +m[0].replace(/,/g, ''), comma = m[0].includes(','), start = performance.now(), ms = 1600;
+        const step = now => {
+            if (!el.isConnected) return;
+            const t = Math.min(1, (now - start) / ms), n = Math.round(target * (1 - Math.pow(1 - t, 3)));
+            el.textContent = t < 1 ? text.replace(m[0], comma ? n.toLocaleString('en-US') : String(n)) : text;
+            if (t < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+    };
+    const io = new IntersectionObserver(entries => entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        io.unobserve(e.target);
+        run(e.target);
+    }), { threshold: 0.6 });
+    els.forEach(el => io.observe(el));
 }
 
 // A page made with the page builder: its title and intro; the sections added to it follow (account.js)
@@ -5349,7 +5385,7 @@ const ACCESSORY_CATALOG = [
         { id: 'lt-cc-tempo', slot: 'lighting', builder: 'lighting', name: 'CC Tempo Lights (Head Lights)', sku: 'SJK-0249', fits: ['tempo'], product: 'acc-deluxe-lights' },
         { id: 'lt-gc-tempo', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Light Kit', sku: 'SJK-1921', fits: ['tempo'], image: 'image/Options/light-gc-tempo.jpg' },
         { id: 'lt-gc-tempo-full', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit', sku: 'SJK-1573', fits: ['tempo'], image: 'image/Options/light-gc-tempo-full.jpg' },
-        { id: 'lt-gc-tempo-rgb', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit RGB', sku: 'SJK-1548', fits: ['tempo'] }
+        { id: 'lt-gc-tempo-rgb', slot: 'lighting', builder: 'lighting', name: 'GC Tempo Full Light Kit RGB', sku: 'SJK-1548', fits: ['tempo'], image: 'image/Options/light-gc-tempo-rgb.jpg' }
     ] },
     { group: 'Golf Accessories', items: [
         { id: 'golf-sand', notOn: REAR_SEAT_TAGS, builder: 'sandBottle', name: 'Sand Bottle', sku: 'SJK-0332', fits: ['golf'], product: 'acc-divot-sand-bottle' },
@@ -5370,18 +5406,18 @@ const ACCESSORY_CATALOG = [
         { id: 'mir-convex', slot: 'rearMirror', builder: 'mirrors', name: 'Convex Rear Mirror', sku: 'SJK-1461', fits: ['tempo', 'onward', 'villager', 'utility'], image: 'image/Options/mirror-convex-short.jpg' }
     ] },
     { group: 'Storage', items: [
-        { id: 'sto-overhead', builder: 'storage', name: 'Overhead Storage Console', sku: 'SJK-0880', fits: ['tempo', 'onward'] },
-        { id: 'sto-underseat', builder: 'storage', name: 'Rear Under Seat Storage Bucket', sku: 'SJK-1002', fits: ['tempo', 'onward'] },
-        { id: 'sto-glovebox', name: 'Onward Locking Glove Box Kit', sku: 'SJK-0881', fits: ['onward'] }
+        { id: 'sto-overhead', builder: 'storage', name: 'Overhead Storage Console', sku: 'SJK-0880', fits: ['tempo', 'onward'], image: 'image/Options/overhead-storage-console.jpg' },
+        { id: 'sto-underseat', builder: 'storage', name: 'Rear Under Seat Storage Bucket', sku: 'SJK-1002', fits: ['tempo', 'onward'], image: 'image/Options/storage-rear-bucket.jpg' },
+        { id: 'sto-glovebox', name: 'Onward Locking Glove Box Kit', sku: 'SJK-0881', fits: ['onward'], image: 'image/Options/storage-glove-box-onward.jpg' }
     ] },
     { group: 'Rain Enclosures', items: [
-        { id: 'enc-onward-black', slot: 'enclosure', builder: 'enclosure', name: 'Two-Sided Rain Enclosure (Black)', fits: ['onward'] },
+        { id: 'enc-onward-black', slot: 'enclosure', builder: 'enclosure', name: 'Two-Sided Rain Enclosure (Black)', fits: ['onward'], image: 'image/Options/enclosure-2-black-cc.jpg' },
         { id: 'enc-2-beige', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Beige)', sku: 'SJK-1855', fits: ['tempo-2'], product: 'acc-golf-cover', image: 'image/Options/enclosure-3-beige.jpg' },
         { id: 'enc-2-white', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (White)', sku: 'SJK-1856', fits: ['tempo-2'], product: 'acc-golf-cover', image: 'image/Options/enclosure-3-white.jpg' },
         { id: 'enc-2-black', slot: 'enclosure', builder: 'enclosure', name: 'Three-Sided Rain Enclosure (Black)', sku: 'SJK-1509', fits: ['tempo-2'], product: 'acc-golf-cover', image: 'image/Options/enclosure-3-black.jpg' },
-        { id: 'enc-22-black', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Black)', sku: 'SJK-0467', fits: ['tempo-2+2'] },
-        { id: 'enc-22-beige', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Beige)', fits: ['tempo-2+2'] },
-        { id: 'enc-22-white', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (White)', sku: 'SJK-1905', fits: ['tempo-2+2'] },
+        { id: 'enc-22-black', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Black)', sku: 'SJK-0467', fits: ['tempo-2+2'], image: 'image/Options/enclosure-22-black.jpg' },
+        { id: 'enc-22-beige', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (Beige)', fits: ['tempo-2+2'], image: 'image/Options/enclosure-22-beige.jpg' },
+        { id: 'enc-22-white', slot: 'enclosure', builder: 'enclosure', name: '2+2 Three-Sided Rain Enclosure (White)', sku: 'SJK-1905', fits: ['tempo-2+2'], image: 'image/Options/enclosure-22-white.jpg' },
         { id: 'enc-4-black', slot: 'enclosure', builder: 'enclosure', name: 'Tempo 4 Rain Enclosure (Black)', fits: ['tempo-4'] },
         { id: 'enc-4-beige', slot: 'enclosure', builder: 'enclosure', name: 'Tempo 4 Rain Enclosure (Beige)', fits: ['tempo-4'] },
         { id: 'enc-42-black', slot: 'enclosure', builder: 'enclosure', name: 'Tempo 4+2 Rain Enclosure (Black)', fits: ['tempo-4+2'] },
@@ -5407,7 +5443,7 @@ const ACCESSORY_CATALOG = [
         { id: 'el-cc-soundbar', slot: 'audio', builder: 'electronics', name: 'Club Car Premium Sound Bar', sku: 'SJK-0787', fits: ['tempo', 'onward', 'villager'], product: 'acc-premium-speaker' },
         { id: 'el-gc-soundbar', slot: 'audio', builder: 'electronics', name: 'GC Sound Bar 27" RGB', sku: 'SJK-1564', fits: ['tempo', 'onward', 'villager'], image: 'image/Options/audio-gc-soundbar-27.jpg' },
         { id: 'el-wireless', builder: 'charging', name: 'Wireless Charging', sku: 'SJK-1510', fits: ['tempo', 'onward'], image: 'image/Options/charge-wireless.jpg' },
-        { id: 'el-usb-premium', slot: 'usb', builder: 'charging', name: 'Premium USB-C Charging Port', sku: 'SJK-1178', fits: ['tempo', 'onward', 'villager', 'utility'] },
+        { id: 'el-usb-premium', slot: 'usb', builder: 'charging', name: 'Premium USB-C Charging Port', sku: 'SJK-1178', fits: ['tempo', 'onward', 'villager', 'utility'], image: 'image/Options/charge-usb-c-voltmeter.jpg' },
         { id: 'el-usb-gc', slot: 'usb', builder: 'charging', name: 'GC USB-C Charging Port QC3.0 with Volt Meter', fits: ['tempo', 'onward', 'villager', 'utility'], image: 'image/Options/charge-usb-c-voltmeter.jpg' }
     ] },
     { group: 'Driver Accessories', items: [
@@ -5417,12 +5453,12 @@ const ACCESSORY_CATALOG = [
     ] },
     { group: 'Exterior', items: [
         { id: 'ext-fender-3', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 3"', sku: 'SJK-1542', fits: ['tempo'], image: 'image/Options/fender-tempo-3.jpg' },
-        { id: 'ext-fender-15', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 1.5"', fits: ['tempo'] },
-        { id: 'ext-fender-onward', slot: 'fenders', name: 'Onward Fenders', sku: 'SJK-1885', fits: ['onward'] },
+        { id: 'ext-fender-15', slot: 'fenders', builder: 'lift', needsLift: true, name: 'Tempo Fenders 1.5"', fits: ['tempo'], image: 'image/Options/fender-tempo-15.jpg' },
+        { id: 'ext-fender-onward', slot: 'fenders', name: 'Onward Fenders', sku: 'SJK-1885', fits: ['onward'], image: 'image/Options/fender-flare-onward.jpg' },
         { id: 'ext-brush-guard', builder: 'lift', name: 'Brush Guard', sku: 'SJK-0119', fits: ['tempo', 'onward', 'utility'], product: 'acc-brush-guard' }
     ] },
     { group: 'Lifted Accessories', items: [
-        { id: 'lift-4', slot: 'lift', builder: 'lift', name: '4" Lift Kit', sku: 'SJK-0330', fits: ['tempo'] },
+        { id: 'lift-4', slot: 'lift', builder: 'lift', name: '4" Lift Kit', sku: 'SJK-0330', fits: ['tempo'], image: 'image/Options/lift-cc-4.jpg' },
         { id: 'lift-nerf', builder: 'lift', needsLift: true, name: 'Nerf Bar', sku: 'SJK-0377', fits: ['lifted'], image: 'image/Options/nerf-bar.jpg' }
     ] }
 ];
@@ -6552,9 +6588,11 @@ function syncLiftWheels(product, i, o) {
     const wheels = findTempoGroup(product, i, 'wheels');
     if (!wheels || !wheels.liftUnlocks) return;
     o.wheelUpgrade = !!o.lift;
-    if (!o.lift && wheels.options.indexOf(o.wheels) >= wheels.upgradeFrom) o.wheels = wheels.options[0];
     const cur = parseWheel(o.wheels);
-    if (o.lift && o.wheels !== LIFT_WHEEL_12 && !(cur && cur.size === 14)) o.wheels = wheelCombo(14, LIFT_KRAKEN_RIMS[0], LIFT_KRAKEN_TIRE);
+    // Not lifted: no 14", and no 12" on off-road tires
+    if (!o.lift && (wheels.options.indexOf(o.wheels) >= wheels.upgradeFrom || (cur && cur.size === 12 && isOffroad12(cur.tire)))) o.wheels = wheels.options[0];
+    // Lifted: a 12" on off-road tires or any 14"; anything else starts on the first 14" Kraken wheel
+    if (o.lift && !(cur && (cur.size === 14 || (cur.size === 12 && isOffroad12(cur.tire))))) o.wheels = wheelCombo(14, LIFT_KRAKEN_RIMS[0], LIFT_KRAKEN_TIRE);
 }
 
 // The 14" wheel upgrade: on, the 14" wheels can be picked; off, they lock again and a 14" choice goes back to
@@ -6748,9 +6786,23 @@ const OPTION_PHOTOS = {
     // Rain enclosures
     'Three-sided rain enclosure, Beige': 'enclosure-3-beige',
     'Three-sided rain enclosure, White': 'enclosure-3-white',
-    'Three-sided rain enclosure, Black': 'enclosure-3-black'
-    // No photo yet (a name here must have its file in image/Options, or its eye opens a broken image):
-    // Overhead Storage Console, Tempo Fenders 1.5", Two-sided rain enclosure (Club Car)
+    'Three-sided rain enclosure, Black': 'enclosure-3-black',
+    'Two-sided rain enclosure, Black (Club Car)': 'enclosure-2-black-cc',
+    // The Bundles' names for items above
+    'Magnetic Beige': 'bag-cover-magnetic-beige',
+    'Magnetic Black': 'bag-cover-magnetic-black',
+    'Battlite lithium': 'battery-battlite',
+    'GC Bluetooth Speaker': 'audio-gc-soundbar-27',
+    'Sand bottle 2pcs': 'sand-bottle',
+    'Side Mirror + 5 pannel': 'mirror-5-panel',
+    'Premium USB-C Charging Port': 'charge-usb-c-voltmeter',
+    'Overhead Storage Console': 'overhead-storage-console',
+    'Select Overhead Storage Console': 'overhead-storage-console',
+    // From the Drive (2026-11-26)
+    'Tempo Fenders 1.5"': 'fender-tempo-15',
+    'Onward Fender Flare Kit': 'fender-flare-onward',
+    'Club Car Flip Seat': 'flip-club-car'
+    // A name here must have its file in image/Options, or its eye opens a broken image
 };
 
 // A photo for an option (by option name, or by the group's id for single-item groups such as the ball washer)
@@ -6868,6 +6920,10 @@ function optionGroupHint(g) {
 const WHEEL_PHOTO_BY_RIM = [
     [/^8"/, 'wheel-8-steel'], [/^10"/, 'wheel-10-5spoke-gunmetal'],
     [/^12" Triton/, 'wheel-12-triton-23105'], [/^12" Hela/, 'wheel-12-hela-215'],
+    [/^12" Athena Bright Chrome/, 'wheel-12-athena-chrome-23105'], [/^12" Athena Gloss Machined/, 'wheel-12-athena-machined-23105'],
+    [/^12" Athena Gloss Black/, 'wheel-12-athena-gloss-23105'], [/^12" Gridlock Gloss/, 'wheel-12-gridlock-gloss-23105'],
+    [/^12" Gridlock Machined/, 'wheel-12-gridlock-machined-23105'], [/^12" Mercury/, 'wheel-12-mercury-23105'],
+    [/^12" Talon/, 'wheel-12-talon-23105'], [/^14" Triton/, 'wheel-14-triton-225'], [/^14" Aerion PVD/, 'wheel-14-aerion-chrome-kraken'],
     [/^14" Aerion Gloss/, 'wheel-14-aerion-gloss-kraken'], [/^14" Aerion Black Chrome/, 'wheel-14-aerion-chrome-kraken'],
     [/^14" Athena/, 'wheel-14-athena-gloss-kraken'], [/^14" Atlas/, 'wheel-14-atlas-gunmetal-kraken'], [/^14" Zeus/, 'wheel-14-zeus-kraken'],
     [/^14" Mercury/, 'wheel-14-mercury-kraken'], [/^14" Nokken/, 'wheel-14-nokken-chrome'], [/^14" Gridlock Machined/, 'wheel-14-gridlock-machined-225'],
@@ -6895,14 +6951,14 @@ function renderWheelPicker(g, o) {
     if (!o.lift) {
         const std = g.options.slice(0, g.options.findIndex(n => parseWheel(n)));
         body = `<div class="opt-grid">${std.map(n => card(n, g.labels[n])).join('')}</div>
-            <p class="opt-grid-label opt-upgrade-head"><span>12" rims</span></p>${rimCards(12, () => true, 'any')}
+            <p class="opt-grid-label opt-upgrade-head"><span>12" rims</span></p>${rimCards(12, t => !isOffroad12(t), 'street')}
             <p class="opt-grid-label opt-upgrade-head"><span>14" wheels come with the lift kit: upgrade to lift to choose them</span></p>`;
     } else {
         const size = cur ? cur.size : 14;
         const kraken = size === 14 && cur && isKrakenTire(cur.tire);
         body = `<p class="opt-group-title">Wheel size</p>${optionSegments([12, 14].map(s => ({ key: `wheels:size:${s}`, label: `${s}"`, active: size === s, onclick: `pickLiftedWheelSize(${s})` })))}`;
         if (size === 12) {
-            body += `<div class="opt-grid mt-3">${card(LIFT_WHEEL_12, g.labels[LIFT_WHEEL_12] || LIFT_WHEEL_12)}</div>`;
+            body += `<div class="mt-3">${rimCards(12, isOffroad12, 'offroad')}</div>`;
         } else {
             body += `<p class="opt-group-title mt-4">Tire type</p>${optionSegments([['kraken', 'Kraken'], ['standard', 'Standard']].map(([k, label]) => ({ key: `wheels:type:${k}`, label, active: (k === 'kraken') === kraken, onclick: `pickLiftedTireType('${k}')` })))}`;
             body += kraken
@@ -6923,7 +6979,7 @@ function pickWheelRim(size, rim, mode) {
     const g = findTempoGroup(product, i, 'wheels'), o = detailBuild.options;
     const r = g && g.rims[size].find(x => x.rim === rim);
     if (!r) return;
-    const allow = mode === 'standard' ? t => !isKrakenTire(t) : () => true;
+    const allow = mode === 'standard' ? t => !isKrakenTire(t) : mode === 'offroad' ? isOffroad12 : mode === 'street' ? t => !isOffroad12(t) : () => true;
     const tires = r.tires.filter(allow), cur = parseWheel(o.wheels);
     o.wheels = wheelCombo(size, rim, cur && cur.size === size && tires.includes(cur.tire) ? cur.tire : tires[0]);
     refreshTempoOptions();
@@ -6936,11 +6992,11 @@ function pickWheelTire(tire) {
     refreshTempoOptions();
 }
 
-// Lifted: 12" is the one Athena on Kraken; 14" starts on the first Kraken wheel
+// Lifted: 12" starts on the first 12" rim on Kraken 23X10-12; 14" on the first Kraken wheel
 function pickLiftedWheelSize(size) {
     const o = detailBuild.options, cur = parseWheel(o.wheels);
     if (cur && cur.size === size) return;
-    o.wheels = size === 12 ? LIFT_WHEEL_12 : wheelCombo(14, LIFT_KRAKEN_RIMS[0], LIFT_KRAKEN_TIRE);
+    o.wheels = size === 12 ? wheelCombo(12, VERSIONS_WHEELS[12].rims[0], OFFROAD_12_TIRES[0]) : wheelCombo(14, LIFT_KRAKEN_RIMS[0], LIFT_KRAKEN_TIRE);
     refreshTempoOptions();
 }
 
