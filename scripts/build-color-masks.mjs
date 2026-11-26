@@ -55,7 +55,10 @@ const MASKS = {
     // one-colour seat comes out even. The handles and the windshield post in front of the seats are cut out. One
     // canopy is offered, so the roof isn't mapped
     'lifestyle-4-elite': {
-        body: { ...RED, sat: [0.32, 1], light: [0.06, 0.85], close: 3, minArea: 600 },
+        // 2026-11-26: an 8 px hole in the rear panel filled; and the two small pieces of paint seen under the seats (the
+        // rear panel's end under the front seat, and the front body's back edge behind it), smaller than minArea
+        body: { ...RED, sat: [0.32, 1], light: [0.06, 0.85], close: 3, minArea: 600, fillHoles: 120,
+            also: [{ ...RED, sat: [0.32, 1], light: [0.06, 0.85], late: true, polys: [[[595, 745], [628, 745], [628, 775], [595, 775]], [[755, 728], [792, 728], [792, 800], [755, 800]]] }] },
         seat: { sat: [0, 0.3], light: [0.03, 0.85], close: 2, minArea: 400,
             polys: L4_SEATS, exclude: L4_HANDLES },
         // The grey panels, traced (the rest of the seat is black bolster), as the Tsunami seats' are in build-masks.mjs:
@@ -98,7 +101,10 @@ const MASKS = {
         // edges and the cushion fronts). The beige is the only tan on the cart, so the colour test finds the seat;
         // the black grab handles and windshield post fail it, so the tan seen past them counts and they don't. minArea is small:
         // a handle tube cuts the cushion's end off into a small piece
-        seat: { hue: [35, 15], sat: [0.1, 0.75], light: [0.15, 0.92], close: 2, minArea: 40, polys: L4_SEATS_LOOSE }
+        // also (2026-11-26): the rear cushion's back edge, a highlight too light and grey for the tan test (it stayed
+        // light on a dark seat)
+        seat: { hue: [35, 15], sat: [0.1, 0.75], light: [0.15, 0.92], close: 2, minArea: 40, polys: L4_SEATS_LOOSE,
+            also: [{ sat: [0, 0.35], light: [0.45, 1], polys: [[[352, 619], [490, 615], [492, 633], [352, 637]]] }] }
     }])),
     // Essential 2+2 (the Sangria Red studio photo, a cut-out): red body, white front and rear-facing seats, and the
     // tan roof (its rolled-up curtains, grey, stay as they are)
@@ -109,17 +115,32 @@ const MASKS = {
             // the posts, straps and rolled curtains are dark, so they stay out
             also: [{ sat: [0, 0.3], light: [0.45, 1], polys: [[[612, 186], [700, 196], [800, 222], [880, 248], [935, 268], [930, 290], [860, 290], [760, 284], [700, 272], [640, 258], [612, 246]]] }] },
         // minArea 60 (2026-11-26; was 300): the body seen through the rear grab handle's opening is a small piece of its own
-        body: { hue: [355, 24], sat: [0.12, 1], light: [0.04, 0.9], close: 3, minArea: 60, polys: [[[100, 500], [1000, 500], [1000, 1000], [100, 1000]]] },
+        // also (2026-11-26): the rear side panel's front strip, a fold in deep shadow right of its lit edge (pure black in the
+        // photo, so no colour test finds it), and its bottom lip; painted lit with the panel (recolor.js lit)
+        body: { hue: [355, 24], sat: [0.12, 1], light: [0.04, 0.9], close: 3, minArea: 60, polys: [[[100, 500], [1000, 500], [1000, 1000], [100, 1000]]],
+            also: [{ light: [0, 1], polys: [[[704, 600], [722, 600], [722, 704], [736, 704], [736, 716], [704, 716]]] }] },
         // 2026-11-26: up to the seat back's top rim (pure white, y 368-390), and light pixels with a faint blue
         // reflection (saturation to 0.26) on the rear-facing seat, which were holes
         seat: { sat: [0, 0.26], light: [0.55, 1], keepWhite: true, close: 2, minArea: 200, fillHoles: 60, polys: [
             [[515, 385], [540, 366], [640, 363], [720, 366], [790, 376], [805, 392], [812, 400], [812, 420], [810, 480], [790, 500], [760, 560], [745, 590], [640, 595], [560, 592], [540, 560], [530, 520], [515, 470]],
             [[790, 395], [840, 398], [880, 430], [892, 470], [890, 525], [800, 528], [790, 480]]
-        ] }
+        ] },
+        // The seats are plain white; a patterned choice (Tsunami) is painted on these traced panels (2026-11-26): the front
+        // seat back's two halves, its cushion, and the rear-facing seat's cushion
+        tones: { panels: [
+            [[560, 386], [636, 384], [640, 484], [562, 486]],
+            [[700, 382], [776, 382], [778, 484], [702, 486]],
+            [[590, 522], [716, 520], [718, 588], [592, 590]],
+            [[818, 486], [866, 484], [868, 506], [820, 508]]
+        ], stripeFrac: 0.2 }
     },
     // Essential 4+2 (a cut-out): white body (the cowl and the side panel; the headlight and badge cut out), black
     // seats (front, rear and rear-facing; the grab handles in front of them cut out). One canopy is offered
     'lifestyle-4-2': { file: 'image/Products/4 plus2 Lifted.png',
+        // The roof (2026-11-26): the photo's is white, the build's is the 88" black, so it's painted. Light grey only, so the
+        // black brackets and posts under it stay as they are (the cut-out's transparency keeps the backdrop out)
+        canopy: { any: [{ sat: [0, 0.15], light: [0.22, 1] }, { sat: [0, 0.7], light: [0.82, 1] }], keepWhite: true, close: 2, minArea: 300, fillHoles: 80,
+            polys: [[[255, 195], [300, 176], [400, 160], [600, 157], [800, 168], [1000, 186], [1040, 194], [1040, 222], [1000, 228], [800, 236], [600, 236], [400, 226], [300, 222], [255, 222]]] },
         // Near white, HSL saturation runs high for a faint tint, so light pixels may be more saturated
         // 2026-11-26: down to lightness 0.35, for the cowl's grey dotted reflection under the basket and the side
         // panel's lip in the rear cushion's shadow (both were left white); the black trim, basket and seats are darker
@@ -148,7 +169,17 @@ const MASKS = {
                 // the openings inside them, so a light seat colour painted the tubes in streaks)
                 [[603, 548], [610, 520], [620, 500], [634, 480], [650, 460], [666, 446], [688, 434], [706, 428], [720, 432], [722, 447], [710, 440], [690, 445], [665, 465], [640, 495], [620, 530], [612, 548]],
                 [[788, 528], [796, 500], [808, 478], [824, 458], [842, 442], [864, 432], [888, 430], [906, 438], [910, 470], [905, 520], [890, 525], [880, 470], [868, 452], [850, 455], [835, 470], [822, 495], [812, 528]]
-            ] }
+            ] },
+        // The seats are plain black; a patterned choice (Tsunami) is painted on these traced panels (2026-11-26), as on the
+        // Elite photo: each seat back half's middle, and each cushion's, with a silver stripe either side, black bolsters round
+        tones: { panels: [
+            [[528, 378], [588, 375], [595, 455], [530, 458]],
+            [[622, 376], [700, 376], [705, 460], [625, 462]],
+            [[432, 490], [600, 486], [602, 512], [436, 516]],
+            [[706, 350], [778, 348], [782, 442], [710, 444]],
+            [[812, 350], [878, 350], [880, 440], [815, 442]],
+            [[612, 478], [782, 474], [784, 508], [614, 512]]
+        ], stripeFrac: 0.2 }
     },
     // Villager 6 (a cut-out): white body (the cowl, headlights and badge cut out; the seat pedestals and side panel)
     // and the white roof. Its seats aren't offered in other colours
@@ -295,17 +326,20 @@ function partMap(spec, px, w, h, cutOut, fromMap) {
         if (c.cutOut || (!cutOut && !spec.keepWhite && c[2] > 0.93 && c[1] < 0.12)) continue; // the studio backdrop (unless the outline is tight and the part is white)
         m[i] = tests.some(t => passes(t, c)) ? 1 : 0;
     }
-    // also (2026-11-26): further areas, each with its own colour test
-    if (spec.also) for (const a of spec.also) for (let i = 0; i < w * h; i++) {
+    // also (2026-11-26): further areas, each with its own colour test; `late` ones are added after the small pieces
+    // are dropped (a piece of paint seen under a seat, smaller than minArea)
+    const addAlso = list => { for (const a of list) for (let i = 0; i < w * h; i++) {
         const x = i % w, y = (i / w) | 0;
         if (m[i] || px[i].cutOut || !a.polys.some(p => inside(x, y, p))) continue;
         if (fromMap && !fromMap[i]) continue;
         if ((a.any || [a]).some(t => passes(t, px[i]))) m[i] = 1;
-    }
+    } };
+    if (spec.also) addAlso(spec.also.filter(a => !a.late));
     if (spec.close) m = morph(morph(m, w, h, spec.close, true), w, h, spec.close, false);
     // Closing can reach back into a cut-out hole; keep the holes
     if (spec.exclude) for (let i = 0; i < w * h; i++) if (m[i] && spec.exclude.some(p => inside(i % w, (i / w) | 0, p))) m[i] = 0;
     if (spec.minArea) dropSpecks(m, w, h, spec.minArea);
+    if (spec.also) addAlso(spec.also.filter(a => a.late));
     // fillHoles (2026-11-26): holes inside the part smaller than this are part too (a grey retouching speck on a panel)
     if (spec.fillHoles) {
         const inv = m.map(v => (v ? 0 : 1));

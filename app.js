@@ -942,7 +942,7 @@ const TEMPO_MATRIX_LEGACY = {
     // Canopy by layout; Tempo 4+2 uses the 4-seater row
     canopy: {
         '2': [['2 Pass Canopy White', '2 Pass Canopy Beige'], ['2 Pass Canopy White', '2 Pass Canopy Beige', '2 Pass Canopy Black'], ['2 Pass Canopy White', '2 Pass Canopy Beige', '2 Pass Canopy Black']],
-        '2+2': [['80" GC Canopy'], ['80" Canopy Black', '4 Pass Onward Canopy Black', '4 Pass Onward Canopy White', '4 Pass Onward Canopy Beige'], ['4 Pass Onward Canopy Black', '4 Pass Onward Canopy White', '4 Pass Onward Canopy Beige']],
+        '2+2': [['80" GC Canopy'], ['80" GC Canopy', '4 Pass Onward Canopy Black', '4 Pass Onward Canopy White', '4 Pass Onward Canopy Beige'], ['4 Pass Onward Canopy Black', '4 Pass Onward Canopy White', '4 Pass Onward Canopy Beige']],
         '4': [['88" Canopy Black'], ['88" Canopy Black'], ['88" Canopy Black']]
     },
     // The document (2026-11-17): Trojan FLA on Golf / Essential and Scratch / Signature, Battlite lithium on Pro /
@@ -1392,14 +1392,32 @@ const isOverheadName = n => OVERHEAD_RE.test(n) && !/carplay|entertainment/i.tes
 // Upgrades, in this order (2026-11-26, the user's choice): headlight, windshield, caddy stand. Accessories start with
 // the driver attachment, overhead attachment and electronics, then storage, rain enclosure and floor mat (the side
 // attachment and mirrors follow)
-const UPGRADE_ORDER = ['lighting', 'windshield', 'caddyStand', 'mirrors']; // mirrors are upgrades (2026-11-26)
-// (Lifestyle's cooler sits where the Golfer's side attachment does: after storage, 2026-11-26)
-const EXTRA_ORDER = ['steering', 'overhead', 'audio', 'storage', 'cooler', 'enclosure', 'floorMat'];
+const UPGRADE_ORDER = ['lighting', 'windshield', 'caddyStand'];
+// (the mirrors right after storage; Lifestyle's cooler where the Golfer's side attachment is, 2026-11-26)
+const EXTRA_ORDER = ['steering', 'overhead', 'audio', 'storage', 'mirrors', 'cooler', 'enclosure', 'floorMat'];
 function arrangeTempoGroups(product, i, groups) {
     const out = groups.map(g => ({ ...g }));
     const get = id => out.find(g => g.id === id);
     // Overhead items found in other groups (the Bundles' add-ons and mirrors) move to the Overhead attachment on Pro /
     // Elite; the USB ports go everywhere
+    // Golfer and Lifestyle 2+2 (2026-11-26, the user's choice: the document, not the Bundles, for now): the document's mirrors (one
+    // pair of side mirrors and one inner mirror at most), and the Onward flip seat by the document's name
+    // The Lifestyle 4+2 is the Lifestyle 4 with a flip seat (2026-11-26, the user's choice): the same document mirrors
+    if (product.layout === '2+2' || product.layout === '4+2') {
+        const mirrors = get('mirrors');
+        if (mirrors && i > 0) {
+            Object.assign(mirrors, { type: 'multi', options: [...TEMPO_MIRRORS_LEGACY], bundleIds: undefined, hint: 'Optional: one pair of side mirrors and one inner mirror',
+                exclusive: [TEMPO_MIRRORS_LEGACY.filter(n => /^side mirror/i.test(n)), TEMPO_MIRRORS_LEGACY.filter(n => /convex|inner/i.test(n))] });
+        }
+        const flip = get('flipSeat');
+        if (product.layout === '2+2' && flip && flip.options) flip.labels = { ...(flip.labels || {}), 'Club Car Premium Flip Seat': 'Onward Premium Flip Seat' };
+    }
+    // Lifestyle Essential's headlights are the document's GC Tempo LED headlights and tail lights on every layout (the
+    // Bundles named others on the 2+2 and 4+2)
+    const essentialLights = get('lighting');
+    if (product.version === 'lifestyle' && i === 0 && essentialLights && essentialLights.type === 'fixed') {
+        Object.assign(essentialLights, { value: TEMPO_MATRIX_LEGACY.lighting.lifestyle[0][0], bundleIds: undefined });
+    }
     const overhead = get('overhead');
     ['audio', 'storage', 'mirrors'].forEach(id => {
         const g = get(id);
@@ -1416,8 +1434,7 @@ function arrangeTempoGroups(product, i, groups) {
     });
     // Convex rear mirrors only on the 2+2, 4 and 4+2 (2026-11-26)
     const mirrors = get('mirrors');
-    // Side mirrors included (Scratch, Essential): not offered again among the mirrors
-    if (mirrors && mirrors.options && get('sideMirrors')) mirrors.options = mirrors.options.filter(n => !/^side mirrors?$/i.test(n.trim()));
+    // (Side mirrors stay an option among the mirrors even where they're included, 2026-11-26, the user's choice)
     if (mirrors && mirrors.options && product.layout === '2') {
         mirrors.options = mirrors.options.filter(n => !/convex/i.test(n));
         if (mirrors.exclusive) mirrors.exclusive = mirrors.exclusive.map(set => set.filter(n => !/convex/i.test(n)));
@@ -1441,11 +1458,12 @@ function arrangeTempoGroups(product, i, groups) {
     const audio = get('audio');
     if (audio && audio.options) Object.assign(audio, { title: 'Electronics', options: audio.options.filter(n => !/carplay|entertainment/i.test(n)) });
     // (Lifestyle Signature as Golfer Scratch, 2026-11-26)
-    if (product.version === 'golfer' || (product.version === 'lifestyle' && i === 1)) {
+    // (Lifestyle Elite too, 2026-11-26: the document gives it the Golfer Pro's wheels; its headlight is fixed)
+    if (product.version === 'golfer' || (product.version === 'lifestyle' && i >= 1)) {
         // The document's light kits, not the Bundles' (12V Basic, 12v Deluxe, SRLLK-21): a kit the Bundles don't have
         // comes into the quotation unpriced
         const docLights = TEMPO_MATRIX_LEGACY.lighting[product.version][i];
-        if (lights && docLights.length) {
+        if (lights && lights.type === 'single' && docLights.length) {
             const none = docLights.filter(n => /^no headlight/i.test(n)), kits = docLights.filter(n => !/^no headlight/i.test(n));
             Object.assign(lights, { options: [...kits, ...none], bundleDefault: kits[0], bundleIds: undefined });
         }
@@ -5388,6 +5406,11 @@ function visualName(slot, name) {
 
 function catalogDefault(product, i, slot) {
     const o = (catalogOptions(product, i, slot) || []).find(x => x.default);
+    // A canopy the build no longer lists under the Bundles' name (the Golfer 2+2 follows the document, 2026-11-26): its first
+    if (o && slot === 'canopy' && isTempoVersion(product)) {
+        const names = tempoCanopyNames(product, i);
+        if (!names.includes(o.option)) return names[0] || null;
+    }
     return o ? o.option : null;
 }
 
@@ -5425,11 +5448,19 @@ function tempoSeatNames(product, i) {
 }
 
 function tempoCanopyNames(product, i) {
+    // (the Golfer 2+2 Pro keeps the document's Onward canopies: the 80" black is Scratch's own canopy, not a colour)
+    if (product.layout === '2+2') return tempoCanopyOwn(product, i);
     return withLowerColors(product, i, 'canopy', tempoCanopyOwn(product, i), tempoCanopyOwn);
 }
 
 function tempoCanopyOwn(product, i) {
     const code = tempoMatrix(product).canopy[tempoLayoutRow(product)][i];
+    // Golfer 2+2 Golf and Scratch (2026-11-26): the document's names (the 80" GC Canopy; Scratch also the Onward 4-pass
+    // in black, white or beige), not the Bundles'
+    if (product.layout === '2+2' && i <= 1) return code;
+    // Golfer 4 (2026-11-26): the document's 88" Canopy Black on every build, not the Bundles' "Canopy Set"
+    // (the Lifestyle 4+2 too: it has the 4-seater canopy, 2026-11-26)
+    if (tempoLayoutRow(product) === '4') return code;
     const names = catalogNames(product, i, 'canopy', code) || code;
     // Versions.docx (2026-11-26): Golf's 2-seater canopy is white or beige; a 2+2 takes 2+2 canopies, not 2-seater ones
     if (product.version !== 'golfer') return names;
@@ -6163,12 +6194,17 @@ function updateDetailPreview() {
     // brings its own colors)
     const look = (key !== product.slug && (COLOR_PREVIEW[key].look || (product.buildLooks && product.buildLooks[detailBuild.level]))) || {};
     const keep = part => key !== product.slug && (!detailBuild[part] || detailBuild[part] === look[part]);
+    // A Tempo photo that isn't the build's own (the Lifestyle 2+2 and 4+2 photos, 2026-11-26): before a seat or canopy is
+    // picked, the build's own one is shown (the 4+2 photo's black seats and white roof aren't the build's)
+    const li = isTempoVersion(product) ? detailLevelIndex(product) : null;
+    const own = part => detailBuild[part] || (li != null && key === product.slug ? catalogDefault(product, li, part)
+        || ((part === 'seat' ? tempoSeatNames(product, li) : tempoCanopyNames(product, li)) || [])[0] : null);
     const token = ++detailPreviewToken;
     renderCartPreview(key, {
         body: keep('body') ? null : (body ? body.hex : null),
-        seat: keep('seat') ? null : getTrimHex('seat', detailBuild.seat),
-        seatBands: keep('seat') ? null : getSeatPattern(detailBuild.seat),
-        canopy: keep('canopy') ? null : getTrimHex('canopy', detailBuild.canopy)
+        seat: keep('seat') ? null : getTrimHex('seat', own('seat')),
+        seatBands: keep('seat') ? null : getSeatPattern(own('seat')),
+        canopy: keep('canopy') ? null : getTrimHex('canopy', own('canopy'))
     }).then(url => {
         // Ignore results from an older click that finished after a newer one
         if (!url || token !== detailPreviewToken) return;
@@ -6347,7 +6383,6 @@ let detailOptionsOpen = null;
 
 function showDetailOptions() {
     detailOptionsOpen = currentSlug;
-    saveDetailBuild();
     const section = document.getElementById('options');
     if (!section) return;
     section.hidden = false;
@@ -6543,44 +6578,6 @@ function updateBuildPanel() {
     if (panel && product && isTempoVersion(product)) panel.innerHTML = renderBuildPanel(product);
     const box = document.getElementById('detail-included');
     if (box && product && isTempoVersion(product)) box.innerHTML = renderBuildIncluded(product);
-    saveDetailBuild();
-}
-
-// The builder's choices survive a reload (2026-11-26, the user's request): kept for the browser tab (sessionStorage),
-// by model page, and put back when the page is drawn again. Saving waits until they're back, so the page's own
-// defaults never overwrite them
-const BUILD_STORE = 'gcph-build:';
-let detailBuildRestoring = null;
-
-function saveDetailBuild() {
-    const product = currentDetailProduct();
-    if (!product || !isTempoVersion(product) || detailBuildRestoring === product.slug) return;
-    const { level, body, seat, canopy, options, confirmed, customize, colorsPicked } = detailBuild;
-    try {
-        sessionStorage.setItem(BUILD_STORE + product.slug, JSON.stringify({ level, body, seat, canopy, options, confirmed, customize, colorsPicked, open: detailOptionsOpen === product.slug }));
-    } catch (err) { /* private window or storage blocked: the page just starts over */ }
-}
-
-function restoreDetailBuild(slug) {
-    let saved = null;
-    try { saved = JSON.parse(sessionStorage.getItem(BUILD_STORE + slug) || 'null'); } catch (err) { saved = null; }
-    detailBuildRestoring = null;
-    const product = currentDetailProduct();
-    if (!saved || !product || product.slug !== slug) return;
-    const buildSet = getProductBuildSet(product);
-    if (!buildSet || !buildSet.builds.some(b => b.id === saved.level)) return;
-    // The colours and options first; switching to the saved build keeps the ones it offers (and checks the rest)
-    Object.assign(detailBuild, { body: saved.body, seat: saved.seat, canopy: saved.canopy, colorsPicked: !!saved.colorsPicked, options: { ...detailBuild.options, ...(saved.options || {}) } });
-    selectBuildLevel(saved.level);
-    detailBuild.confirmed = !!saved.confirmed;
-    detailBuild.customize = !!saved.customize;
-    if (saved.open) detailOptionsOpen = slug;
-    redrawBuildSection();
-    updateConfirmGate();
-    const section = document.getElementById('options');
-    if (section && saved.open) section.hidden = false;
-    refreshTempoOptions();
-    updateBuildSummaryLine();
 }
 
 // Choices for a new build level: keeps each earlier choice the new level still offers
@@ -6633,7 +6630,6 @@ function confirmBuildLevel(id) {
     detailBuild.confirmed = true;
     redrawBuildSection();
     updateConfirmGate();
-    saveDetailBuild();
     scrollToDetailSection('colors');
 }
 
@@ -6667,7 +6663,8 @@ document.addEventListener('click', e => {
 }, true);
 
 function selectBuildLevel(id) {
-    if (detailBuild.level !== id) { detailBuild.confirmed = false; detailBuild.openIncluded = []; setTimeout(updateConfirmGate, 0); }
+    const changed = detailBuild.level !== id;
+    if (changed) { detailBuild.confirmed = false; detailBuild.openIncluded = []; setTimeout(updateConfirmGate, 0); }
     detailBuild.level = id;
     // Another build is another photo: show the whole cart
     focusColorPart(null);
@@ -6681,8 +6678,10 @@ function selectBuildLevel(id) {
     });
     const product = currentDetailProduct();
     if (product && isTempoVersion(product)) {
-        // Keep the colors the new build offers; otherwise fall back to its first body color / the standard trim
+        // Another build starts over (2026-11-26, the user's rule): its own colours, no lift, no upgrades ticked and
+        // Customize package closed; nothing picked on the previous build carries over
         const i = detailLevelIndex(product);
+        if (changed) Object.assign(detailBuild, { body: null, seat: null, canopy: null, colorsPicked: false, customize: false });
         if (!tempoSeatNames(product, i).includes(detailBuild.seat)) detailBuild.seat = null;
         if (!getDetailCanopyOptions(product).includes(detailBuild.canopy)) detailBuild.canopy = null;
         applyBuildLook(product);
@@ -6690,7 +6689,10 @@ function selectBuildLevel(id) {
         // The body kept if the new build offers it, else the new build's own (Included in the bundles), else its first
         const keep = bodies.findIndex(c => c.name === detailBuild.body);
         const bodyIdx = keep >= 0 ? keep : Math.max(0, bodies.findIndex(c => c.name === catalogDefault(product, i, 'body')));
-        detailBuild.options = carryTempoOptions(product, i, detailBuild.options || {});
+        if (changed) {
+            detailBuild.options = defaultTempoOptions(product, i);
+            fixTempoSubChoices(product, i, detailBuild.options);
+        } else detailBuild.options = carryTempoOptions(product, i, detailBuild.options || {});
         const pickers = document.getElementById('detail-color-pickers');
         if (pickers) pickers.innerHTML = renderDetailColorPickers(product);
         if (detailBuild.seat) updateSeatPhoto(detailBuild.seat);
@@ -7409,7 +7411,10 @@ function renderTempoOptions(product) {
     // attachment are in their own sections, so they're left out of this list
     const ownSection = new Set(groups.filter(g => g.part && g.part !== 'included' && isIncludedNow(g, o)).map(g => g.title));
     const included = buildIncludedItems(product, i, o).filter(([t]) => !ownSection.has(t));
-    const choices = part('included').filter(g => g.type !== 'fixed' && g.id !== 'lighting' && !(g.id === 'wheels' && o.lift));
+    // (an included item with one option, like the Genesis flip seat on Golf and Scratch, isn't a choice: it's in the
+    // list above, 2026-11-26)
+    const choices = part('included').filter(g => g.type !== 'fixed' && g.id !== 'lighting' && !(g.id === 'wheels' && o.lift)
+        && !(g.type === 'single' && g.id !== 'wheels' && (g.options || []).length < 2));
     // The battery first (the colours line was taken out, 2026-11-26, the user's choice), then the other included choices
     const batteryChoice = choices.find(g => g.id === 'batteryUpgrade');
     const includedBody = `
@@ -7429,9 +7434,9 @@ function renderTempoOptions(product) {
     const accessories = [
         // Up to storage, then the side attachment, then the rain enclosure and the rest (2026-11-26, the user's choice)
         sub('Overhead attachment', part('overhead').map(withSubs).join('')),
-        renderTempoSection(extras.filter(g => g.order <= EXTRA_ORDER.indexOf('storage')), subs, o),
+        renderTempoSection(extras.filter(g => g.order <= EXTRA_ORDER.indexOf('mirrors')), subs, o),
         sub('Side attachment', side),
-        renderTempoSection(extras.filter(g => g.order > EXTRA_ORDER.indexOf('storage')), subs, o),
+        renderTempoSection(extras.filter(g => g.order > EXTRA_ORDER.indexOf('mirrors')), subs, o),
         sub('Driver attachment', driver.length ? `<p class="opt-group-hint mb-2">Included</p>${renderTempoIncluded(driver)}` : ''),
         sub('Mirrors', part('mirrors').map(withSubs).join('')),
         sub('More for this build', part('accessories').map(withSubs).join(''))
@@ -7932,8 +7937,6 @@ function renderProductDetailsPage() {
     };
     if (tempo) fixTempoSubChoices(product, levelIdx, detailBuild.options);
     if (tempo) applyBuildLook(product);
-    // The choices saved before a reload come back right after the page is drawn
-    if (tempo) { detailBuildRestoring = product.slug; setTimeout(() => restoreDetailBuild(product.slug), 0); }
     const canopyOptions = getDetailCanopyOptions(product);
     setTimeout(updateDetailBuildSummary, 0);
     setTimeout(updateBuildSummaryLine, 0);

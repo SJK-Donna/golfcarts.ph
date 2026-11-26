@@ -64,14 +64,20 @@ const COLOR_PREVIEW = {
     // blocks of the new colour with black holes; shaded, those stay the body's shadows. Red measures as dark as a black
     // cart's paint, but its light and shade are the panel's, not reflections, so it isn't softened as a dark photo is
     'lifestyle-tempo-2-2': { base: 'image/Products/Tempo 2+2 - Family - Sangria Red.png', mask: 'image/Products/builds/masks/lifestyle-2-2-sangria.png', shade: true, brightPaint: true,
+        // (2026-11-26: plain white seats; only a patterned choice like Tsunami is painted by tone. whiteSeat: the seat is
+        // white, so its light pixels are seat, not studio backdrop; the photo is a cut-out, so there is no backdrop)
+        seatTones: 'image/Products/builds/masks/lifestyle-2-2-sangria-tones.png', whiteSeat: true,
         // The rear side panel, the rocker below the well under the seat, and the cowl's shaded right flank
-        lit: [[[705, 590], [720, 560], [800, 530], [858, 524], [872, 560], [862, 640], [832, 700], [760, 722], [705, 716]],
-            [[615, 635], [700, 635], [705, 716], [615, 716]], [[480, 565], [545, 540], [556, 600], [546, 652], [488, 652]]] },
+        // (the kick panel under the seat front follows the photo's shading, so it fades into the well; 2026-11-26)
+        lit: [[[704, 584], [720, 560], [800, 530], [858, 524], [872, 560], [862, 640], [832, 700], [760, 722], [704, 718]],
+            [[480, 565], [545, 540], [556, 600], [546, 652], [488, 652]]] },
     // Paint maps (scripts/build-color-masks.mjs) of body, seats and roof, shaded like paint. The Transporter photo has
     // no roof, so its canopy choice can't be shown; the Villagers' seats aren't offered in other colours
     // Its seats and grab handles are the same black, so pixels of the seat's colour beside a seat are handle, not seat:
     // they aren't recoloured with it (`seatStrays: false`, 2026-11-16; they streaked the handles under a light seat)
-    'lifestyle-tempo-4-2': { base: 'image/Products/4 plus2 Lifted.png', mask: 'image/Products/builds/masks/lifestyle-4-2.png', shade: true, seatStrays: false, seatFormGain: 1.3 },
+    // (seatTones, 2026-11-26: its seats are plain black, so only a patterned choice like Tsunami is painted by tone)
+    'lifestyle-tempo-4-2': { base: 'image/Products/4 plus2 Lifted.png', mask: 'image/Products/builds/masks/lifestyle-4-2.png', shade: true, seatStrays: false, seatFormGain: 1.3,
+        seatTones: 'image/Products/builds/masks/lifestyle-4-2-tones.png' },
     'villager-6': { base: 'image/Products/Villager 6.png', mask: 'image/Products/builds/masks/villager-6.png', shade: true },
     'villager-8': { base: 'image/Products/Villager 8.png', mask: 'image/Products/builds/masks/villager-8.png', shade: true },
     'transporter-400': { base: 'image/Products/Transporter 4.png', mask: 'image/Products/builds/masks/transporter-4.png', shade: true },
@@ -719,7 +725,7 @@ function paintRegion(out, base, region, target, xGradient, bands, contrast = 0.8
 // lightness turned white and grey seats flat and washed out.
 // `shadowDepth` (default 0.8): how much of a one-color seat's shadows carry over (lower on seats photographed with
 // deeply shaded black bolsters, the Elite photos, where they showed as grey patches under white)
-function paintToneSeat(out, base, region, target, bands, shadowDepth = 0.8) {
+function paintToneSeat(out, base, region, target, bands, shadowDepth = 0.8, whiteSeat = false) {
     const px = base.imageData.data;
     if (!region.toneY) {
         region.toneY = [0, 1, 2].map(t => {
@@ -740,8 +746,8 @@ function paintToneSeat(out, base, region, target, bands, shadowDepth = 0.8) {
         return { rgb, Y: 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] };
     });
     region.idx.forEach((i, k) => {
-        // Studio white caught at the seat's outline is background, not seat
-        if (base.light[i] > 0.92 && base.sat[i] < 0.12) return;
+        // Studio white caught at the seat's outline is background, not seat (unless the seat itself is white)
+        if (!whiteSeat && base.light[i] > 0.92 && base.sat[i] < 0.12) return;
         const Y = linearLuma(px[i * 4], px[i * 4 + 1], px[i * 4 + 2]);
         let rgb = [0, 0, 0];
         if (!patterned) {
@@ -908,7 +914,7 @@ async function renderCartPreview(slug, choice) {
         const patterned = choice.seatBands && choice.seatBands.length;
         if (cfg.plainSeatFrom && !patterned) await paintDonorSeat(out, regions, cfg.plainSeatFrom, seat.hsl);
         else if (cfg.patternSeatFrom && patterned) await paintDonorSeat(out, regions, cfg.patternSeatFrom, seat.hsl, choice.seatBands);
-        else if (cfg.seatTones && (cfg.stripedSeat || patterned)) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatShadowDepth);
+        else if (cfg.seatTones && (cfg.stripedSeat || patterned)) paintToneSeat(out, base, regions.seat, seat.hsl, choice.seatBands, cfg.seatShadowDepth, !!cfg.whiteSeat);
         else if (cfg.shade) shadeRegion(out, base, regions.seat, seat.hsl, null);
         else paintRegion(out, base, regions.seat, seat.hsl, null, seatBands, cfg.seatContrast);
         if (cfg.mask && !(cfg.plainSeatFrom && !patterned) && !(cfg.patternSeatFrom && patterned)) blendRegionEdges(out, base, regions.seat, cfg.seatStrays !== false);
