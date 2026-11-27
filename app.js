@@ -1461,9 +1461,16 @@ function arrangeTempoGroups(product, i, groups) {
         overhead.options = overhead.options.filter(n => n !== '5 Panel Mirror');
         if (!mirrors.options.includes('5 Panel Mirror')) mirrors.options = [...mirrors.options, '5 Panel Mirror'];
     }
+    // The 4-seater and 4+2 (Scratch / Signature, Pro / Elite) also have the long convex mirror (2026-11-27, the user's
+    // choice): one inner mirror, and not with the 5 panel mirror or any overhead attachment
+    if (mirrors && mirrors.options && i >= 1 && tempoLayoutRow(product) === '4' && !mirrors.options.includes(LONG_CONVEX)) {
+        mirrors.options = [...mirrors.options, LONG_CONVEX];
+        if (mirrors.exclusive) mirrors.exclusive = mirrors.exclusive.map(set => (set.some(n => /convex|5 panel/i.test(n)) ? [...set, LONG_CONVEX] : set));
+    }
     // Side mirrors with turn signals need headlights and tail lights
     if (mirrors) mirrors.optionLock = (n, o) => (/turn signal/i.test(n) && !hasTailLights(product, i, o) ? 'Needs headlights and tail lights'
-        : fivePanel && /5 panel/i.test(n) && fivePanelBlocked(o) ? `Not with the ${o.overhead}` : '');
+        : fivePanel && /5 panel/i.test(n) && fivePanelBlocked(o) ? `Not with the ${o.overhead}`
+        : n === LONG_CONVEX && longConvexBlocker(o) ? `Not with the ${longConvexBlocker(o)}` : '');
     // ...and the other way: with the 5 panel mirror, only the Club Car Premium Sound Bar overhead
     if (fivePanel) overhead.optionLock = (n, o) => (hasFivePanel(o) && !fivePanelPartner(n) ? 'Not with the 5 Panel Mirror' : '');
     // Headlight: Golf starts with none; Scratch and Pro can choose none, but don't start with it
@@ -6661,9 +6668,16 @@ function carryTempoOptions(product, i, prev) {
 const fivePanelPartner = n => /club car premium sound bar/i.test(n || '');
 const fivePanelBlocked = o => !!o.overhead && !fivePanelPartner(o.overhead);
 const hasFivePanel = o => (Array.isArray(o.mirrors) ? o.mirrors : [o.mirrors || '']).some(n => /5 panel/i.test(n));
+// The long convex mirror: not with the 5 panel mirror or any overhead attachment (2026-11-27, the user's choice)
+const LONG_CONVEX = 'Convex Inner Mirror (long)';
+const longConvexBlocker = o => (o.overhead ? o.overhead : hasFivePanel(o) ? '5 Panel Mirror' : '');
 // The Golfer 2+2's premium flip seat goes with a Camello, Black or White seat only (2026-11-27)
 const premiumFlipSeatOk = (product, i) => /camello|black|white/i.test(chosenSeatName(product, i));
 function fixTempoSubChoices(product, i, o) {
+    if (longConvexBlocker(o)) {
+        if (Array.isArray(o.mirrors)) o.mirrors = o.mirrors.filter(n => n !== LONG_CONVEX);
+        else if (o.mirrors === LONG_CONVEX) o.mirrors = '';
+    }
     if (product.version === 'golfer' && product.layout === '2+2' && /premium/i.test(o.flipSeat || '') && !premiumFlipSeatOk(product, i)) o.flipSeat = 'Rear Flip Seat';
     if (fivePanelBlocked(o)) {
         if (Array.isArray(o.mirrors)) o.mirrors = o.mirrors.filter(n => !/5 panel/i.test(n));
@@ -7200,6 +7214,8 @@ function closeOptionPhoto() {
 // One selectable card. `extra` holds attributes such as disabled. `inline`: the photo shows on the card (wheels);
 // otherwise a card with a photo gets the eye button beside it (a button can't hold another button, so both sit in
 // a wrapper)
+// The Lifestyle line shows no notes under the options (2026-11-27, the user's choice)
+const lifestyleBuild = () => (currentDetailProduct() || {}).version === 'lifestyle';
 // A short line under an option's name: what sets it apart (2026-11-27)
 const OPTION_NOTES = {
     'GC Tempo LED Headlights': 'For early and twilight tee times on the course',
@@ -7420,7 +7436,7 @@ function renderTempoGroup(g, o, nested, cell = false, forceOpen = false) {
                 key: `${g.id}:${k}`, label: (g.labels && g.labels[opt]) || opt, photo: optionPhoto(opt) || (g.options.length === 1 ? optionPhoto(g.id) : null), active,
                 onclick: multi ? `toggleTempoOption('${g.id}', ${k})` : `pickTempoOption('${g.id}', ${k})`,
                 kind: multi ? 'check' : 'radio',
-                note: g.locked ? 'Needs the lift kit' : ruleLock || (locked ? 'Upgrade' : '') || OPTION_NOTES[opt] || '',
+                note: g.locked ? 'Needs the lift kit' : ruleLock || (locked ? 'Upgrade' : '') || (lifestyleBuild() ? '' : OPTION_NOTES[opt]) || '',
                 extra: g.locked || ruleLock ? 'data-locked="true" aria-disabled="true"' : locked ? 'data-locked="true"' : '',
                 inline: g.id === 'wheels'
             }));
