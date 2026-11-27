@@ -1088,8 +1088,8 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (m.floorMat[line][i]) include('floorMat', 'Floor mat', 'GC floor mat');
     if (m.audio[line][i]) include('electronics', 'Audio', m.audio[line][i]);
     if (m.speedCodeIncluded[i]) include('speedCode', 'Speed code', 'Included, no fee');
-    // Golf and Lifestyle Essential come with the hinged windshield, in the Included list (2026-11-27, the user's choice)
-    if (i === 0) include('windshield', 'Windshield', 'Premium Hinged Windshield');
+    // Every build comes with the hinged windshield, in the Included list (2026-11-27, the user's choice)
+    include('hingedWindshield', 'Windshield', 'Premium Hinged Windshield');
     // Lighting: one kit is included as it is; where there are several, one is included and the visitor picks it;
     // a build without lights has no lighting row
     const kits = m.lighting[line][i];
@@ -1158,8 +1158,8 @@ function getTempoOptionGroupsLegacy(product, i) {
         rowsFor: o => (o.steering ? [['Steering wheel', m.steering[i][0]], ['Scorecard holder', m.steering[i][1]]] : []) });
     if (m.overhead[line][i].length) add({ id: 'overhead', covers: ['audio'], section: 'Accessories', title: 'Overhead attachment', type: 'optional', options: m.overhead[line][i] });
     // Tinted windshield: not on Golf / Essential (2026-11-26, the user's choice)
-    // Two to choose from (2026-11-27, the user's choice): tinted, or the premium hinged one
-    if (i > 0) add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'optional', options: ['Tinted windshield', 'Premium Hinged Windshield'] });
+    // The tinted windshield, in place of the included hinged one (not on Golf / Essential)
+    if (i > 0) add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'optional', options: ['Tinted windshield'], replaces: 'hingedWindshield' });
     if (!m.floorMat[line][i]) add({ id: 'floorMat', section: 'Upgrades', title: 'Floor mat', type: 'flag', label: 'GC floor mat' });
     if (m.mirrors[line][i].length) add({ id: 'mirrors', section: 'Upgrades', title: 'Mirrors', type: 'optional', options: m.mirrors[line][i] }); // one mirror package: each already includes the side mirrors (2026-11-19)
     // No under seat storage tray on the Lifestyle line (2026-11-27, the user's choice)
@@ -1455,7 +1455,9 @@ function arrangeTempoGroups(product, i, groups) {
     }
     // Side mirrors with turn signals need headlights and tail lights
     if (mirrors) mirrors.optionLock = (n, o) => (/turn signal/i.test(n) && !hasTailLights(product, i, o) ? 'Needs headlights and tail lights'
-        : fivePanel && /5 panel/i.test(n) && fivePanelBlocked(o, i) ? `Not with the ${o.overhead}` : '');
+        : fivePanel && /5 panel/i.test(n) && fivePanelBlocked(o) ? `Not with the ${o.overhead}` : '');
+    // ...and the other way: with the 5 panel mirror, only the Club Car Premium Sound Bar overhead
+    if (fivePanel) overhead.optionLock = (n, o) => (hasFivePanel(o) && !fivePanelPartner(n) ? 'Not with the 5 Panel Mirror' : '');
     // Headlight: Golf starts with none; Scratch and Pro can choose none, but don't start with it
     const lights = get('lighting');
     if (lights && lights.type === 'single') {
@@ -4051,7 +4053,7 @@ const HOME_COMPARE_ROWS = [
         [OPT('overhead-storage-console'), 'One of: overhead storage console, 5 panel mirror, GC Sound Bar 27" RGB, Club Car Premium Sound Bar']]],
     ['Storage', [null, [OPT('overhead-storage-console'), 'Overhead storage console, under seat storage tray'],
         [OPT('overhead-storage-console'), 'Under seat storage tray']]],
-    ['Windshield', [null, [null, 'Tinted or premium hinged windshield (upgrade)'], [null, 'Tinted or premium hinged windshield (upgrade)']]],
+    ['Windshield', [[null, 'Premium hinged windshield (included)'], [null, 'Premium hinged included; tinted (upgrade)'], [null, 'Premium hinged included; tinted (upgrade)']]],
     ['Rain enclosure', [null, [OPT('enclosure-3-beige'), 'Three-sided (CCJX): beige, white or black'],
         [OPT('enclosure-3-black'), 'Two-sided black (CC), or three-sided (CCJX): beige, white or black']]],
     ['Cooling', [null, [null, 'Zero Breeze Mark 3 (with an enclosure)'], [null, 'Zero Breeze Mark 3 (with an enclosure)']]]
@@ -6522,7 +6524,7 @@ function buildIncludedItems(product, i, o) {
     return all.filter(g => isIncludedNow(g, o)).map(g => {
         if (g.type === 'fixed') { const up = all.find(u => u.replaces === g.id), v = up && describeTempoChoice(product, i, up, o); return [g.title, v || g.value]; }
         // The wheels by their full name, not the Bundles' code ("8in", 2026-11-27)
-        if (g.id === 'wheels') return [g.title, wheelLabel(describeTempoChoice(product, i, g, o))];
+        if (g.id === 'wheels') return [g.title, wheelLabel(describeTempoChoice(product, i, g, o)).replace('rims with cover', 'rims with wheel cover')];
         return [g.title, describeTempoChoice(product, i, g, o)];
     }).filter(([, v]) => v);
 }
@@ -6642,11 +6644,13 @@ function carryTempoOptions(product, i, prev) {
 }
 
 // Keeps sub-choices valid (Lifestyle 2 and 4): a flip seat always has one of its colors, cooling needs an enclosure
-// The 5 panel mirror fits with no overhead attachment, or with the sound bar: on Pro / Elite the Club Car Premium Sound
-// Bar only, not the GC one (2026-11-27, the user's choice)
-const fivePanelBlocked = (o, i) => !!o.overhead && !(i === 2 ? /club car premium sound bar/i : /sound bar/i).test(o.overhead);
+// The 5 panel mirror pairs with the Club Car Premium Sound Bar only: not with the GC sound bar or the overhead storage
+// console, on every build (2026-11-27, the user's choice)
+const fivePanelPartner = n => /club car premium sound bar/i.test(n || '');
+const fivePanelBlocked = o => !!o.overhead && !fivePanelPartner(o.overhead);
+const hasFivePanel = o => (Array.isArray(o.mirrors) ? o.mirrors : [o.mirrors || '']).some(n => /5 panel/i.test(n));
 function fixTempoSubChoices(product, i, o) {
-    if (fivePanelBlocked(o, i)) {
+    if (fivePanelBlocked(o)) {
         if (Array.isArray(o.mirrors)) o.mirrors = o.mirrors.filter(n => !/5 panel/i.test(n));
         else if (/5 panel/i.test(o.mirrors || '')) o.mirrors = '';
     }
@@ -6780,7 +6784,7 @@ function pickTempoOption(id, index) {
     }
     const value = group.options[index];
     const lockNote = group.optionLock && group.optionLock(value, detailBuild.options);
-    if (lockNote) { showToast(/tail lights/.test(lockNote) ? `${lockNote}: choose a headlight kit with tail lights first.` : `${lockNote}: remove it from the overhead attachment first.`); return; }
+    if (lockNote) { showToast(/tail lights/.test(lockNote) ? `${lockNote}: choose a headlight kit with tail lights first.` : `${lockNote}: remove that one first.`); return; }
     detailBuild.options[id] = group.type === 'optional' && detailBuild.options[id] === value ? '' : value;
     fixTempoSubChoices(product, i, detailBuild.options);
     refreshTempoOptions();
@@ -6801,7 +6805,7 @@ function toggleTempoOption(id, index) {
     } else {
         const value = group.options[index];
         const lockNote = group.optionLock && group.optionLock(value, o);
-        if (lockNote && !o[id].includes(value)) { showToast(/tail lights/.test(lockNote) ? `${lockNote}: choose a headlight kit with tail lights first.` : `${lockNote}: remove it from the overhead attachment first.`); return; }
+        if (lockNote && !o[id].includes(value)) { showToast(/tail lights/.test(lockNote) ? `${lockNote}: choose a headlight kit with tail lights first.` : `${lockNote}: remove that one first.`); return; }
         const same = (group.exclusive || []).find(set => set.includes(value)) || [];
         o[id] = o[id].includes(value) ? o[id].filter(x => x !== value) : [...o[id].filter(x => !same.includes(x)), value];
     }
