@@ -1088,8 +1088,8 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (m.floorMat[line][i]) include('floorMat', 'Floor mat', 'GC floor mat');
     if (m.audio[line][i]) include('electronics', 'Audio', m.audio[line][i]);
     if (m.speedCodeIncluded[i]) include('speedCode', 'Speed code', 'Included, no fee');
-    // Every build comes with the hinged windshield, in the Included list (2026-11-27, the user's choice)
-    include('hingedWindshield', 'Windshield', 'Premium Hinged Windshield');
+    // Golf and Lifestyle Essential come with the hinged windshield, in the Included list (2026-11-27, the user's choice)
+    if (i === 0) include('windshield', 'Windshield', 'Premium Hinged Windshield');
     // Lighting: one kit is included as it is; where there are several, one is included and the visitor picks it;
     // a build without lights has no lighting row
     const kits = m.lighting[line][i];
@@ -1158,8 +1158,8 @@ function getTempoOptionGroupsLegacy(product, i) {
         rowsFor: o => (o.steering ? [['Steering wheel', m.steering[i][0]], ['Scorecard holder', m.steering[i][1]]] : []) });
     if (m.overhead[line][i].length) add({ id: 'overhead', covers: ['audio'], section: 'Accessories', title: 'Overhead attachment', type: 'optional', options: m.overhead[line][i] });
     // Tinted windshield: not on Golf / Essential (2026-11-26, the user's choice)
-    // The tinted windshield, in place of the included hinged one (not on Golf / Essential)
-    if (i > 0) add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'optional', options: ['Tinted windshield'], replaces: 'hingedWindshield' });
+    // Scratch / Signature and Pro / Elite: tinted, or the premium hinged one, as an upgrade (2026-11-27, the user's choice)
+    if (i > 0) add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'optional', options: ['Tinted windshield', 'Premium Hinged Windshield'] });
     if (!m.floorMat[line][i]) add({ id: 'floorMat', section: 'Upgrades', title: 'Floor mat', type: 'flag', label: 'GC floor mat' });
     if (m.mirrors[line][i].length) add({ id: 'mirrors', section: 'Upgrades', title: 'Mirrors', type: 'optional', options: m.mirrors[line][i] }); // one mirror package: each already includes the side mirrors (2026-11-19)
     // No under seat storage tray on the Lifestyle line (2026-11-27, the user's choice)
@@ -1495,9 +1495,10 @@ function arrangeTempoGroups(product, i, groups) {
             const street = [wheelCombo(12, 'Triton Machined Black', '215/35-12'), wheelCombo(12, 'Hela Bright Chrome', '215/35-12')].filter(n => wheels.options.includes(n));
             wheels.allowed.up = [...wheels.allowed.up, ...street.filter(n => !wheels.allowed.up.includes(n))];
         }
-        // Golfer Scratch lifted: the Gridlock and Talon rims on the 23x10.5-12 off-road tires too (2026-11-27, the user's choice)
+        // Golfer Scratch lifted: the 12" Hela on the 23x10.5-12 off-road tires too (2026-11-27, the user's choice; the
+        // Gridlock and Talon on them taken out again)
         if (wheels && wheels.allowed && i === 1 && product.version === 'golfer') {
-            const offroad = ['Gridlock Machined Black', 'Gridlock Gloss Black', 'Talon Machined Black'].map(r => wheelCombo(12, r, '23x10.5-12')).filter(n => wheels.options.includes(n));
+            const offroad = [wheelCombo(12, 'Hela Bright Chrome', '23x10.5-12')].filter(n => wheels.options.includes(n));
             wheels.allowed.up = [...wheels.allowed.up, ...offroad.filter(n => !wheels.allowed.up.includes(n))];
         }
         // Golfer Pro and Lifestyle Elite lifted: every 12" rim on its four tires, and every 14" rim on 225/30, Kraken or Morpheus tires
@@ -4053,7 +4054,7 @@ const HOME_COMPARE_ROWS = [
         [OPT('overhead-storage-console'), 'One of: overhead storage console, 5 panel mirror, GC Sound Bar 27" RGB, Club Car Premium Sound Bar']]],
     ['Storage', [null, [OPT('overhead-storage-console'), 'Overhead storage console, under seat storage tray'],
         [OPT('overhead-storage-console'), 'Under seat storage tray']]],
-    ['Windshield', [[null, 'Premium hinged windshield (included)'], [null, 'Premium hinged included; tinted (upgrade)'], [null, 'Premium hinged included; tinted (upgrade)']]],
+    ['Windshield', [[null, 'Premium hinged windshield (included)'], [null, 'Tinted or premium hinged windshield (upgrade)'], [null, 'Tinted or premium hinged windshield (upgrade)']]],
     ['Rain enclosure', [null, [OPT('enclosure-3-beige'), 'Three-sided (CCJX): beige, white or black'],
         [OPT('enclosure-3-black'), 'Two-sided black (CC), or three-sided (CCJX): beige, white or black']]],
     ['Cooling', [null, [null, 'Zero Breeze Mark 3 (with an enclosure)'], [null, 'Zero Breeze Mark 3 (with an enclosure)']]]
