@@ -933,7 +933,8 @@ const GOLF_SIDE_PAIRS = (() => {
     const kinds = ['cooler', 'premium', 'washer', null];
     return kinds.flatMap(l => kinds.map(r => [l, r])).filter(([l, r]) => !(l === 'washer' && r === 'washer') && (l || r));
 })();
-const TEMPO_MIRRORS_LEGACY = ['Side Mirrors', 'Side Mirrors with Turn Signal', '5 Panel Mirror', 'Convex Inner Mirror (short)', 'Convex Inner Mirror (long)'];
+const TEMPO_MIRRORS_LEGACY = ['Side Mirrors', 'Side Mirrors with Turn Signal', '5 Panel Mirror', 'Convex Inner Mirror (short)']; // the long convex mirror taken out (2026-11-27, the user's choice)
+const TEMPO_ENCLOSURE_22 = ['2+2 Three-Sided Rain Enclosure (Beige)', '2+2 Three-Sided Rain Enclosure (White)', '2+2 Three-Sided Rain Enclosure (Black)'];
 const TEMPO_THREE_SIDED_LEGACY = ['Three-sided rain enclosure, Beige', 'Three-sided rain enclosure, White', 'Three-sided rain enclosure, Black'];
 const WHEEL_STEEL_LEGACY = '8" steel rims with cover';
 const TEMPO_MATRIX_LEGACY = {
@@ -998,9 +999,9 @@ const TEMPO_MATRIX_LEGACY = {
     // +2 layouts: the included rear flip seat, by line and layout (Golfer Pro may take the Club Car premium seat
     // instead), and its colours
     flipSeat: {
-        golfer: { '2+2': [['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat', 'Club Car Premium Flip Seat']] },
+        golfer: { '2+2': [['Rear Flip Seat'], ['Rear Flip Seat'], ['Rear Flip Seat', 'Club Car Premium Flip Seat']] },
         lifestyle: {
-            '2+2': [['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat'], ['Genesis Rear Flip Seat', 'Club Car Premium Flip Seat']],
+            '2+2': [['Rear Flip Seat'], ['Rear Flip Seat'], ['Rear Flip Seat', 'Club Car Premium Flip Seat']],
             '4+2': [['Club Car Flip Seat'], ['Club Car Flip Seat'], ['Club Car Premium Flip Seat']]
         }
     },
@@ -1088,8 +1089,9 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (m.floorMat[line][i]) include('floorMat', 'Floor mat', 'GC floor mat');
     if (m.audio[line][i]) include('electronics', 'Audio', m.audio[line][i]);
     if (m.speedCodeIncluded[i]) include('speedCode', 'Speed code', 'Included, no fee');
-    // Golf and Lifestyle Essential come with the hinged windshield, in the Included list (2026-11-27, the user's choice)
-    if (i === 0) include('windshield', 'Windshield', 'Premium Hinged Windshield');
+    // Every build comes with the Clear Hinged Windshield (the Bundles' SJK-1506), in the Included list (2026-11-27, the
+    // user's choice); a windshield upgrade takes its place
+    include('hingedWindshield', 'Windshield', 'Clear Hinged Windshield');
     // Lighting: one kit is included as it is; where there are several, one is included and the visitor picks it;
     // a build without lights has no lighting row
     const kits = m.lighting[line][i];
@@ -1159,13 +1161,14 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (m.overhead[line][i].length) add({ id: 'overhead', covers: ['audio'], section: 'Accessories', title: 'Overhead attachment', type: 'optional', options: m.overhead[line][i] });
     // Tinted windshield: not on Golf / Essential (2026-11-26, the user's choice)
     // Scratch / Signature and Pro / Elite: tinted, or the premium hinged one, as an upgrade (2026-11-27, the user's choice)
-    if (i > 0) add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'optional', options: ['Tinted windshield', 'Premium Hinged Windshield'] });
+    if (i > 0) add({ id: 'windshield', section: 'Upgrades', title: 'Windshield', type: 'optional', options: ['Tinted windshield', 'Premium Hinged Windshield'], replaces: 'hingedWindshield' });
     if (!m.floorMat[line][i]) add({ id: 'floorMat', section: 'Upgrades', title: 'Floor mat', type: 'flag', label: 'GC floor mat' });
     if (m.mirrors[line][i].length) add({ id: 'mirrors', section: 'Upgrades', title: 'Mirrors', type: 'optional', options: m.mirrors[line][i] }); // one mirror package: each already includes the side mirrors (2026-11-19)
     // No under seat storage tray on the Lifestyle line (2026-11-27, the user's choice)
     const storage = m.storage[i].filter(n => line !== 'lifestyle' || !/under seat/i.test(n));
     if (storage.length) add({ id: 'storage', section: 'Upgrades', title: 'Storage', type: 'multi', options: storage });
-    const enclosures = (layout === '2' ? m.enclosureTwoSeat : m.enclosureFourSeat)[i];
+    // Golfer and Lifestyle 2+2, every build: the 2+2 three-sided rain enclosure in beige, white or black first (2026-11-27, the user's choice)
+    const enclosures = [...(layout === '2+2' ? TEMPO_ENCLOSURE_22 : []), ...(layout === '2' ? m.enclosureTwoSeat : m.enclosureFourSeat)[i]];
     if (enclosures.length) add({ id: 'enclosure', section: 'Upgrades', title: 'Rain enclosure', type: 'optional', options: enclosures });
     // Cooling (Zero Breeze) taken out of the builder (2026-11-26, the user's choice)
     return groups;
@@ -1231,8 +1234,8 @@ function buildLabelHtml(level) {
 }
 
 // "Golfer 2 · Scratch Golfer": a model and its build level named together
-// A Lifestyle build is named by its seats (2026-11-26, the user's choice): "2 · Essential", not "Essential 2 · Essential"
-const buildTitleName = product => (product.version === 'lifestyle' && product.layout ? product.layout : product.name);
+// A Lifestyle build is named "Lifestyle" and its seats (2026-11-27, the user's choice): "Lifestyle 2 · Essential"
+const buildTitleName = product => (product.version === 'lifestyle' && product.layout ? `Lifestyle ${product.layout}` : product.name);
 
 function buildTitle(product, level) {
     return `${buildTitleName(product)} · ${buildLabel(level)}`;
@@ -1418,6 +1421,11 @@ function arrangeTempoGroups(product, i, groups) {
         }
         const flip = get('flipSeat');
         if (product.layout === '2+2' && flip && flip.options) flip.labels = { ...(flip.labels || {}), 'Club Car Premium Flip Seat': 'Onward Premium Flip Seat' };
+        // Golfer 2+2 (2026-11-27, the user's choice): the premium flip seat only with a Camello, Black or White seat;
+        // any other seat (Tsunami and the rest) takes the rear flip seat
+        if (product.version === 'golfer' && product.layout === '2+2' && flip && flip.options && flip.options.length > 1) {
+            flip.optionLock = n => (/premium/i.test(n) && !premiumFlipSeatOk(product, i) ? 'Needs a Camello, Black or White seat' : '');
+        }
     }
     // Lifestyle Essential's headlights are the document's GC Tempo LED headlights and tail lights on every layout (the
     // Bundles named others on the 2+2 and 4+2)
@@ -1488,16 +1496,16 @@ function arrangeTempoGroups(product, i, groups) {
         const wheels = get('wheels');
         const doc = golferDocWheels()[i];
         if (wheels && doc) wheels.allowed = { std: doc.std.filter(n => wheels.options.includes(n)), up: doc.up.filter(n => wheels.options.includes(n)) };
-        // Golfer Scratch and Lifestyle Signature lifted can also keep the 12" street wheels, Triton or Hela on 215/35-12
+        // Golfer Scratch and Lifestyle Signature lifted can also keep the 12" street wheels, Triton on 215/35-12 or Hela on Kruizer 205/40-R12
         // (2026-11-27, the user's choice)
         if (wheels && wheels.allowed && i === 1) {
             wheels.groupedLift = true; // lifted: size, then tire, then rims (Scratch and Signature, 2026-11-27)
-            const street = [wheelCombo(12, 'Triton Machined Black', '215/35-12'), wheelCombo(12, 'Hela Bright Chrome', '215/35-12')].filter(n => wheels.options.includes(n));
+            const street = [wheelCombo(12, 'Triton Machined Black', '215/35-12'), wheelCombo(12, 'Hela Bright Chrome', 'Kruizer 205/40-R12')].filter(n => wheels.options.includes(n));
             wheels.allowed.up = [...wheels.allowed.up, ...street.filter(n => !wheels.allowed.up.includes(n))];
         }
         // Golfer Scratch lifted: the 12" Hela on the 23x10.5-12 off-road tires too (2026-11-27, the user's choice; the
         // Gridlock and Talon on them taken out again)
-        if (wheels && wheels.allowed && i === 1 && product.version === 'golfer') {
+        if (wheels && wheels.allowed && i === 1) { // Scratch and Signature
             const offroad = [wheelCombo(12, 'Hela Bright Chrome', '23x10.5-12')].filter(n => wheels.options.includes(n));
             wheels.allowed.up = [...wheels.allowed.up, ...offroad.filter(n => !wheels.allowed.up.includes(n))];
         }
@@ -1534,7 +1542,8 @@ function arrangeTempoGroups(product, i, groups) {
 // (a function: the wheel names it uses are defined further down)
 function golferDocWheels() {
     const w = (size, rim, tire) => wheelCombo(size, rim, tire);
-    const street12 = [w(12, 'Triton Machined Black', '215/35-12'), w(12, 'Hela Bright Chrome', '215/35-12')];
+    // (the 12" Hela on the Bundles' Kruizer 205/40-R12 tire, not the document's 215/35-12: 2026-11-27, the user's choice)
+    const street12 = [w(12, 'Triton Machined Black', '215/35-12'), w(12, 'Hela Bright Chrome', 'Kruizer 205/40-R12')];
     const g225 = ['Gridlock Machined Black', 'Gridlock Gloss Black', 'Talon Machined Black'].map(r => w(14, r, '225/30-14'));
     return [
         { std: [WHEEL_STEEL_8], up: [] },
@@ -1584,7 +1593,7 @@ function bundleWheelCombo(name) {
     if (n === '8in') return WHEEL_STEEL_8;
     if (n === '10in') return WHEEL_ALLOY_10;
     if (n === '12in Triton') return wheelCombo(12, 'Triton Machined Black', '215/35-12');
-    if (n === '12in Hela') return wheelCombo(12, 'Hela Bright Chrome', '215/35-12');
+    if (n === '12in Hela') return wheelCombo(12, 'Hela Bright Chrome', 'Kruizer 205/40-R12'); // its bundle's tire (2026-11-27, the user's choice)
     const k = n.match(/^(.*?)\s+with\s+Kr?aken\s+Tires?$/i);
     if (!k) return null;
     const words = k[1].toLowerCase().replace(/\bchome\b/, 'chrome').split(/\s+/).filter(w => !['with', 'inserts'].includes(w));
@@ -1627,7 +1636,7 @@ function wheelLabel(name) {
         '8in': '8" steel rims with wheel cover, standard tires',
         '10in': '10" Club Car premium rims, standard tires',
         '12in Triton': '12" Triton Machined Black rims, 215/35-12 tires',
-        '12in Hela': '12" Hela Bright Chrome rims, 215/35-12 tires'
+        '12in Hela': '12" Hela Bright Chrome rims, Kruizer 205/40-R12 tires'
     };
     if (known[n]) return known[n];
     const kraken = n.match(/^(.*?)\s+with\s+Kr?aken\s+Tires?$/i);
@@ -4035,8 +4044,8 @@ const HOME_COMPARE_ROWS = [
     ['Canopy', [[null, '2 Pass Canopy: white or beige'], [null, '2 Pass Canopy: white, beige or black'], [null, '2 Pass Canopy: white, beige or black']]],
     ['Battery', [[OPT('battery-trojan-8v'), 'Trojan FLA'], [OPT('battery-trojan-8v'), 'Trojan FLA'], [OPT('battery-battlite'), 'Battlite lithium']]],
     ['Rims & tires', [[OPT('wheel-8-steel'), '8" steel rims with cover'],
-        [OPT('wheel-8-steel'), '8" steel rims with cover, 12" Triton Machined Black or 12" Hela Bright Chrome (215/35-12 tires)'],
-        [OPT('wheel-10-5spoke-gunmetal'), '10" 5 Spoke Alloy Wheel in Gunmetal, 12" Triton Machined Black or 12" Hela Bright Chrome (215/35-12 tires)']]],
+        [OPT('wheel-8-steel'), '8" steel rims with cover, 12" Triton Machined Black (215/35-12 tires) or 12" Hela Bright Chrome (Kruizer 205/40-R12 tires)'],
+        [OPT('wheel-10-5spoke-gunmetal'), '10" 5 Spoke Alloy Wheel in Gunmetal, 12" Triton Machined Black (215/35-12 tires) or 12" Hela Bright Chrome (Kruizer 205/40-R12 tires)']]],
     ['Rims upgrade', [null,
         [OPT('wheel-14-gridlock-machined-225'), '14" Gridlock Machined Black or Gloss Black, 14" Talon (225/30-14); 12" Triton Machined Black (23x10.5-12)'],
         [OPT('wheel-14-aerion-gloss-kraken'), '14 choices: 14" Aerion, Gridlock, Talon (225/30-14); Aerion, Athena, Atlas, Zeus, Mercury (Kraken 23x10-14); 12" Hela, Triton (23x10.5-12)']]],
@@ -4054,7 +4063,7 @@ const HOME_COMPARE_ROWS = [
         [OPT('overhead-storage-console'), 'One of: overhead storage console, 5 panel mirror, GC Sound Bar 27" RGB, Club Car Premium Sound Bar']]],
     ['Storage', [null, [OPT('overhead-storage-console'), 'Overhead storage console, under seat storage tray'],
         [OPT('overhead-storage-console'), 'Under seat storage tray']]],
-    ['Windshield', [[null, 'Premium hinged windshield (included)'], [null, 'Tinted or premium hinged windshield (upgrade)'], [null, 'Tinted or premium hinged windshield (upgrade)']]],
+    ['Windshield', [[null, 'Clear hinged windshield (included)'], [null, 'Clear hinged (included); tinted or premium hinged (upgrade)'], [null, 'Clear hinged (included); tinted or premium hinged (upgrade)']]],
     ['Rain enclosure', [null, [OPT('enclosure-3-beige'), 'Three-sided (CCJX): beige, white or black'],
         [OPT('enclosure-3-black'), 'Two-sided black (CC), or three-sided (CCJX): beige, white or black']]],
     ['Cooling', [null, [null, 'Zero Breeze Mark 3 (with an enclosure)'], [null, 'Zero Breeze Mark 3 (with an enclosure)']]]
@@ -5480,7 +5489,9 @@ function tempoBodyNames(product, i) {
 
 function tempoSeatNames(product, i) {
     const code = tempoMatrix(product).seat[i];
-    return withLowerColors(product, i, 'seat', catalogNames(product, i, 'seat', code) || code, tempoSeatNames);
+    const names = withLowerColors(product, i, 'seat', catalogNames(product, i, 'seat', code) || code, tempoSeatNames);
+    // Pro and Elite, every layout: not the plain White, Beige, Black and Gray seats (2026-11-27, the user's choice)
+    return i === 2 ? names.filter(n => !['White', 'Beige', 'Black', 'Gray', 'Grey'].includes(n)) : names;
 }
 
 function tempoCanopyNames(product, i) {
@@ -6650,7 +6661,10 @@ function carryTempoOptions(product, i, prev) {
 const fivePanelPartner = n => /club car premium sound bar/i.test(n || '');
 const fivePanelBlocked = o => !!o.overhead && !fivePanelPartner(o.overhead);
 const hasFivePanel = o => (Array.isArray(o.mirrors) ? o.mirrors : [o.mirrors || '']).some(n => /5 panel/i.test(n));
+// The Golfer 2+2's premium flip seat goes with a Camello, Black or White seat only (2026-11-27)
+const premiumFlipSeatOk = (product, i) => /camello|black|white/i.test(chosenSeatName(product, i));
 function fixTempoSubChoices(product, i, o) {
+    if (product.version === 'golfer' && product.layout === '2+2' && /premium/i.test(o.flipSeat || '') && !premiumFlipSeatOk(product, i)) o.flipSeat = 'Rear Flip Seat';
     if (fivePanelBlocked(o)) {
         if (Array.isArray(o.mirrors)) o.mirrors = o.mirrors.filter(n => !/5 panel/i.test(n));
         else if (/5 panel/i.test(o.mirrors || '')) o.mirrors = '';
@@ -6773,6 +6787,9 @@ function findTempoGroup(product, i, id) {
 }
 
 // Pick-one groups; picking an optional group's chosen option again clears it
+// What a locked option's message asks for
+const lockToast = note => /tail lights/.test(note) ? `${note}: choose a headlight kit with tail lights first.`
+    : /seat$/.test(note) ? `${note}: change the seat color first.` : `${note}: remove that one first.`;
 function pickTempoOption(id, index) {
     const product = currentDetailProduct();
     const i = detailLevelIndex(product);
@@ -6785,7 +6802,7 @@ function pickTempoOption(id, index) {
     }
     const value = group.options[index];
     const lockNote = group.optionLock && group.optionLock(value, detailBuild.options);
-    if (lockNote) { showToast(/tail lights/.test(lockNote) ? `${lockNote}: choose a headlight kit with tail lights first.` : `${lockNote}: remove that one first.`); return; }
+    if (lockNote) { showToast(lockToast(lockNote)); return; }
     detailBuild.options[id] = group.type === 'optional' && detailBuild.options[id] === value ? '' : value;
     fixTempoSubChoices(product, i, detailBuild.options);
     refreshTempoOptions();
@@ -6806,7 +6823,7 @@ function toggleTempoOption(id, index) {
     } else {
         const value = group.options[index];
         const lockNote = group.optionLock && group.optionLock(value, o);
-        if (lockNote && !o[id].includes(value)) { showToast(/tail lights/.test(lockNote) ? `${lockNote}: choose a headlight kit with tail lights first.` : `${lockNote}: remove that one first.`); return; }
+        if (lockNote && !o[id].includes(value)) { showToast(lockToast(lockNote)); return; }
         const same = (group.exclusive || []).find(set => set.includes(value)) || [];
         o[id] = o[id].includes(value) ? o[id].filter(x => x !== value) : [...o[id].filter(x => !same.includes(x)), value];
     }
@@ -7029,6 +7046,8 @@ const OPTION_PHOTOS = {
     'Clear windshield': 'windshield-clear',
     'Tinted windshield': 'windshield-tinted',
     'Premium Hinged Windshield': 'windshield-folding',
+    'Clear Hinged Windshield': 'windshield-clear',
+    'Golf Bag Attachment Combo': 'bag-attachment',
     'Battlite lithium battery': 'battery-battlite',
     'Side mirrors': 'mirror-side',
     'Side mirrors and 5 panel rear mirror': 'mirror-5-panel',
@@ -7069,7 +7088,7 @@ const OPTION_PHOTOS = {
     'GC Brush Guard': 'brush-guard',
     'Nerf Bar': 'nerf-bar',
     // Rear flip seats
-    'Genesis Rear Flip Seat': 'flip-genesis',
+    'Rear Flip Seat': 'flip-genesis',
     'Club Car Premium Flip Seat': 'flip-onward',
     // Audio and charging
     'GC Sound Bar 27" RGB': 'audio-gc-soundbar-27',
@@ -7085,6 +7104,9 @@ const OPTION_PHOTOS = {
     'Convex Inner Mirror (long)': 'mirror-convex-long',
     'Under Seat Storage Tray': 'storage-under-seat',
     // Rain enclosures
+    '2+2 Three-Sided Rain Enclosure (Beige)': 'enclosure-22-beige',
+    '2+2 Three-Sided Rain Enclosure (White)': 'enclosure-22-white',
+    '2+2 Three-Sided Rain Enclosure (Black)': 'enclosure-22-black',
     'Three-sided rain enclosure, Beige': 'enclosure-3-beige',
     'Three-sided rain enclosure, White': 'enclosure-3-white',
     'Three-sided rain enclosure, Black': 'enclosure-3-black',
@@ -7367,6 +7389,7 @@ function pickLiftedTireType(type) {
 }
 
 function renderTempoGroup(g, o, nested, cell = false, forceOpen = false) {
+    if (g.id === 'flipSeatColor') return ''; // follows the seat; its section taken out (2026-11-27, the user's choice)
     const open = forceOpen || g.open || (detailBuild.openIncluded || []).includes(g.id);
     if (!open && g.included && g.type === 'single' && g.options && g.options.length > 1) {
         const product = currentDetailProduct();
@@ -7507,7 +7530,7 @@ function renderTempoOptions(product) {
     // attachment are in their own sections, so they're left out of this list
     const ownSection = new Set(groups.filter(g => g.part && g.part !== 'included' && isIncludedNow(g, o)).map(g => g.title));
     const included = buildIncludedItems(product, i, o).filter(([t]) => !ownSection.has(t));
-    // (an included item with one option, like the Genesis flip seat on Golf and Scratch, isn't a choice: it's in the
+    // (an included item with one option, like the rear flip seat on Golf and Scratch, isn't a choice: it's in the
     // list above, 2026-11-26)
     const choices = part('included').filter(g => g.type !== 'fixed' && g.id !== 'lighting' && !(g.id === 'wheels' && o.lift)
         && !(g.type === 'single' && g.id !== 'wheels' && (g.options || []).length < 2));
