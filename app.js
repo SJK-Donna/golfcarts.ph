@@ -1500,9 +1500,9 @@ function arrangeTempoGroups(product, i, groups) {
             const offroad = ['Gridlock Machined Black', 'Gridlock Gloss Black', 'Talon Machined Black'].map(r => wheelCombo(12, r, '23x10.5-12')).filter(n => wheels.options.includes(n));
             wheels.allowed.up = [...wheels.allowed.up, ...offroad.filter(n => !wheels.allowed.up.includes(n))];
         }
-        // Golfer Pro lifted: every 12" rim on its four tires, and every 14" rim on 225/30, Kraken or Morpheus tires
+        // Golfer Pro and Lifestyle Elite lifted: every 12" rim on its four tires, and every 14" rim on 225/30, Kraken or Morpheus tires
         // (2026-11-27, the user's photos); the document's wheels stay first
-        if (wheels && wheels.allowed && i === 2 && product.version === 'golfer') {
+        if (wheels && wheels.allowed && i === 2) {
             const more = wheels.options.filter(n => { const p = parseWheel(n); return p && (p.size === 12 || /225\/30|Kraken|Morpheus/i.test(p.tire)) && !/PVD|Chrome inserts/.test(p.rim); });
             wheels.allowed.up = [...wheels.allowed.up, ...more.filter(n => !wheels.allowed.up.includes(n))];
         }

@@ -136,10 +136,15 @@ function useWebp(text) {
 }
 
 // ---- 4. Pre-render ----
-const template = useWebp(fs.readFileSync(rel('index.html'), 'utf8')).replace('<base href="/">', `<base href="${base}">`);
-if (!template.includes(`<base href="${base}">`)) throw new Error('index.html must contain <base href="/">');
 const appSource = useWebp(fs.readFileSync(rel('app.js'), 'utf8'));
 fs.writeFileSync(out('app.js'), appSource);
+// The scripts and stylesheet carry a fingerprint of their contents (?v=…), so a browser loads the new ones after each
+// deploy instead of a cached copy (2026-11-27: visitors kept seeing old builder rules)
+const fingerprint = f => createHash('sha1').update(fs.readFileSync(out(f))).digest('hex').slice(0, 10);
+let template = useWebp(fs.readFileSync(rel('index.html'), 'utf8')).replace('<base href="/">', `<base href="${base}">`);
+if (!template.includes(`<base href="${base}">`)) throw new Error('index.html must contain <base href="/">');
+for (const f of ['app.js', 'recolor.js', 'account.js']) template = template.replace(`<script src="${f}"></script>`, `<script src="${f}?v=${fingerprint(f)}"></script>`);
+template = template.replace('<link rel="stylesheet" href="css/site.css">', `<link rel="stylesheet" href="css/site.css?v=${fingerprint('css/site.css')}">`);
 const recolorSource = fs.readFileSync(rel('recolor.js'), 'utf8');
 const accountSource = fs.readFileSync(rel('account.js'), 'utf8');
 
