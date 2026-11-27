@@ -1088,8 +1088,8 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (m.floorMat[line][i]) include('floorMat', 'Floor mat', 'GC floor mat');
     if (m.audio[line][i]) include('electronics', 'Audio', m.audio[line][i]);
     if (m.speedCodeIncluded[i]) include('speedCode', 'Speed code', 'Included, no fee');
-    // Lifestyle Essential comes with the hinged windshield (2026-11-27, the user's choice)
-    if (line === 'lifestyle' && i === 0) include('windshield', 'Windshield', 'Premium Hinged Windshield');
+    // Golf and Lifestyle Essential come with the hinged windshield, in the Included list (2026-11-27, the user's choice)
+    if (i === 0) include('windshield', 'Windshield', 'Premium Hinged Windshield');
     // Lighting: one kit is included as it is; where there are several, one is included and the visitor picks it;
     // a build without lights has no lighting row
     const kits = m.lighting[line][i];
@@ -1135,8 +1135,6 @@ function getTempoOptionGroupsLegacy(product, i) {
                     })) });
             }
         }
-        // Golf: the hinged windshield as an accessory, before the floor mat (2026-11-27, the user's choice)
-        if (i === 0) add({ id: 'windshield', section: 'Accessories', title: 'Windshield', type: 'optional', options: ['Premium Hinged Windshield'], asExtra: true });
         if (layout === '2') add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
     } else if (m.lifestyleCooler[i]) {
         add({ id: 'cooler', section: 'Accessories', title: 'Cooler', type: 'qty' });
@@ -1520,10 +1518,10 @@ function arrangeTempoGroups(product, i, groups) {
         // The lithium battery is changed with the included items, under Customize package (2026-11-26)
         else if (g.id === 'batteryUpgrade') g.part = 'included';
         // Accessories start with storage, the rain enclosure and the floor mat, before the attachments (2026-11-26)
-        else if (EXTRA_ORDER.includes(g.id) || g.asExtra) g.part = 'extras';
+        else if (EXTRA_ORDER.includes(g.id)) g.part = 'extras';
         else if (UPGRADE_ORDER.includes(g.id) || !g.included) g.part = 'upgrades';
         else g.part = 'included';
-        g.order = g.asExtra ? EXTRA_ORDER.indexOf('floorMat') - 0.5 : UPGRADE_ORDER.includes(g.id) ? UPGRADE_ORDER.indexOf(g.id) : EXTRA_ORDER.includes(g.id) ? EXTRA_ORDER.indexOf(g.id) : 99;
+        g.order = UPGRADE_ORDER.includes(g.id) ? UPGRADE_ORDER.indexOf(g.id) : EXTRA_ORDER.includes(g.id) ? EXTRA_ORDER.indexOf(g.id) : 99;
     });
     // The driver attachment: the steering wheel and its scorecard holder, included on Pro / Elite
     return kept;
