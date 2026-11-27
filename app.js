@@ -1088,6 +1088,8 @@ function getTempoOptionGroupsLegacy(product, i) {
     if (m.floorMat[line][i]) include('floorMat', 'Floor mat', 'GC floor mat');
     if (m.audio[line][i]) include('electronics', 'Audio', m.audio[line][i]);
     if (m.speedCodeIncluded[i]) include('speedCode', 'Speed code', 'Included, no fee');
+    // Lifestyle Essential comes with the hinged windshield (2026-11-27, the user's choice)
+    if (line === 'lifestyle' && i === 0) include('windshield', 'Windshield', 'Premium Hinged Windshield');
     // Lighting: one kit is included as it is; where there are several, one is included and the visitor picks it;
     // a build without lights has no lighting row
     const kits = m.lighting[line][i];
