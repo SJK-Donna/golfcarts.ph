@@ -971,10 +971,10 @@ const TEMPO_MATRIX_LEGACY = {
         // or no headlight (Versions.docx, 2026-11-26)
         // Golf has none (Versions.docx); Scratch and Pro may drop theirs, but don't start without (2026-11-26)
         golfer: [[],
-            ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Tempo LED Headlights & Tail Lights', 'No headlight'], ['Club Car Tempo Deluxe Light Kit', 'No headlight']],
+            ['GC Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights', 'GC Apex Tempo LED Headlights & Tail Lights', 'No headlight'], ['Club Car Tempo Deluxe Light Kit', 'No headlight']],
         // Signature: the GC Apex or the GC Tempo LED headlights and tail lights (Versions.docx; GC Tempo LED Headlights and
         // No headlight taken out, 2026-11-26, the user's choice)
-        lifestyle: [['GC Tempo LED Headlights & Tail Lights'], ['GC Apex Tempo LED Headlights & Tail Lights', 'GC Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']]
+        lifestyle: [['GC Tempo LED Headlights & Tail Lights'], ['GC Tempo LED Headlights & Tail Lights', 'GC Apex Tempo LED Headlights & Tail Lights'], ['Club Car Tempo Deluxe Light Kit']] // GC Tempo first (2026-11-27)
     },
     // Golfer 2 and 4 golf accessories, all included: Golf the black GC bag cover only; Scratch a GC bag cover (black,
     // beige, white) or a CC magnetic one (black, beige); Pro a CC magnetic one. From Scratch, a sand bottle (max 2)
@@ -990,7 +990,7 @@ const TEMPO_MATRIX_LEGACY = {
     sandBottles: ['Sand bottle with mounting bracket', 'Two sand bottles with mounting brackets'],
     golfSideItems: GOLF_SIDE_PAIRS,
     golfSides: GOLF_SIDE_PAIRS.map(([l, r]) => [l && `${GOLF_SIDE_NAMES[l]} left`, r && `${GOLF_SIDE_NAMES[r]} right`].filter(Boolean).join(', ')),
-    golfExtras: [false, true, true],
+    golfExtras: [true, true, true], // Golf too, as accessories (2026-11-27, the user's choice)
     lifestyleCooler: [false, true, true], // an add-on on the Lifestyle builds
     lift: [false, true, true],           // Lifted 3.5" GC lift kit: not on Golf / Essential (2026-11-27, the user's choice)
     liftFenders: ['Tempo Fenders'], // the 3" kit, named without its size; the 1.5" and the Onward Fender Flare Kit taken out (2026-11-26, the user's choice)
@@ -1110,7 +1110,8 @@ function getTempoOptionGroupsLegacy(product, i) {
             if (bags.length > 1) add({ id: 'bagCover', section: 'Accessories', title: 'Bag cover', type: 'single', options: bags, included: true });
             else include('bagCover', 'Bag cover', bags[0]);
             if (m.golfExtras[i]) {
-                add({ id: 'sandBottle', section: 'Accessories', title: 'Sand bottle', type: 'single', options: m.sandBottles, included: true,
+                // On Golf (2026-11-27) they're accessories: nothing on either side to start
+                add({ id: 'sandBottle', section: 'Accessories', title: 'Sand bottle', type: 'single', options: m.sandBottles, included: i > 0, startEmpty: i === 0,
                     // Which side the one bottle goes on is said in the quote
                     rowsFor: o => o.sandBottle ? [['Sand bottle', o.sandBottle + (/two|2/i.test(o.sandBottle) ? '' : `, ${o.sandSide === 'right' ? 'right' : 'left'} side`)]] : [] });
                 // A ball washer and a cooler on either side, or two coolers; never two washers. `sides`: what each choice
@@ -1119,7 +1120,7 @@ function getTempoOptionGroupsLegacy(product, i) {
                 const sideName = { washer: 'Ball and club washer', cooler: 'Caddy Master cooler' };
                 const sides = Object.fromEntries(m.golfSides.map((name, k) => [name, m.golfSideItems[k]]));
                 add({ id: 'ballWasher', covers: ['cooler'], section: 'Accessories', title: 'Ball washer and cooler', type: 'single',
-                    hint: 'Included, choose one. One ball washer per cart, on the left or the right', options: m.golfSides, included: true, sides,
+                    hint: `${i > 0 ? 'Included, choose one' : 'Optional'}. One ball washer per cart, on the left or the right`, options: m.golfSides, included: i > 0, startEmpty: i === 0, sides,
                     // The Premium Caddie Cooler has its own row (the bundles' side items are the Caddy Master and the washer),
                     // one row for both sides
                     quoteRows: Object.fromEntries(Object.entries(sides).map(([name, [left, right]]) => {
@@ -1132,6 +1133,8 @@ function getTempoOptionGroupsLegacy(product, i) {
                     })) });
             }
         }
+        // Golf: the hinged windshield as an accessory, before the floor mat (2026-11-27, the user's choice)
+        if (i === 0) add({ id: 'windshield', section: 'Accessories', title: 'Windshield', type: 'optional', options: ['Premium Hinged Windshield'], asExtra: true });
         if (layout === '2') add({ id: 'caddyStand', section: 'Accessories', title: 'Caddy stand', type: 'flag', label: 'Add a caddy stand' });
     } else if (m.lifestyleCooler[i]) {
         add({ id: 'cooler', section: 'Accessories', title: 'Cooler', type: 'qty' });
@@ -1452,7 +1455,7 @@ function arrangeTempoGroups(product, i, groups) {
     }
     // Side mirrors with turn signals need headlights and tail lights
     if (mirrors) mirrors.optionLock = (n, o) => (/turn signal/i.test(n) && !hasTailLights(product, i, o) ? 'Needs headlights and tail lights'
-        : fivePanel && /5 panel/i.test(n) && fivePanelBlocked(o) ? `Not with the ${o.overhead}` : '');
+        : fivePanel && /5 panel/i.test(n) && fivePanelBlocked(o, i) ? `Not with the ${o.overhead}` : '');
     // Headlight: Golf starts with none; Scratch and Pro can choose none, but don't start with it
     const lights = get('lighting');
     if (lights && lights.type === 'single') {
@@ -1515,10 +1518,10 @@ function arrangeTempoGroups(product, i, groups) {
         // The lithium battery is changed with the included items, under Customize package (2026-11-26)
         else if (g.id === 'batteryUpgrade') g.part = 'included';
         // Accessories start with storage, the rain enclosure and the floor mat, before the attachments (2026-11-26)
-        else if (EXTRA_ORDER.includes(g.id)) g.part = 'extras';
+        else if (EXTRA_ORDER.includes(g.id) || g.asExtra) g.part = 'extras';
         else if (UPGRADE_ORDER.includes(g.id) || !g.included) g.part = 'upgrades';
         else g.part = 'included';
-        g.order = UPGRADE_ORDER.includes(g.id) ? UPGRADE_ORDER.indexOf(g.id) : EXTRA_ORDER.includes(g.id) ? EXTRA_ORDER.indexOf(g.id) : 99;
+        g.order = g.asExtra ? EXTRA_ORDER.indexOf('floorMat') - 0.5 : UPGRADE_ORDER.includes(g.id) ? UPGRADE_ORDER.indexOf(g.id) : EXTRA_ORDER.includes(g.id) ? EXTRA_ORDER.indexOf(g.id) : 99;
     });
     // The driver attachment: the steering wheel and its scorecard holder, included on Pro / Elite
     return kept;
@@ -1714,7 +1717,7 @@ function getTempoSubGroups(product, i, o) {
 function defaultTempoOptions(product, i) {
     const o = {};
     getTempoOptionGroups(product, i).forEach(g => {
-        if (g.type === 'single') o[g.id] = g.bundleDefault || g.options[0];
+        if (g.type === 'single') o[g.id] = g.startEmpty ? '' : g.bundleDefault || g.options[0];
         if (g.type === 'optional') o[g.id] = '';
         if (g.type === 'multi') o[g.id] = [];
         if (g.type === 'qty') o[g.id] = 0;
@@ -6518,6 +6521,8 @@ function buildIncludedItems(product, i, o) {
     const all = getTempoOptionGroups(product, i);
     return all.filter(g => isIncludedNow(g, o)).map(g => {
         if (g.type === 'fixed') { const up = all.find(u => u.replaces === g.id), v = up && describeTempoChoice(product, i, up, o); return [g.title, v || g.value]; }
+        // The wheels by their full name, not the Bundles' code ("8in", 2026-11-27)
+        if (g.id === 'wheels') return [g.title, wheelLabel(describeTempoChoice(product, i, g, o))];
         return [g.title, describeTempoChoice(product, i, g, o)];
     }).filter(([, v]) => v);
 }
@@ -6637,10 +6642,11 @@ function carryTempoOptions(product, i, prev) {
 }
 
 // Keeps sub-choices valid (Lifestyle 2 and 4): a flip seat always has one of its colors, cooling needs an enclosure
-// The 5 panel mirror fits with no overhead attachment or the sound bar only (2026-11-27)
-const fivePanelBlocked = o => !!o.overhead && !/sound bar/i.test(o.overhead);
+// The 5 panel mirror fits with no overhead attachment, or with the sound bar: on Pro / Elite the Club Car Premium Sound
+// Bar only, not the GC one (2026-11-27, the user's choice)
+const fivePanelBlocked = (o, i) => !!o.overhead && !(i === 2 ? /club car premium sound bar/i : /sound bar/i).test(o.overhead);
 function fixTempoSubChoices(product, i, o) {
-    if (fivePanelBlocked(o)) {
+    if (fivePanelBlocked(o, i)) {
         if (Array.isArray(o.mirrors)) o.mirrors = o.mirrors.filter(n => !/5 panel/i.test(n));
         else if (/5 panel/i.test(o.mirrors || '')) o.mirrors = '';
     }
@@ -7567,7 +7573,7 @@ function renderSideAttachment(product, i, o) {
     const sandOne = sand && sand.options.find(n => !/two|2/i.test(n)), sandTwo = sand && sand.options.find(n => /two|2/i.test(n));
     const sandOn = s => !!o.sandBottle && (o.sandBottle === sandTwo || (o.sandSide || 'left') === s);
     const rows = [
-        sides && ['cooler', 'Caddy Master cooler', s => items[s === 'left' ? 0 : 1] === 'cooler', 'Included. Left, right or both'],
+        sides && ['cooler', 'Caddy Master cooler', s => items[s === 'left' ? 0 : 1] === 'cooler', sides.included ? 'Included. Left, right or both' : 'Left, right or both'],
         sides && ['premium', 'Premium Caddie Cooler', s => items[s === 'left' ? 0 : 1] === 'premium', 'Upgrade (SJK-1363). Left, right or both'],
         sides && ['washer', 'Ball washer', s => items[s === 'left' ? 0 : 1] === 'washer', 'Left or right'],
         sand && sandOne && ['sand', 'Sand bottle', sandOn, 'Up to two']
