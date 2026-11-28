@@ -435,12 +435,12 @@ create table if not exists public.quotation_pss (
 );
 
 create or replace function public.quotation_pss_stamp() returns trigger
-language plpgsql as $
+language plpgsql as $$
 begin
     new.updated_by := lower(auth.jwt() ->> 'email');
     new.updated_at := now();
     return new;
-end $;
+end $$;
 
 drop trigger if exists quotation_pss_stamp on public.quotation_pss;
 create trigger quotation_pss_stamp before insert or update on public.quotation_pss

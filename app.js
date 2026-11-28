@@ -1147,7 +1147,7 @@ function getTempoOptionGroupsLegacy(product, i) {
     // Scratch / Signature only: Golf / Essential has no battery upgrade (2026-11-26, the user's choice)
     if (i === 1) add({ id: 'batteryUpgrade', section: 'Upgrades', title: 'Lithium battery', type: 'flag', label: m.batteryUpgrade, replaces: 'battery' });
     if (!m.speedCodeIncluded[i]) add({ id: 'speedCode', section: 'Upgrades', title: 'Speed code', type: 'flag', label: 'Speed code (with fee)' });
-    if (m.lift[i]) add({ id: 'lift', section: 'Upgrades', title: 'Lift kit', type: 'flag', label: 'Lifted 3.5" GC lift kit' });
+    if (liftOffered(product, i)) add({ id: 'lift', section: 'Upgrades', title: 'Lift kit', type: 'flag', label: 'Lifted 3.5" GC lift kit' });
     if (plusTwo && line === 'lifestyle') {
         const bags = m.bagAttachment.lifestyle[i];
         if (bags.length) add({ id: 'bagAttachment', section: 'Upgrades', title: 'Golf bag attachment', type: 'optional', options: bags });
@@ -1174,12 +1174,18 @@ function getTempoOptionGroupsLegacy(product, i) {
     return groups;
 }
 
+// The lift kit: on Scratch / Signature and Pro / Elite only. Golf and Essential have none (2026-11-28, the user's choice, though
+// the Bundles sheet lists a lift kit and 14" wheels for the Golfer 2+2 / 4 Golf and Lifestyle 2+2 Essential)
+function liftOffered(product, i) {
+    return !!TEMPO_MATRIX_LEGACY.lift[i];
+}
+
 // Sub-choices that appear once a parent option is chosen
 function getTempoSubGroupsLegacy(product, i, o) {
     const m = TEMPO_MATRIX_LEGACY;
     const subs = [];
     // Shown wherever a lift is offered; locked until the cart is lifted (2026-11-19)
-    if (m.lift[i]) {
+    if (liftOffered(product, i)) {
         subs.push({ id: 'liftFender', parent: 'lift', title: 'Fenders', type: 'single', options: m.liftFenders, locked: !o.lift });
         subs.push({ id: 'liftAddOns', parent: 'lift', title: 'Lift add-ons', type: 'multi', options: m.liftAddOns, locked: !o.lift });
     }
@@ -1502,30 +1508,33 @@ function arrangeTempoGroups(product, i, groups) {
         // The document's wheels: the standard ones, and the Rims Upgrade ones once lifted
         const wheels = get('wheels');
         const doc = golferDocWheels()[i];
-        if (wheels && doc) wheels.allowed = { std: doc.std.filter(n => wheels.options.includes(n)), up: doc.up.filter(n => wheels.options.includes(n)) };
+        if (wheels && doc) wheels.allowed = { std: doc.std.map(n => wheelOptionName(wheels.options, n)).filter(Boolean), up: doc.up.filter(n => wheels.options.includes(n)) };
+        // A build in the Bundles sheet takes its wheels from it instead (below)
+        if (wheels && sheetWheels(product, i)) wheels.allowed = sheetWheels(product, i, wheels.options);
         // Golfer Scratch and Lifestyle Signature lifted can also keep the 12" street wheels, Triton on 215/35-12 or Hela on Kruizer 205/40-R12
         // (2026-11-27, the user's choice)
-        if (wheels && wheels.allowed && i === 1) {
-            wheels.groupedLift = true; // lifted: size, then tire, then rims (Scratch and Signature, 2026-11-27)
+        if (wheels && wheels.allowed && i === 1) wheels.groupedLift = true; // lifted: size, then tire, then rims (Scratch and Signature, 2026-11-27)
+        if (wheels && wheels.allowed && i === 1 && !sheetWheels(product, i)) {
             const street = [wheelCombo(12, 'Triton Machined Black', '215/35-12'), wheelCombo(12, 'Hela Bright Chrome', 'Kruizer 205/40-R12')].filter(n => wheels.options.includes(n));
             wheels.allowed.up = [...wheels.allowed.up, ...street.filter(n => !wheels.allowed.up.includes(n))];
         }
         // Golfer Scratch lifted: the 12" Hela on the 23x10.5-12 off-road tires too (2026-11-27, the user's choice; the
         // Gridlock and Talon on them taken out again)
-        if (wheels && wheels.allowed && i === 1) { // Scratch and Signature
+        if (wheels && wheels.allowed && i === 1 && !sheetWheels(product, i)) { // Scratch and Signature
             const offroad = [wheelCombo(12, 'Hela Bright Chrome', '23x10.5-12')].filter(n => wheels.options.includes(n));
             wheels.allowed.up = [...wheels.allowed.up, ...offroad.filter(n => !wheels.allowed.up.includes(n))];
         }
         // Golfer Pro and Lifestyle Elite lifted: every 12" rim on its four tires, and every 14" rim on 225/30, Kraken or Morpheus tires
         // (2026-11-27, the user's photos); the document's wheels stay first
-        if (wheels && wheels.allowed && i === 2) {
+        if (wheels && wheels.allowed && i === 2 && !sheetWheels(product, i)) {
             const more = wheels.options.filter(n => { const p = parseWheel(n); return p && (p.size === 12 || /225\/30|Kraken|Morpheus/i.test(p.tire)) && !/PVD|Chrome inserts/.test(p.rim); });
             wheels.allowed.up = [...wheels.allowed.up, ...more.filter(n => !wheels.allowed.up.includes(n))];
         }
     } else if (i === 0) {
-        // Lifestyle Essential, like Golf (2026-11-26, the user's choice): its 8" steel wheels only, lifted or not
+        // Lifestyle Essential, like Golf (2026-11-26, the user's choice): its 8" steel wheels only, lifted or not; the
+        // Lifestyle 2+2 Essential follows the Bundles sheet (its lift and 14" wheels, 2026-11-28)
         const wheels = get('wheels');
-        if (wheels) wheels.allowed = { std: golferDocWheels()[0].std.filter(n => wheels.options.includes(n)), up: [] };
+        if (wheels) wheels.allowed = sheetWheels(product, i, wheels.options) || { std: golferDocWheels()[0].std.map(n => wheelOptionName(wheels.options, n)).filter(Boolean), up: [] };
     }
     const kept = out.filter(g => !(g.options && !g.options.length && g.type !== 'fixed'));
     kept.forEach(g => {
@@ -1559,6 +1568,45 @@ function golferDocWheels() {
             ...['Aerion Gloss Black', 'Aerion Black Chrome', 'Athena Solid Gloss Black', 'Atlas Gunmetal', 'Zeus Gloss Black and Machined', 'Mercury'].map(r => w(14, r, 'Kraken 23x10-14')),
             w(12, 'Hela Bright Chrome', '23x10.5-12'), w(12, 'Triton Machined Black', '23x10.5-12')] }
     ];
+}
+
+// The tires and rims each build has in the Bundles sheet ("Bundles 11.27.26" tab, 2026-11-28, the user's choice: "follow
+// the sheet"), and nothing else. Standard: 8" steel with cover (Golf, Essential, Scratch, Signature) or the 10" alloy (Pro,
+// Elite), and on Scratch / Signature / Pro / Elite the 12" Triton (215/35-12) and Hela (Kruizer 205/40-R12, its parts
+// row; the Golfer 2 Scratch's website name says 215/35-12). Lifted: the five 14" Kraken wheels; the Golfer 2 Scratch and
+// Pro also the 14" Gridlock on 225/30-14 (Gloss Black, Machined Black) and on 23x10-14 (Gloss Black: its parts row is the
+// All Black rim, though its website name says Machined Black; the tire still shown as the Kraken, 2026-11-28), and the 12"
+// Triton and Hela on Kraken 23x10-12. The Golfer 2 Golf and Lifestyle 4+2 Essential have no lift. Lifted, the 12" street
+// wheels stay on offer too (the sheet lists them for the build without the lift; 2026-11-28, the user's choice: "include
+// the 12 in lift"). null: a build the sheet doesn't have (Lifestyle 2 and 4).
+// With `options`, the lists as the build's wheel group names them (names it doesn't have are left out)
+const SHEET_KRAKEN_14 = ['Nokken with Chrome inserts', 'Aerion Gloss Black', 'Aerion PVD Black', 'Zeus Gloss Black and Machined', 'Athena Solid Gloss Black'];
+function sheetWheels(product, i, options) {
+    const inSheet = product.version === 'golfer' ? ['2', '2+2', '4'].includes(product.layout) : ['2+2', '4+2'].includes(product.layout);
+    if (!inSheet) return null;
+    const w = (size, rim, tire) => wheelCombo(size, rim, tire);
+    const street12 = [w(12, 'Triton Machined Black', '215/35-12'), w(12, 'Hela Bright Chrome', 'Kruizer 205/40-R12')];
+    const std = i === 0 ? [WHEEL_STEEL_8] : [i === 1 ? WHEEL_STEEL_8 : WHEEL_ALLOY_10, ...street12];
+    let up = [];
+    if (liftOffered(product, i)) {
+        up = SHEET_KRAKEN_14.map(r => w(14, r, 'Kraken 23x10-14'));
+        if (product.version === 'golfer' && product.layout === '2') up.push(w(14, 'Gridlock Gloss Black', '225/30-14'), w(14, 'Gridlock Machined Black', '225/30-14'),
+            w(14, 'Gridlock Gloss Black', 'Kraken 23x10-14'), w(12, 'Triton Machined Black', 'Kraken 23X10-12'), w(12, 'Hela Bright Chrome', 'Kraken 23X10-12'));
+        if (i > 0) up.push(...street12);
+    }
+    if (!options) return { std, up };
+    const named = n => wheelOptionName(options, n);
+    return { std: std.map(named).filter(Boolean), up: up.map(named).filter(Boolean) };
+}
+
+// A wheel as a build's wheel group names it: a build without the lift keeps the Bundles' own names ("8in", "10in"), so
+// the steel and alloy wheels are matched to those too; null when the group doesn't have it (2026-11-28: matched by the
+// long names only, a Golf or Essential build had no wheel chosen, and its quote request no wheel row)
+function wheelOptionName(options, n) {
+    if (options.includes(n)) return n;
+    if (n === WHEEL_STEEL_8 && options.includes('8in')) return '8in';
+    if (n === WHEEL_ALLOY_10 && options.includes('10in')) return '10in';
+    return null;
 }
 
 // Lights with tail lights: the kit chosen, or the build's own (the deluxe kit has both)
@@ -1754,15 +1802,16 @@ function defaultTempoOptions(product, i) {
 // Vehicle models referenced by the header menus and pillar pages.
 // `slug` links to a PRODUCTS_DATA page when one exists; `image: null` shows a placeholder.
 // `label` (optional) is the short name shown in menus and on the pillar pages (e.g. "2 Seater");
-// `name` stays the full model name used in quotes and on the model pages.
+// `name` stays the full model name used in quotes and on the model pages. `finderImage` (optional): its photo in the
+// cart finder's Seats step, when that differs from the menus' (2026-11-28)
 const VEHICLE_MODELS = {
-    'g-tempo-2':     { name: 'Golfer 2', label: '2 Seater',            image: 'image/Products/builds/golfer-2-golfer.jpg',                slug: 'golfer-tempo-2', badge: 'Bestseller' },
-    'g-tempo-2-2':   { name: 'Golfer 2+2', label: '2+2 Seater',          image: 'image/Products/builds/golfer-2-2-golfer.jpg',       slug: 'golfer-tempo-2-2' },
-    'g-tempo-4':     { name: 'Golfer 4', label: '4 Seater',             image: 'image/Products/builds/golfer-4-golfer.jpg',             slug: 'golfer-tempo-4' },
-    'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/builds/lifestyle-2-essential.jpg',                 slug: 'lifestyle-tempo-2' },
-    'l-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2' },
-    'l-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/builds/lifestyle-4-essential.jpg',             slug: 'lifestyle-tempo-4' },
-    'l-tempo-4-2':   { name: 'Tempo 4+2', label: '4+2 Seater',           image: 'image/Products/4 plus2 Lifted.png',         slug: 'lifestyle-tempo-4-2' },
+    'g-tempo-2':     { name: 'Golfer 2', label: '2 Seater',            image: 'image/Products/builds/golfer-2-golfer.jpg',                slug: 'golfer-tempo-2', badge: 'Bestseller', finderImage: 'image/Products/builds/finder-golfer-2.jpg' },
+    'g-tempo-2-2':   { name: 'Golfer 2+2', label: '2+2 Seater',          image: 'image/Products/builds/golfer-2-2-golfer.jpg',       slug: 'golfer-tempo-2-2', finderImage: 'image/Products/builds/finder-golfer-2-2.jpg' },
+    'g-tempo-4':     { name: 'Golfer 4', label: '4 Seater',             image: 'image/Products/builds/golfer-4-golfer.jpg',             slug: 'golfer-tempo-4', finderImage: 'image/Products/builds/finder-golfer-4.jpg' },
+    'l-tempo-2':     { name: 'Tempo 2', label: '2 Seater',             image: 'image/Products/builds/lifestyle-2-essential.jpg',                 slug: 'lifestyle-tempo-2', finderImage: 'image/Products/builds/finder-lifestyle-2.jpg' },
+    'l-tempo-2-2':   { name: 'Tempo 2+2', label: '2+2 Seater',           image: 'image/Products/Tempo 2+2 - Family.png',     slug: 'lifestyle-tempo-2-2', finderImage: 'image/Products/builds/finder-lifestyle-2-2.jpg' },
+    'l-tempo-4':     { name: 'Tempo 4', label: '4 Seater',             image: 'image/Products/builds/lifestyle-4-essential.jpg',             slug: 'lifestyle-tempo-4', finderImage: 'image/Products/builds/finder-lifestyle-4.jpg' },
+    'l-tempo-4-2':   { name: 'Tempo 4+2', label: '4+2 Seater',           image: 'image/Products/4 plus2 Lifted.png',         slug: 'lifestyle-tempo-4-2', finderImage: 'image/Products/builds/finder-lifestyle-4-2.jpg' },
     'villager-6':    { name: 'Villager 6',          image: 'image/Products/Villager 6.png',             slug: 'villager-6' },
     'villager-8':    { name: 'Villager 8',          image: 'image/Products/Villager 8.png',             slug: 'villager-8' },
     'transporter-4': { name: 'Transporter 4',       image: 'image/Products/Transporter 4.png',          slug: 'transporter-400' },
@@ -2807,8 +2856,8 @@ function setCategoryFilter(cat) {
 // PRODUCTS_DATA and TEMPO_LINES, so the finder offers what the menus and model pages do.
 // ==========================================
 const FINDER_USES = [
-    { id: 'golfer', label: 'The Golfer', short: 'Golfer', text: 'For regular golf: bag cover, golf accessories and the builds golfers ask for.', image: 'image/Products/builds/golfer-2-scratch-right.jpg' },
-    { id: 'lifestyle', label: 'Lifestyle & Private Use', short: 'Lifestyle', text: 'For family transport and getting around a home, village, estate or farm.', image: 'image/Products/builds/lifestyle-4-signature.jpg' }
+    { id: 'golfer', label: 'The Golfer', short: 'Golfer', text: 'For regular golf: bag cover, golf accessories and the builds golfers ask for.', image: 'image/Products/builds/finder-golfer.jpg' },
+    { id: 'lifestyle', label: 'Lifestyle & Private Use', short: 'Lifestyle', text: 'For family transport and getting around a home, village, estate or farm.', image: 'image/Products/builds/finder-lifestyle.jpg' }
 ];
 
 let finder = { step: 1, use: null, model: null };
@@ -2886,7 +2935,7 @@ function renderFinder() {
         cards = FINDER_USES.map(u => finderCard({ value: u.id, image: u.image, title: u.label, text: u.text }));
     } else if (finder.step === 2) {
         title = 'How many seats do you need?';
-        cards = finderModels(finder.use).map(m => finderCard({ value: m.key, image: m.image, title: m.label, badge: m.badge, detail: m.product.seating }));
+        cards = finderModels(finder.use).map(m => finderCard({ value: m.key, image: m.finderImage || m.image, title: m.label, badge: m.badge, detail: m.product.seating }));
     } else {
         const product = PRODUCTS_DATA.find(p => p.slug === model.slug);
         title = 'Choose your build';
@@ -6235,7 +6284,10 @@ function detailPreviewKey(product) {
     if (!hasLiveColorPreview(key)) return product.slug;
     // A one-color seat on a build photographed with a striped seat shows on its plain-seat photo, when it has one
     const plain = COLOR_PREVIEW[key].plainSeatPhoto;
-    return plain && detailBuild.seat && !getSeatPattern(detailBuild.seat) ? plain : key;
+    if (plain && detailBuild.seat && !getSeatPattern(detailBuild.seat)) return plain;
+    // and a patterned seat on a build photographed with a plain one shows on a photo with real patterned seats, when it has one
+    const pattern = COLOR_PREVIEW[key].patternSeatPhoto;
+    return pattern && detailBuild.seat && getSeatPattern(detailBuild.seat) ? pattern : key;
 }
 
 function updateDetailPreview() {
@@ -6552,7 +6604,8 @@ function buildIncludedItems(product, i, o) {
 function isIncludedNow(g, o) {
     if (g.type === 'fixed') return true;
     // (a build with no lifted wheels, like Golf, keeps its standard wheel when lifted)
-    if (g.id === 'wheels') return (!o.lift || (g.allowed && !g.allowed.up.length)) && g.upgradeFrom != null && g.options.indexOf(o.wheels) > -1 && !parseWheel(o.wheels);
+    // (a build with one wheel, like the Lifestyle 4+2 Essential's 8" steel, lists it too, 2026-11-28)
+    if (g.id === 'wheels') return (!o.lift || (g.allowed && !g.allowed.up.length)) && (g.upgradeFrom != null || g.options.length === 1) && g.options.indexOf(o.wheels) > -1 && !parseWheel(o.wheels);
     return !!g.included;
 }
 

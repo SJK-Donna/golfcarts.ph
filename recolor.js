@@ -71,6 +71,11 @@ const COLOR_PREVIEW = {
         // (the kick panel under the seat front follows the photo's shading, so it fades into the well; 2026-11-26)
         lit: [[[704, 584], [720, 560], [800, 530], [858, 524], [872, 560], [862, 640], [832, 700], [760, 722], [704, 718]],
             [[480, 565], [545, 540], [556, 600], [546, 652], [488, 652]]] },
+    // Lifestyle 2+2 Essential (2026-11-28): its own photo, the cream cart with beige seats and the black roof (paint map by
+    // scripts/build-color-masks.mjs); parts left in the photo's own colours (`look`) stay as photographed. Signature and
+    // Elite keep the Sangria photo above
+    'lifestyle-tempo-2-2:essential': { base: 'image/Products/builds/lifestyle-2-2-essential.jpg', mask: 'image/Products/builds/masks/lifestyle-2-2-essential.png', shade: true,
+        look: { body: 'Cashmere', seat: 'Beige', canopy: '80" GC Canopy' } },
     // Paint maps (scripts/build-color-masks.mjs) of body, seats and roof, shaded like paint. The Transporter photo has
     // no roof, so its canopy choice can't be shown; the Villagers' seats aren't offered in other colours
     // Its seats and grab handles are the same black, so pixels of the seat's colour beside a seat are handle, not seat:
@@ -98,7 +103,7 @@ const STRIPED_SEATS = ['golfer-2-scratch-right', 'golfer-2-2-scratch'];
 const SEAT_TONES = [...STRIPED_SEATS, 'golfer-2-pro', 'golfer-2-2-pro-right'];
 [
     ['golfer-tempo-2:golf', 'golfer-2-golfer'], ['golfer-tempo-2:scratch', 'golfer-2-scratch-right'], ['golfer-tempo-2:pro', 'golfer-2-pro'],
-    ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer'], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch'], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro-right']
+    ['golfer-tempo-2-2:golf', 'golfer-2-2-golfer'], ['golfer-tempo-2-2:scratch', 'golfer-2-2-scratch'], ['golfer-tempo-2-2:pro', 'golfer-2-2-pro']
 ].forEach(([key, photo]) => {
     COLOR_PREVIEW[key] = {
         base: `image/Products/builds/${photo}.jpg`, mask: `image/Products/builds/masks/${photo}.png`, shade: true,
@@ -108,6 +113,19 @@ const SEAT_TONES = [...STRIPED_SEATS, 'golfer-2-pro', 'golfer-2-2-pro-right'];
 // The Scratch 2+2 photo is the Golfer 2+2 cart shot from the same camera, so a one-color seat is the Golfer photo's
 // real standard seat, repainted (`plainSeatFrom`), instead of the Tsunami seat with its stripes smoothed away
 COLOR_PREVIEW['golfer-tempo-2-2:scratch'].plainSeatFrom = 'golfer-tempo-2-2:golf';
+// Golfer 2+2 Pro (2026-11-28): the new Platinum photo with Camello seats; a patterned seat (Tsunami, Black & Gray) is
+// painted on the same cart's photo with striped premium seats (`patternSeatFrom`), tone by tone, so it shows its stripes
+COLOR_PREVIEW['golfer-tempo-2-2:pro-striped'] = {
+    base: 'image/Products/builds/golfer-2-2-pro-striped.jpg', mask: 'image/Products/builds/masks/golfer-2-2-pro-striped.png', shade: true,
+    seatTones: 'image/Products/builds/masks/golfer-2-2-pro-striped-tones.png', stripedSeat: true
+};
+COLOR_PREVIEW['golfer-tempo-2-2:pro'].patternSeatFrom = 'golfer-tempo-2-2:pro-striped';
+// Lifestyle 2+2 Elite (2026-11-28): the same two Platinum photos as the Pro (the sales team's Elite photos are those)
+COLOR_PREVIEW['lifestyle-tempo-2-2:elite'] = COLOR_PREVIEW['golfer-tempo-2-2:pro'];
+// Lifestyle 2+2 Signature (2026-11-28, the sales team's IMAGES/2+2 Signature folder): its model is the Scratch 2+2 cart with
+// striped seats, its plain-seat swatch the Golfer 2+2 cart, both from the same cameras as the Scratch 2+2 photos, so
+// it is previewed exactly as Scratch 2+2
+COLOR_PREVIEW['lifestyle-tempo-2-2:signature'] = COLOR_PREVIEW['golfer-tempo-2-2:scratch'];
 // The Golfer 2 photos are shot from different angles, so the Scratch photo has no plain seat to borrow. A one-color
 // seat shows instead on the Lifestyle 2 Essential photo (`plainSeatPhoto`): the same cart from the same side, with a
 // plain seat. `look` is that photo's own colors (Essential's in app.js), which are left as photographed.
@@ -116,6 +134,12 @@ COLOR_PREVIEW['golfer-tempo-2:scratch-plain'] = {
     look: { body: 'White', seat: 'Beige', canopy: '2 Pass Canopy Beige' }
 };
 COLOR_PREVIEW['golfer-tempo-2:scratch'].plainSeatPhoto = 'golfer-tempo-2:scratch-plain';
+// And the other way (2026-11-28): the Pro photo's seats are plain Camello, with no headrests, and no Golfer 2 photo from
+// its camera has Tsunami seats, so a patterned seat on the Pro shows on the Scratch photo (`patternSeatPhoto`), its real
+// Tsunami seats repainted. `look`: that photo's own colours
+COLOR_PREVIEW['golfer-tempo-2:pro-pattern'] = { ...COLOR_PREVIEW['golfer-tempo-2:scratch'], plainSeatPhoto: undefined,
+    look: { body: 'Cashmere', seat: 'Tsunami Silver Grey & Black', canopy: '2 Pass Canopy Beige' } };
+COLOR_PREVIEW['golfer-tempo-2:pro'].patternSeatPhoto = 'golfer-tempo-2:pro-pattern';
 // Lifestyle 2 (2026-11-16): every build is previewed on the Essential photo, with its paint map, shaded like paint,
 // instead of the red Base+ cut-out picked by colour (whose patterned seats were flat stripes across the seat, the
 // steering wheel and the windshield post, on a background the depth effect showed black). The Signature and Elite
@@ -161,6 +185,34 @@ COLOR_PREVIEW['golfer-tempo-4:pro-plain'] = {
     base: 'image/Products/builds/golfer-4-pro-aligned.jpg', mask: 'image/Products/builds/masks/golfer-4-pro-aligned.png', shade: true
 };
 COLOR_PREVIEW['golfer-tempo-4:scratch'].plainSeatFrom = 'golfer-tempo-4:pro-plain';
+
+// The sales team's IMAGES folder (2026-11-28): per build, the model photo every swatch is painted on, and swatch photos
+// of the other seat types (paint maps by scripts/build-color-masks.mjs). A Tsunami-seat model paints a one-colour seat
+// on its folder's plain-seat photo (`plainSeatFrom`); a plain-seat model paints a patterned seat on its folder's
+// Tsunami photo (`patternSeatFrom`). `look`: the swatches the photo already shows, left as photographed
+const imagesPhoto = (name, look, extra) => ({
+    base: `image/Products/builds/${name}.jpg`, mask: `image/Products/builds/masks/${name}.png`, shade: true, look, ...extra
+});
+const imagesStriped = (name, look, extra) => imagesPhoto(name, look, { seatTones: `image/Products/builds/masks/${name}-tones.png`, stripedSeat: true, ...extra });
+// Lifestyle 4 Elite has no new photo: it keeps its own, and its plain seat stays the old Essential photo's (same camera)
+COLOR_PREVIEW['lifestyle-tempo-4:elite-plain'] = COLOR_PREVIEW['lifestyle-tempo-4:essential'];
+COLOR_PREVIEW['lifestyle-tempo-4:elite'].plainSeatFrom = 'lifestyle-tempo-4:elite-plain';
+Object.assign(COLOR_PREVIEW, {
+    'golfer-tempo-4:golf': imagesPhoto('golfer-4-golf-cream', { body: 'Cashmere', seat: 'Beige' }),
+    'golfer-tempo-4:scratch': imagesStriped('golfer-4-scratch-green', { body: 'Green', seat: 'Tsunami Red' }, { plainSeatFrom: 'golfer-tempo-4:pro' }),
+    // (its orange paint isn't one of the swatches: any body colour is painted)
+    'golfer-tempo-4:pro': imagesPhoto('golfer-4-pro-orange', { seat: 'Camello' }, { patternSeatFrom: 'golfer-tempo-4:pro-striped' }),
+    'golfer-tempo-4:pro-striped': imagesStriped('golfer-4-pro-striped', {}),
+    'lifestyle-tempo-4:essential': imagesPhoto('lifestyle-4-essential-cream', { body: 'Cashmere', seat: 'Beige' }),
+    'lifestyle-tempo-4:signature': imagesStriped('lifestyle-4-signature-green', { body: 'Green', seat: 'Tsunami Silver Red & Black' }, { plainSeatFrom: 'lifestyle-tempo-4:signature-plain' }),
+    'lifestyle-tempo-4:signature-plain': imagesPhoto('lifestyle-4-signature-plain', {}),
+    'lifestyle-tempo-4-2:essential': imagesPhoto('lifestyle-4-2-essential', { body: 'White', seat: 'Beige' }),
+    'lifestyle-tempo-4-2:signature': imagesStriped('lifestyle-4-2-signature', { body: 'Cashmere', seat: 'Tsunami Gray' }, { plainSeatFrom: 'lifestyle-tempo-4-2:signature-plain' }),
+    'lifestyle-tempo-4-2:signature-plain': imagesPhoto('lifestyle-4-2-signature-plain', {}),
+    // (its seats are two-tone: a one-colour choice is painted on the Essential photo's plain seat, same camera)
+    'lifestyle-tempo-4-2:elite': imagesPhoto('lifestyle-4-2-elite', { body: 'Green', seat: 'Black & Gray' }, { patternSeatFrom: 'lifestyle-tempo-4-2:elite-striped', plainSeatFrom: 'lifestyle-tempo-4-2:essential' }),
+    'lifestyle-tempo-4-2:elite-striped': imagesStriped('lifestyle-4-2-elite-striped', {})
+});
 
 const recolorCache = {};
 // The largest side a photo is repainted at: the build photos' full 1600 px

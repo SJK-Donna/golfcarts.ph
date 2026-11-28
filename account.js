@@ -5203,6 +5203,7 @@ function renderQuotationEditor(data) {
             ${qt.status === 'approved' && !prepares ? '<p class="text-sm text-mute">Approved. The sales manager sends it to the customer.</p>' : ''}
             ${(qt.status === 'submitted' || qt.status === 'approved') && prepares ? `<button type="button" onclick="reopenQuotation()" class="link text-sm">Edit (needs approval again)</button>` : ''}
             <button type="button" onclick="previewQuotation()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Preview PDF</button>
+            ${(qt.status === 'approved' || qt.status === 'sent') && can('quotations.prepare') ? '<button type="button" onclick="openQuotationPss()" class="btn btn-outline min-h-[2.75rem] px-5 text-sm">Edit PSS</button>' : ''}
             ${canDeleteQuotation(qt) ? `<button type="button" onclick="deleteQuotation()" class="link text-sm">Delete</button>` : ''}
         </div>
         ${dirty && editable ? '<p class="text-xs text-mute mt-3">Unsaved changes. The PDF preview shows the last saved version.</p>' : ''}
@@ -5332,7 +5333,7 @@ async function quotationPdfFields(qt) {
 // the logo and quotation number, the headline, the customer's cart standing on the golf course (its cut-out from
 // scripts/pdf-carts.mjs), the upgrades on eight white cards, the "More from" bubble and the company line. No date:
 // the picture is made when the quotation is saved, and page 1 carries the date it's sent ---
-const PAGE3_DESIGN = 2; // 2: cleaner cart cut-outs (2026-11-12)
+const PAGE3_DESIGN = 3; // 2: cleaner cart cut-outs (2026-11-12); 3: a plain font, Arial (2026-11-28, the user's choice)
 const PAGE3 = { w: 1240, h: 1754, margin: 70, slate: '#4E6276', ink: '#151714', mute: '#6B6C64', green: '#749E35' };
 
 function loadPageImage(src) {
@@ -5383,8 +5384,8 @@ function pageFit(ctx, img, x, y, w, h, align = 'center') {
 
 async function drawQuotationPage3(qt, offers) {
     const { w: W, h: H, margin: M } = PAGE3;
-    const serif = '"Newsreader Variable", Georgia, serif', sans = '"Instrument Sans Variable", Arial, sans-serif';
-    await Promise.all([`800 64px ${serif}`, `700 36px ${sans}`, `400 20px ${sans}`].map(f => document.fonts.load(f).catch(() => null)));
+    // A plain font throughout (2026-11-28, the user's choice: "normal font like Calibri or Arial")
+    const serif = 'Arial, Helvetica, sans-serif', sans = 'Arial, Helvetica, sans-serif';
     const [bg, logo, cutout, photo, ...offerImages] = await Promise.all([
         loadPageImage('image/pdf/page3-bg.jpg'), loadPageImage('image/GCPH_logo.png'), loadPageImage(cartCutoutPath(qt.photo)),
         loadPageImage(qt.photo), ...offers.map(o => loadPageImage(o.image))]);
@@ -5556,7 +5557,37 @@ function quotationPdfExtra(qt) {
     for (let round = 0; offers.length < PDF_OFFER_LIMIT && groups.some(g => g.items[round]); round++) {
         groups.forEach(g => { if (g.items[round] && offers.length < PDF_OFFER_LIMIT) offers.push(g.items[round]); });
     }
-    return { specs, offers };
+    return { specs, offers, build: quotationBuildSummary(qt, product) };
+}
+
+// Page 1's "Your build" (2026-11-28, the user's choice): the request's rows sorted into its colours, what the build comes
+// with, the upgrades chosen, and the accessories added, with their photos. A row is included when its group is a fixed
+// item still as it comes, or an included choice; the wheels while on a standard (not lifted) wheel. Everything else
+// chosen is an upgrade
+function quotationBuildSummary(qt, product) {
+    const rows = (qt.build_rows || []).filter(r => Array.isArray(r) && r.length === 2 && r[1]).map(r => [String(r[0]), String(r[1])]);
+    const colors = rows.filter(([k]) => ['Body color', 'Seat', 'Canopy'].includes(k));
+    const line = typeof TEMPO_LINES !== 'undefined' && TEMPO_LINES[product.version];
+    const build = (rows.find(([k]) => k === 'Build') || [])[1] || '';
+    const i = line ? line.levels.findIndex(l => l.name === build || l.id === build.toLowerCase()) : -1;
+    const groups = i >= 0 ? getTempoOptionGroups(product, i) : [];
+    const skip = new Set(['Model', 'Build', 'Body color', 'Seat', 'Canopy', 'Accessories', 'Quantity', 'Location', 'Custom cart', 'Photo']);
+    const included = [], upgrades = [];
+    rows.filter(([k]) => !skip.has(k)).forEach(([k, v]) => {
+        const g = groups.find(x => x.title === k);
+        const isIncluded = !g ? false
+            : g.type === 'fixed' ? v === String(g.value)
+            : g.id === 'wheels' ? !/^14|23x10-12|23x10.5-12/i.test(v)
+            : !!g.included;
+        (isIncluded ? included : upgrades).push([k, v]);
+    });
+    // The accessories added in the quote form: the catalog's, found by name in the request's row, with their photos
+    const added = (rows.find(([k]) => k === 'Accessories') || [])[1] || '';
+    const accessories = added && added !== 'None' && typeof ACCESSORY_CATALOG !== 'undefined'
+        ? ACCESSORY_CATALOG.flatMap(g => g.items).filter((a, n, all) => added.includes(a.name) && all.findIndex(b => b.name === a.name) === n)
+            .map(a => ({ name: a.name, image: String(a.image || (findProductRef(a.product) || {}).image || '').replace(/\.webp$/i, '') }))
+        : [];
+    return { colors, included, upgrades, accessories };
 }
 
 async function writeQuotation(change, message) {
@@ -5849,11 +5880,21 @@ async function saveQuotationPss() {
     showToast('PSS saved. PSS.xlsx now has these details.');
 }
 
+// The "Edit PSS" button: to the PSS form below the quotation, its sections opened
+function openQuotationPss() {
+    const section = document.getElementById('pss-section');
+    if (!section) return;
+    section.querySelectorAll('details').forEach(d => { d.open = true; });
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const first = section.querySelector('input, select, textarea');
+    if (first && !first.disabled) first.focus({ preventScroll: true });
+}
+
 function renderQuotationPss(qt) {
     const saved = quotationPss[qt.id];
     if (saved === undefined) return '';
     const head = '<h3 class="type-md text-ink">PSS (Product Specification Sheet)</h3>';
-    if (saved === false) return `<section class="mt-12">${head}<p class="text-sm text-mute mt-2">The PSS form isn't in the database yet: run supabase/add-quotation-pss.sql in the Supabase SQL Editor. PSS.xlsx still downloads, with the blanks to fill in Excel.</p></section>`;
+    if (saved === false) return `<section id="pss-section" class="mt-12">${head}<p class="text-sm text-mute mt-2">The PSS form isn't in the database yet: run supabase/add-quotation-pss.sql in the Supabase SQL Editor. PSS.xlsx still downloads, with the blanks to fill in Excel.</p></section>`;
     const editable = can('quotations.prepare');
     const v = pssValues(qt);
     const field = ([key, label, type]) => {
@@ -5866,7 +5907,7 @@ function renderQuotationPss(qt) {
         return `<div class="field${type === 'long' ? ' sm:col-span-2' : ''}"><label for="${id}">${escapeHtml(label)}</label>${input}</div>`;
     };
     return `
-        <section class="mt-12" aria-labelledby="pss-title">
+        <section id="pss-section" class="mt-12" aria-labelledby="pss-title">
             <h3 id="pss-title" class="type-md text-ink">PSS (Product Specification Sheet)</h3>
             <p class="text-sm text-mute mt-2">${editable ? 'Filled from the quotation; change or add anything here, save, then download PSS.xlsx. It stays editable after the quotation is sent.' : 'Edited by sales.'}${saved && saved.updated_at ? ` Last saved by ${escapeHtml(adminName(saved.updated_by))}, ${formatShortDate(saved.updated_at)}.` : ''}</p>
             ${PSS_FORM.map(([title, fields]) => `

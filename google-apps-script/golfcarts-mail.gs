@@ -356,11 +356,16 @@ function quotationPdf(qt) {
   // Page 3 as one picture, drawn by the admin when the quotation was saved (account.js drawQuotationPage3); without it,
   // the plain page 3 below, with the upgrades' own photos
   const picture = offers.length ? String((qt.pdf_extra || {}).page3 || '') : '';
-  const images = siteImages(['image/GCPH_logo.png', qt.photo, picture].concat(picture ? [] : offers.map(function (o) { return o.image; })));
-  const offerImages = images.slice(3);
+  // Page 1's accessories, with their photos (2026-11-28)
+  const added = (((qt.pdf_extra || {}).build || {}).accessories || []).filter(function (a) { return a && a.name; });
+  const offerPaths = picture ? [] : offers.map(function (o) { return o.image; });
+  const images = siteImages(['image/GCPH_logo.png', qt.photo, picture].concat(offerPaths, added.map(function (a) { return a.image; })));
+  const offerImages = images.slice(3, 3 + offerPaths.length);
+  const addedImages = images.slice(3 + offerPaths.length);
   lastPage3 = !offers.length ? 'none (no upgrades)' : !picture ? 'plain (no page 3 picture saved)'
     : images[2] ? 'picture' : 'plain (the picture could not be fetched: ' + picture + ')';
-  return Utilities.newBlob(quotationHtml(qt, images[0], images[1], offers.map(function (o, i) { return { group: o.group, name: o.name, image: offerImages[i] }; }), images[2]), MimeType.HTML)
+  return Utilities.newBlob(quotationHtml(qt, images[0], images[1], offers.map(function (o, i) { return { group: o.group, name: o.name, image: offerImages[i] }; }), images[2],
+    added.map(function (a, i) { return { name: a.name, image: addedImages[i] }; })), MimeType.HTML)
     .getAs(MimeType.PDF).setName('Quotation ' + qt.reference + '.pdf');
 }
 
@@ -376,7 +381,7 @@ function customerLines(qt, model, build) {
   return { t: t, rows: rows.concat(upgrades) };
 }
 
-function quotationHtml(qt, logo, photo, offers, page3Picture) {
+function quotationHtml(qt, logo, photo, offers, page3Picture, accessories) {
   const c = qt.customer || {};
   const extra = qt.pdf_extra || {};
   const rows = (qt.build_rows || []).filter(function (r) { return Array.isArray(r) && r.length === 2; }).map(function (r) { return [String(r[0]), String(r[1])]; });
@@ -419,6 +424,26 @@ function quotationHtml(qt, logo, photo, offers, page3Picture) {
     return '<tr><td colspan="3" style="' + cell + ';text-align:right' + (strong ? ';font-weight:bold' : '') + '">' + label + '</td><td style="' + cell + ';' + money + (strong ? ';font-weight:bold;font-size:13px' : '') + '">' + value + '</td></tr>';
   };
 
+  // ---- Page 1's "Your build" (2026-11-28, the user's choice): the colours, what the build comes with and the upgrades
+  // chosen side by side, then the accessories added, with their photos. From the admin (account.js quotationBuildSummary);
+  // a quotation saved before has none, and its page 1 is as it was
+  const summary = extra.build || {};
+  const list = function (title, items) {
+    return '<td style="width:50%;vertical-align:top;padding:0 8px 0 0">' + '<div style="font-size:10px;font-weight:bold;letter-spacing:1px;color:' + C.greenText + ';margin-bottom:3px">' + title + '</div>' +
+      (items.length ? items.map(function (r) { return '<div style="font-size:10.5px;line-height:1.45;page-break-inside:avoid"><span style="color:' + C.mute + '">' + esc(r[0]) + ':</span> ' + esc(r[1]) + '</div>'; }).join('')
+        : '<div style="font-size:10.5px;color:' + C.mute + '">None</div>') + '</td>';
+  };
+  const accessoryCards = (accessories || []).length ? '<div style="font-size:10px;font-weight:bold;letter-spacing:1px;color:' + C.greenText + ';margin:10px 0 4px">ACCESSORIES ADDED</div>' +
+    '<table style="width:100%;border-collapse:separate;border-spacing:6px"><tr>' + accessories.map(function (a, i) {
+      return (i && i % 4 === 0 ? '</tr><tr>' : '') + '<td style="width:25%;vertical-align:top;text-align:center;border:1px solid ' + C.line + ';padding:5px;page-break-inside:avoid">' +
+        (a.image ? '<img src="' + a.image + '" alt="" style="height:70px;max-width:100%">' : '') +
+        '<div style="font-size:9.5px;line-height:1.3;margin-top:3px">' + esc(a.name) + '</div></td>';
+    }).join('') + new Array((4 - accessories.length % 4) % 4 + 1).join('<td style="width:25%"></td>') + '</tr></table>' : '';
+  const yourBuild = summary.included || summary.upgrades || (accessories || []).length ? heading('Your build') +
+    ((summary.colors || []).length ? '<p style="font-size:10.5px;margin:0 0 6px">' + summary.colors.map(function (r) { return '<span style="color:' + C.mute + '">' + esc(r[0]) + ':</span> ' + esc(r[1]); }).join(' &nbsp;&middot;&nbsp; ') + '</p>' : '') +
+    '<table style="width:100%;border-collapse:collapse"><tr>' + list('INCLUDED WITH YOUR BUILD', summary.included || []) + list('UPGRADES', summary.upgrades || []) + '</tr></table>' +
+    accessoryCards : '';
+
   // ---- Page 1: the quotation
   const page1 = '<div style="' + PAGE_PAD + '"><table style="width:100%;border-collapse:collapse"><tr><td style="vertical-align:middle">' + logoHtml(44) + '</td>' +
     '<td style="text-align:right;vertical-align:middle"><div style="font-size:24px;font-weight:bold;letter-spacing:1px">QUOTATION</div>' +
@@ -439,6 +464,7 @@ function quotationHtml(qt, logo, photo, offers, page3Picture) {
     }).join('') +
     (t.units !== 1 || priced.rows.length > 1 ? sum('Price per cart', peso(t.perCart)) : '') + (t.units !== 1 ? sum('Number of carts', String(t.units)) : '') +
     (t.discount ? sum('Discount', '- ' + peso(t.discount)) : '') + sum('Net of VAT', peso(t.total / 1.12)) + sum('Add VAT 12%', peso(t.total - t.total / 1.12)) + sum('TOTAL (VAT inclusive)', peso(t.total), true) + '</table>' +
+    yourBuild +
     (qt.notes ? heading('Notes') + '<p style="font-size:11px;line-height:1.5;margin:0;white-space:pre-line">' + esc(qt.notes) + '</p>' : '') +
     (qt.terms ? heading('Terms') + '<p style="font-size:10px;line-height:1.5;margin:0;white-space:pre-line;color:' + C.mute + '">' + esc(qt.terms) + '</p>' : '') +
     footer + '</div>';
@@ -467,7 +493,7 @@ function quotationHtml(qt, logo, photo, offers, page3Picture) {
     : pageBreak +
     '<div style="height:' + PAGE3_HEIGHT + ';overflow:hidden;background:' + SLATE + '">' +
     '<div style="background:' + MIST + ';padding:30px 40px 0">' + pageHead('UPGRADES & ACCESSORIES') + '</div>' +
-    '<div style="background:' + MIST + ';padding:16px 40px 14px"><div style="font-family:Georgia,serif;font-size:30px;font-weight:bold">ELEVATE YOUR RIDE</div>' +
+    '<div style="background:' + MIST + ';padding:16px 40px 14px"><div style="font-family:Arial,Helvetica,sans-serif;font-size:30px;font-weight:bold">ELEVATE YOUR RIDE</div>' +
       '<div style="font-size:15px;font-weight:bold;margin:2px 0 6px">TRANSFORM YOUR CART INTO A MASTERPIECE</div>' +
       '<p style="font-size:11px;line-height:1.5;margin:0;color:' + C.mute + '">Upgrades and accessories that fit your ' + esc(model) + '. Tell us what you need: we\'ll price it and make it yours.</p></div>' +
     '<div style="padding:10px 30px 0"><table style="width:100%;border-collapse:separate;border-spacing:10px">' + offerRows.map(function (row) {

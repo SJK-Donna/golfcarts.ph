@@ -50,6 +50,52 @@ const L4_HANDLES = [
 ];
 // A loose outline round both Lifestyle 4 seats, for the plain beige seats found by colour (2026-11-26)
 const L4_SEATS_LOOSE = [[[236, 470], [258, 425], [310, 410], [470, 408], [560, 405], [700, 410], [800, 402], [870, 410], [905, 450], [918, 520], [915, 620], [925, 700], [900, 735], [700, 740], [560, 715], [440, 712], [320, 700], [240, 640]]];
+// Golfer 4 Golf and Lifestyle 4 Essential (the IMAGES folder's wide cream photos, one camera, padded to 1600 x 1200):
+// the cream body's rear panel, the box under the front seat and the hood; the seats are where the photo differs from its
+// white-seat swatch
+// The IMAGES Golfer 4 / Lifestyle 4 Signature camera: the panel box under the front seat, which the old Scratch 4 body
+// map (carried over) doesn't have; any coloured paint inside it is body
+// (and paint in shadow, as dark as lightness 0.015 but still saturated; the black trim is not)
+// A patch of the box the old map cut out (nothing is there in these photos): all of it is paint
+const G4N_PATCH = { anywhere: true, light: [0, 1], polys: [[[600, 805], [670, 805], [670, 838], [600, 838]]] };
+const G4N_BOX = { anywhere: true, any: [{ sat: [0.08, 1], light: [0.06, 0.96] }, { sat: [0.12, 1], light: [0.005, 0.06] }, { sat: [0, 0.25], light: [0.35, 0.95] }],
+    // (2026-11-28, checked at full size: also its pale crease highlight, and the outline's right side on the box's own edge,
+    // not the black hinge and fender beside it)
+    polys: [[[548, 700], [600, 705], [640, 725], [880, 727], [885, 760], [858, 772], [846, 830], [842, 876], [700, 879], [582, 882], [575, 800], [562, 780], [548, 740]]] };
+// The orange photos (checked at full size): the paint's bright lips and edges the old map stopped short of; only a strong
+// orange counts (the Camello seats are a paler, yellower tan, the tail light isn't in the outline)
+const G4N_ORANGE = { anywhere: true, hue: [10, 7], sat: [0.55, 1], light: [0.06, 0.9], polys: [[[290, 600], [1460, 600], [1460, 900], [290, 900]]] };
+// and their Camello seats, grown over the leather the old map missed (inside the grab handles, the cushion ends)
+const G4N_CAMELLO = { from: 'golfer-4-pro', fromAt: { scale: 0.946, dx: 5.5, dy: 15.5 }, grow: 30, hue: [20, 6], sat: [0.15, 0.9], light: [0.07, 0.88], close: 4, minArea: 400, fillHoles: 250 };
+// (2026-11-28, checked at full size: widened to the lip under the seat fronts, the rear panel's lower corner by the
+// wheel arch, the front box's left edge and bottom, and the hood's lower lip above the bumper; the colour test keeps the
+// black frame, tyres and bumper out)
+const L4C_BODY = [[[298, 630], [392, 630], [402, 670], [470, 688], [592, 690], [592, 762], [527, 762], [524, 797], [405, 798], [396, 772], [372, 724], [340, 697], [298, 697]],
+    [[585, 688], [870, 695], [885, 830], [600, 840]],
+    [[878, 690], [930, 640], [1000, 603], [1150, 598], [1250, 612], [1302, 648], [1306, 748], [1282, 769], [1160, 780], [1050, 756], [900, 735], [868, 735]]];
+const L4C_SEATS = [[[360, 450], [910, 450], [910, 725], [360, 725]]];
+// Lifestyle 4+2 (the IMAGES folder's camera, 1600 x 1200): the band of the body, and a box round both rows of seats and the
+// flip seat (the photos are alike there except for the seats, so the box needs no detail)
+const L42_BODY = [[[150, 620], [300, 605], [480, 625], [560, 680], [880, 640], [950, 585], [1150, 585], [1310, 625], [1435, 700], [1445, 835], [1300, 885], [880, 875], [780, 945], [300, 915], [140, 855]]];
+// Its Tsunami seats' panels, stripe to stripe (inside: panel, each side's outer share: stripe, the rest: bolster), traced on
+// the Signature photo: the four seat backs, the cushions and the flip seat (lightness can't tell the grey panels from the
+// black bolsters: the seats' shading is stronger than the difference)
+const L42_PANELS = [[[332, 452], [455, 448], [458, 600], [338, 600]], [[480, 455], [528, 452], [530, 590], [482, 590]],
+    [[565, 452], [690, 448], [692, 605], [568, 605]], [[748, 458], [855, 455], [855, 605], [750, 605]],
+    [[400, 632], [530, 630], [530, 705], [405, 705]], [[600, 632], [750, 630], [750, 722], [605, 725]], [[752, 628], [925, 625], [925, 718], [755, 720]],
+    [[175, 565], [290, 560], [292, 612], [180, 615]]];
+// The two rear roof posts where they pass the seat backs (the Elite seats are lower than the Signature ones there)
+const L42_POSTS = [[[255, 330], [285, 330], [300, 395], [318, 440], [300, 446], [278, 400], [260, 350]], [[560, 330], [620, 330], [602, 450], [562, 452]]];
+// The lower left of the windshield, where the Signature photos' reflections differ
+const L42_GLASS = [[[885, 370], [960, 370], [960, 440], [885, 440]]];
+const L42_SEATS = [[[140, 370], [935, 370], [935, 800], [140, 800]]];
+// Golfer 2+2 Pro photos (2026-11-28, checked at full size): the old Pro map, carried over, leaves out the grey side panel
+// under the seat cushion (between the seat frame and the beltline), and takes in the red tail light and the clear lower
+// lip of the windshield; the panel is added (grey paint: the frame is darker, the seat a tan), the light and lip cut out
+const G22P_PANEL = { anywhere: true, sat: [0, 0.3], light: [0.25, 0.92], polys: [[[415, 665], [480, 668], [520, 690], [560, 690], [600, 700], [610, 745], [560, 742], [450, 712], [420, 700]]] };
+// (and the panel's crease below it, in shadow)
+const G22P_CREASE = { anywhere: true, sat: [0, 0.3], light: [0.08, 0.92], polys: [[[450, 711], [517, 726], [515, 736], [452, 735]]] };
+const G22P_CUT = [[[330, 682], [356, 682], [356, 732], [330, 732]], [[878, 612], [950, 603], [1005, 600], [1005, 612], [950, 622], [890, 636], [876, 632]]];
 const MASKS = {
     // Essential 4 (the red Elite photo): two-tone seats, black bolsters and grey panels, painted tone by tone so a
     // one-colour seat comes out even. The handles and the windshield post in front of the seats are cut out. One
@@ -239,6 +285,65 @@ const MASKS = {
         canopy: { any: [{ sat: [0, 0.2], light: [0.45, 1] }, { sat: [0, 0.6], light: [0.8, 1] }], keepWhite: true, close: 2, minArea: 300,
             polys: [[[250, 247], [300, 228], [400, 213], [500, 205], [600, 203], [700, 206], [790, 215], [800, 232], [790, 240], [700, 238], [600, 236], [500, 238], [400, 240], [300, 246]]] }
     },
+    // Lifestyle 2+2 Essential (2026-11-28): a cream cart with beige seats and a black roof, the Golfer 2+2 Golfer cart from
+    // the same camera, framed smaller (scripts/align-photos.mjs). Body, seats and roof are that photo's map, carried over
+    'lifestyle-2-2-essential': {
+        body: { from: 'golfer-2-2-golfer', fromAt: { scale: 0.9235, dx: -7.5, dy: 37 }, light: [0, 1], keepWhite: true, close: 1, minArea: 600 },
+        seat: { from: 'golfer-2-2-golfer', fromAt: { scale: 0.9235, dx: -7.5, dy: 37 }, light: [0, 1], keepWhite: true, close: 1, minArea: 400 },
+        canopy: { from: 'golfer-2-2-golfer', fromAt: { scale: 0.9235, dx: -7.5, dy: 37 }, light: [0, 1], keepWhite: true, close: 1, minArea: 600 }
+    },
+    // Golfer 2+2 Pro (2026-11-28): the new Platinum photos, the old Pro photo's cart and camera, framed 16 px / 32 px off
+    // (scripts/align-photos.mjs). The Camello photo takes the old Pro map whole; the striped one (premium seats with
+    // headrests, as the Scratch 2+2's) takes its seats from the Scratch 2+2 map, its stripe tones too (WARPED_TONES)
+    'golfer-2-2-pro': { body: { from: 'golfer-2-2-pro-right', fromAt: { scale: 1.001, dx: 16, dy: 32 }, light: [0, 1], keepWhite: true, close: 1, minArea: 600, also: [G22P_PANEL, G22P_CREASE], exclude: G22P_CUT },
+        // The seats, grown 14 px over the Camello leather and its brown creases (the old map stopped short of the backs' edges)
+        seat: { from: 'golfer-2-2-pro-right', fromAt: { scale: 1.001, dx: 16, dy: 32 }, grow: 14, hue: [25, 22], sat: [0.15, 1], light: [0.06, 0.92], close: 2, minArea: 400 }, canopy: { from: 'golfer-2-2-pro-right', fromAt: { scale: 1.001, dx: 16, dy: 32 }, light: [0, 1], keepWhite: true, close: 1, minArea: 600 } },
+    'golfer-2-2-pro-striped': { body: { from: 'golfer-2-2-pro-right', fromAt: { scale: 1.001, dx: 16, dy: 32 }, light: [0, 1], keepWhite: true, close: 1, minArea: 600, also: [G22P_PANEL, G22P_CREASE], exclude: G22P_CUT }, seat: { from: 'golfer-2-2-scratch', fromAt: { scale: 1.0415, dx: 30, dy: 55.5 }, light: [0, 1], keepWhite: true, close: 1, minArea: 400 }, canopy: { from: 'golfer-2-2-pro-right', fromAt: { scale: 1.001, dx: 16, dy: 32 }, light: [0, 1], keepWhite: true, close: 1, minArea: 600 } },
+    // The sales team's IMAGES folder (2026-11-28), one folder per build: the model photo each swatch is painted on, and
+    // swatch photos of the other seat types. Each new photo is lined up with an older one of the same cart and camera
+    // (scripts/align-photos.mjs) and takes its map; photos of one folder line up to the pixel with each other.
+    // Golfer 4: the Golf photo (cream, bag cover) is framed smaller than the old one; the Scratch (green, Tsunami Red)
+    // and Pro (orange Camello; and orange with Tsunami seats) photos are one camera, as the Lifestyle 4 Signature ones
+    'golfer-4-golf-cream': { body: { hue: [40, 30], sat: [0.03, 0.5], light: [0.42, 0.98], keepWhite: true, close: 3, minArea: 600, fillHoles: 400, polys: L4C_BODY },
+        seat: { diffWith: 'golfer-4-golf-white', light: [0, 1], keepWhite: true, close: 3, minArea: 400, polys: L4C_SEATS } },
+    'golfer-4-scratch-green': { body: { from: 'golfer-4-scratch', fromAt: { scale: 0.946, dx: 0, dy: 14.5 }, light: [0, 1], keepWhite: true, close: 3, minArea: 400, fillHoles: 300, also: [G4N_PATCH, G4N_BOX] }, seat: { from: 'golfer-4-scratch', fromAt: { scale: 0.946, dx: 0, dy: 14.5 }, light: [0, 1], keepWhite: true, close: 1, minArea: 400 } },
+    'golfer-4-pro-orange': { body: { from: 'golfer-4-pro', fromAt: { scale: 0.946, dx: 5.5, dy: 15.5 }, light: [0, 1], keepWhite: true, close: 3, minArea: 400, fillHoles: 300, also: [G4N_PATCH, G4N_BOX, G4N_ORANGE] }, seat: G4N_CAMELLO },
+    'golfer-4-pro-striped': { body: { from: 'golfer-4-pro', fromAt: { scale: 0.946, dx: 5.5, dy: 15.5 }, light: [0, 1], keepWhite: true, close: 3, minArea: 400, fillHoles: 300, also: [G4N_PATCH, G4N_BOX, G4N_ORANGE] }, seat: { from: 'golfer-4-scratch', fromAt: { scale: 0.946, dx: 0, dy: 14.5 }, light: [0, 1], keepWhite: true, close: 1, minArea: 400 } },
+    // Lifestyle 4: Essential (cream, beige seats; framed smaller), Signature (green, Tsunami Red; and cream with plain seats)
+    'lifestyle-4-essential-cream': { body: { hue: [40, 30], sat: [0.03, 0.5], light: [0.42, 0.98], keepWhite: true, close: 3, minArea: 600, fillHoles: 400, polys: L4C_BODY },
+        seat: { diffWith: 'lifestyle-4-essential-white', light: [0, 1], keepWhite: true, close: 3, minArea: 400, polys: L4C_SEATS } },
+    'lifestyle-4-signature-green': { body: { from: 'golfer-4-scratch', fromAt: { scale: 0.946, dx: 0, dy: 14.5 }, light: [0, 1], keepWhite: true, close: 3, minArea: 400, fillHoles: 300, also: [G4N_PATCH, G4N_BOX] }, seat: { from: 'golfer-4-scratch', fromAt: { scale: 0.946, dx: 0, dy: 14.5 }, light: [0, 1], keepWhite: true, close: 1, minArea: 400 } },
+    'lifestyle-4-signature-plain': { body: { from: 'golfer-4-scratch', fromAt: { scale: 0.946, dx: 0, dy: 14.5 }, light: [0, 1], keepWhite: true, close: 3, minArea: 400, fillHoles: 300, also: [G4N_PATCH, G4N_BOX] }, seat: { from: 'lifestyle-4-signature', fromAt: { scale: 0.9455, dx: 27.5, dy: 14 }, light: [0, 1], keepWhite: true, close: 1, minArea: 400 } },
+    // Lifestyle 4+2: a new camera, no older map. The Elite photo's green body is found by colour; the others take it.
+    // Seats: where a photo differs from one with other seats (diffWith; the body, found first, is never seat), or the
+    // Essential's beige seats by colour. The Tsunami seats (black bolsters, grey panels, silver stripes) get tone maps
+    'lifestyle-4-2-elite': {
+        // (and the paint in deep shadow, darker still but as green: checked at full size on a white body)
+        body: { any: [{ hue: [158, 22], sat: [0.12, 1], light: [0.03, 0.92] }, { hue: [158, 30], sat: [0.25, 1], light: [0.008, 0.03] }], close: 4, minArea: 600, fillHoles: 300, polys: L42_BODY },
+        // Its seats (checked at full size): the Signature photo's larger Tsunami seats, less the backdrop where those have
+        // headrests and the two rear roof posts in front of the seat backs (the difference from the Essential photo also
+        // caught the posts and frame, and missed the black side bolsters). The Signature map is read from disk, so after a
+        // change to it run this one again
+        seat: { from: 'lifestyle-4-2-signature', light: [0, 0.92], close: 2, minArea: 400, fillHoles: 150, exclude: L42_POSTS },
+    },
+    'lifestyle-4-2-essential': {
+        body: { from: 'lifestyle-4-2-elite', light: [0, 1], keepWhite: true, close: 1, minArea: 600 },
+        seat: { hue: [30, 18], sat: [0.12, 0.8], light: [0.15, 0.92], close: 2, minArea: 100, polys: L42_SEATS }
+    },
+    'lifestyle-4-2-signature-plain': {
+        body: { from: 'lifestyle-4-2-elite', light: [0, 1], keepWhite: true, close: 1, minArea: 600 },
+        seat: { from: 'lifestyle-4-2-essential', light: [0, 1], keepWhite: true, close: 1, minArea: 100 }
+    },
+    'lifestyle-4-2-signature': {
+        body: { from: 'lifestyle-4-2-elite', light: [0, 1], keepWhite: true, close: 1, minArea: 600 },
+        seat: { diffWith: 'lifestyle-4-2-signature-plain', light: [0, 1], keepWhite: true, close: 2, minArea: 400, polys: L42_SEATS, exclude: L42_GLASS },
+        tones: { panels: L42_PANELS, stripeFrac: 0.14 }
+    },
+    'lifestyle-4-2-elite-striped': {
+        body: { from: 'lifestyle-4-2-elite', light: [0, 1], keepWhite: true, close: 1, minArea: 600 },
+        seat: { from: 'lifestyle-4-2-signature', light: [0, 1], keepWhite: true, close: 1, minArea: 400 },
+        tones: { panels: L42_PANELS, stripeFrac: 0.14 }
+    },
     // Golfer 4 Golfer: black paint, as black as the bumpers and trim, so it can't be found by colour. Its body is the
     // Scratch photo's (2026-11-16): the same cart and camera in red paint, found exactly by colour, badge and all; this
     // photo is framed a little larger (scripts/align-photos.mjs). Traced by hand before, it left black along the
@@ -331,7 +436,7 @@ function partMap(spec, px, w, h, cutOut, fromMap) {
     const addAlso = list => { for (const a of list) for (let i = 0; i < w * h; i++) {
         const x = i % w, y = (i / w) | 0;
         if (m[i] || px[i].cutOut || !a.polys.some(p => inside(x, y, p))) continue;
-        if (fromMap && !fromMap[i]) continue;
+        if (fromMap && !fromMap[i] && !a.anywhere) continue; // anywhere: also outside the carried-over map
         if ((a.any || [a]).some(t => passes(t, px[i]))) m[i] = 1;
     } };
     if (spec.also) addAlso(spec.also.filter(a => !a.late));
@@ -363,7 +468,21 @@ for (const [name, spec] of Object.entries(MASKS)) {
     // `from`: a part outlined by another photo's map (shot from the same camera), grown by `grow` px. `fromAt`
     // (2026-11-16): where that photo is framed differently, { scale, dx, dy } takes this photo's pixel (x, y) to the
     // other's ((x - w/2) / scale + w/2 - dx, (y - h/2) / scale + h/2 - dy), measured by scripts/align-photos.mjs
+    // `diffWith` (2026-11-28): the pixels where this photo differs from another of the same cart and camera (a photo
+    // with other seats: the seats are where the two differ), by more than `diffMin` (RGB distance, default 40). With
+    // `from` as well, only where both hold (the photos may differ in more than the seats: frame, posts)
     const fromMap = async (part, c) => {
+        let diff = null;
+        if (part.diffWith) {
+            const raw = await sharp(path.join(root, 'image/Products/builds', `${part.diffWith}.jpg`)).resize(w, h).removeAlpha().raw().toBuffer();
+            diff = new Uint8Array(w * h);
+            const min = part.diffMin || 40;
+            for (let i = 0; i < w * h; i++) {
+                const d = Math.hypot(data[i * 3] - raw[i * 3], data[i * 3 + 1] - raw[i * 3 + 1], data[i * 3 + 2] - raw[i * 3 + 2]);
+                diff[i] = d > min ? 1 : 0;
+            }
+            if (!part.from) return part.grow ? morph(diff, w, h, part.grow, true) : diff;
+        }
         if (!part.from) return null;
         const file = path.join(root, 'image/Products/builds/masks', `${part.from}.png`);
         let m = new Uint8Array(w * h);
@@ -378,7 +497,9 @@ for (const [name, spec] of Object.entries(MASKS)) {
             const raw = await sharp(file).resize(w, h).removeAlpha().raw().toBuffer();
             for (let i = 0; i < w * h; i++) m[i] = raw[i * 3 + c] > 127 ? 1 : 0;
         }
-        return part.grow ? morph(m, w, h, part.grow, true) : m;
+        if (part.grow) m = morph(m, w, h, part.grow, true);
+        if (diff) for (let i = 0; i < w * h; i++) m[i] = m[i] && diff[i] ? 1 : 0;
+        return m;
     };
     const parts = [];
     for (const [c, p] of ['body', 'seat', 'canopy'].entries()) parts.push(spec[p] ? partMap(spec[p], px, w, h, !!alpha, await fromMap(spec[p], c)) : null);
@@ -487,7 +608,9 @@ for (const [name, a] of Object.entries(ALIGNED)) {
 // seat doesn't cover (its edges) takes the nearest one's. recolor.js paints a patterned seat tone by tone with it
 // The Scratch photo was replaced 2026-11-18 (framed differently); the measurements are for the old one, whose stripe
 // map is kept as golfer-2-scratch-right-old-tones.png (tones)
-const WARPED_TONES = { 'lifestyle-2-essential': { from: 'golfer-2-scratch-right', tones: 'golfer-2-scratch-right-old', scale: 0.97, dx: -136, dy: 36.4 } };
+const WARPED_TONES = { 'lifestyle-2-essential': { from: 'golfer-2-scratch-right', tones: 'golfer-2-scratch-right-old', scale: 0.97, dx: -136, dy: 36.4 },
+    'golfer-2-2-pro-striped': { from: 'golfer-2-2-scratch', scale: 1.0415, dx: 30, dy: 55.5 },
+    ...Object.fromEntries(['golfer-4-scratch-green', 'golfer-4-pro-striped', 'lifestyle-4-signature-green'].map(n => [n, { from: 'golfer-4-scratch', scale: 0.946, dx: 0, dy: 14.5 }])) };
 for (const [name, t] of Object.entries(WARPED_TONES)) {
     if (only && name !== only && t.from !== only) continue;
     const masks = path.join(root, 'image/Products/builds/masks');
